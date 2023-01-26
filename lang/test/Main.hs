@@ -6,37 +6,57 @@ import Effen
 import qualified Data.Map as Map
 
 example1 :: Comp
-example1 = App (Fun "x" (If (Var "x") (return' False) (return' True))) (BoolV True)
+example1 = app' (Fun $ \[x] -> If x (return' False) (return' True)) [BoolV True]
 
 example2 :: Comp
-example2 = Do "x" (app' plus' (5::Int)) (app' (Var "x") (6::Int))
+example2 = Do (app' plus' [IntV 5]) $ \x -> app' x [IntV 6]
 
 example3 :: Comp
 example3 =
-  Handle (Han (Handler
-    ("x", Return $ Pair (Var "x") (StringV ""))
-    (Map.fromList [
-      ("write", OpHandle "s" "k" $
-        Do "pair" $ app' (Var "k") ()           $
-        Do "x"    $ app' fst' (Var "pair")      $
-        Do "acc"  $ app' snd' (Var "pair")      $
-        Do "s'"   $ app' concat' (Var "s")      $
-        Do "s''"  $ app' (Var "s'") (Var "acc") $
-        Return    $ Pair (Var "x") (Var "acc")
+  handle'
+    (\x -> return' (x, ""))
+    [
+      ("write", \[s] k ->
+        Do (app' k [Unit])      $ \pair ->
+        Do (app' fst' [pair]) $ \x    ->
+        Do (app' snd' [pair]) $ \acc  ->
+        Do (app' concat' [s, acc]) $ \s'   ->
+        return' $ pair' x s'
       )
-    ])
-  ))
-  (Do "_" (op' "write" "hello")
-  (Do "_" (op' "write" "world")
-    (Return Unit)
-  ))
+    ]
+    (
+      Do (op' "write" ["hello"]) $ \_ ->
+      Do (op' "write" [" "])     $ \_ ->
+      Do (op' "write" ["world"]) $ \_ ->
+      return' ()
+    )
+
+-- Okay so it's annoying that this works, because it's not algebraic, also not higher-order though
+localHandler :: Comp -> Comp
+localHandler = handle'
+    return'
+    [
+      ("local", \[s] k ->
+        handle'
+        return'
+        [("read", \_ k -> Do (app' k [s]) return')]
+        (Do (app' k [Unit]) return')
+      )
+    ]
+
+local1 :: Comp
+local1 = localHandler $
+    Do (op' "local" [StringV "scope1"]) $ \_ ->
+    Do (op' "read" [Unit]) $ \x ->
+    return' x
 
 testEval :: Test.HUnit.Test
 testEval = TestList $ map mkEvalTest
   [
     ("Not", BoolV False, example1),
     ("BuiltInPlus", IntV 11, example2),
-    ("Write", Pair Unit (StringV "helloworld"), example3)
+    ("Write", Pair Unit (StringV "hello world"), example3),
+    ("Local1", StringV "scope1", local1)
   ]
   where
     mkEvalTest (name, val, comp) = 
@@ -44,22 +64,8 @@ testEval = TestList $ map mkEvalTest
         (name ++ " failed")
         val (eval comp)
 
-testSubstitute :: Test.HUnit.Test
-testSubstitute = TestList $ map mkSubstituteTest
-  [
-    ("x", BoolV False, 
-      Return (Var "x"),
-      Return (BoolV False)),
-    ("x", BoolV True,
-      If (Var "x") (Return (BoolV True)) (Return (BoolV False)),
-      If (BoolV True) (Return (BoolV True)) (Return (BoolV False)))
-  ]
-  where
-    mkSubstituteTest (var, val, comp, exp) = TestCase $ assertEqual "" exp (substitute1 var val comp)
-
 main :: IO ()
 main = defaultMain $ hUnitTestToTests $ TestList
   [
-    testEval,
-    testSubstitute
+    testEval
   ]

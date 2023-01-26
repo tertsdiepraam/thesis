@@ -1,0 +1,245 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\newcommand\kw[1]{\mathbf{#1}}
+\newcommand\IS{\mathbin{\;::=\;}}
+\newcommand\OR{\mathbin{\;|\;}}
+
+% Syntax
+\newcommand\true{\kw{true}}
+\newcommand\false{\kw{false}}
+\newcommand\bool{\kw{bool}}
+\newcommand\fun[2]{\kw{fun}\; #1 \mapsto #2}
+\newcommand\Handler[1]{\kw{handler}\;\{\\&\qquad#1\\\}}
+\newcommand\Effect[2]{\kw{effect}\;#1\;\{\\&\qquad#2\\\}}
+\newcommand\HEffect[2]{\kw{heffect}\;#1\;\{\\&\qquad#2\\\}}
+\newcommand\Elaboration[1]{\kw{elaboration}\;\{\\&\qquad#1\\\}}
+\newcommand\handler[1]{\kw{handler}\;\{#1\}}
+\newcommand\return[1]{\kw{return}\; #1}
+\newcommand\op[4]{#1\;(#2; #3)\mapsto#4}
+\newcommand\opcall[4]{#1\,(#2; #3. #4)}
+\newcommand\seq[3]{\kw{do}\;#1 \gets #2\;\kw{in}\;#3}
+\newcommand\cond[3]{\kw{if}\;#1\;\kw{then}\;#2\;\kw{else}\;#3}
+\newcommand\handle[2]{\kw{with}\;#1\;\kw{handle}\;#2}
+\newcommand\elaborate[2]{\kw{with}\;#1\;\kw{elaborate}\;#2}
+\newcommand\comp[1]{\underline{#1}}
+
+\newcommand\judgement[2]{\dfrac{\phantom{|}#1}{#2}}
+\newcommand\step{\rightsquigarrow}
+
+\begin{document}
+
+This is the definition for the language for this thesis project.
+It's based on "An Introduction to Algebraic Effects and Handlers" by
+Matija Pretnar. We're making the following changes:
+
+\begin{itemize}
+\item Functions and operations can take multiple values. This is because partial
+    application is cumbersome with effects. Some operations (e.g. catch) also
+    require multiple arguments.
+\item We add a global scope of functions and effects.
+\item We add type information to global declarations so they can be type-checked
+    separately.
+\item We add more value types (integers, tuples, strings, unit) to make more
+    interesting effects.
+\item We add elaborations for higher-order effects. 
+\item The entrypoint of the program is the main function in the global scope.
+\end{itemize}
+
+\section{Syntax definition}
+
+\begin{align*}
+    \text{program}\;p
+        \IS & d \; p
+\end{align*}
+\begin{align*}
+    \text{value}\;v
+        \IS & x & \text{variable} \\
+        \OR & () & \text{unit} \\
+        \OR & \true \OR \false & \text{boolean}\\
+        \OR & n & \text{integer} \\
+        \OR & s & \text{string} \\
+        \OR & h & \text{handler} \\
+        \OR & e & \text{elaboration} \\
+        \OR & \fun{(x_1, \dots, x_n)}{c} & \text{anonymous function} \\
+        \OR & (v_1, \dots, v_n) & \text{tuple} \\
+\end{align*}
+\begin{align*}
+    \text{handler}\;h
+        \IS & \Handler{
+        \begin{aligned}[t]
+            &\return{x} \;\mapsto\; c_r,\\
+            &\op{op_1}{x_1, \dots, x_n}{k}{c_1},\\
+            &\dots,\\
+            &\op{op_m}{x_1, \dots, x_n}{k}{c_m},\;\\
+        \end{aligned}
+    }\\
+\end{align*}
+\begin{align*}
+    \text{elaboration}\;e
+        \IS & \Elaboration{
+        \begin{aligned}[t]
+            &\op{op_1}{c_1, \dots, c_n}{k}{c_1},\\
+            &\dots,\\
+            &\op{op_m}{c_1, \dots, c_n}{k}{c_m},\;\\
+        \end{aligned}
+    }
+\end{align*}
+\begin{align*}
+    \text{computation}\;c
+        \IS & \return{v} & \text{pure value}\\
+        \OR & \opcall{op}{v_1, \dots, v_n}{y}{c} & \text{algebraic operation}\\
+        \OR & \opcall{op_h}{c_1, \dots, c_n}{y}{c} & \text{higher-order operation}\\
+        \OR & \seq{x}{c_1}{c_2} & \text{sequencing} \\
+        \OR & \cond{v}{c_1}{c_2} & \text{conditional} \\
+        \OR & v(v_1,\dots, v_n) & \text{function application}\\
+        \OR & \handle{v}{c} & \text{handle algebraic effects}\\
+        \OR & \elaborate{v}{c} & \text{elaborate higher-order effects}
+\end{align*}
+\begin{align*}
+    \text{declaration}\;d
+        \IS & \fun{ident(x_1, T_1,\dots, x_n: T_n): T_c}{c} \\
+        \OR & \Effect{ident}{
+                \begin{aligned}[t]
+                & op_1(A_1, \dots, A_m): A_{c_1},\\
+                & \dots \\
+                & op_n(A_1, \dots, A_m): A_{c_n},\\
+                \end{aligned}
+              }\\
+        \OR & \HEffect{ident}{
+                \begin{aligned}[t]
+                & op_1(\comp{C}_1, \dots, \comp{C}_{m_1}): \comp{C}_1,\\
+                & \dots, \\
+                & op_n(\comp{C}_1, \dots, \comp{C}_{m_n}): \comp{C}_n,\\
+                \end{aligned}
+              }
+\end{align*}
+
+\begin{align*}
+    \text{value type}\; A, B
+        \IS & \kw{bool} \\
+        \OR & \kw{str} \\
+        \OR & \kw{int} \\
+        \OR & () \\
+        \OR & (A_1, \dots, A_n) \\
+        \OR & A \to \comp{C} \\
+        \OR & \comp{C} \Rightarrow \comp{D} \\
+    \\
+    \text{computation type}\; \comp{C}, \comp{D}
+        \IS & A ! \{ op_1, \dots, op_n \}
+\end{align*}
+
+\newpage
+
+\section{Semantics}
+
+\begin{gather*}
+    \judgement{c_1\step c_1'}{\seq{x}{c_1}{c_2} \step \seq{x}{c_1'}{c_2}}\\
+    \judgement{}{\seq{x}{\return{v}}{c} \step c[v/x]}\\
+    \judgement{}{\seq{x}{
+        \opcall{op}{v_1,\dots,v_n}{y}{c_{op}}}{c_{ret}}
+        \step \opcall{op}{v_1,\dots,v_n}{y}{\seq{x}{c_{op}}{c_{ret}}}}\\
+        \judgement{}{\seq{x}{
+            \opcall{op_h}{c_1,\dots,c_n}{y}{c_{op}}}{c_{ret}}
+            \step \opcall{op_h}{c_1,\dots,c_n}{y}{\seq{x}{c_{op}}{c_{ret}}}}
+\end{gather*}
+\begin{gather*}
+    \judgement{}{\cond{\true}{c_1}{c_2} \step c_1}\\
+    \judgement{}{\cond{\false}{c_1}{c_2} \step c_2}\\
+    \judgement{}{(\fun{(x_1,\dots,x_n)}{c}) (v_1,\dots,v_n) \step c[v_1/x_1,\dots,v_n/x_n]}
+\end{gather*}
+\begin{gather*}
+    \judgement{c \step c'}{\handle{h}{c} \step \handle{h}{c'}}\\
+    \judgement{}{\handle{h}{(\return{v})} \step c_r[v/x] }\\
+    \judgement{}{\handle{h}{\opcall{op_i}{v_1,\dots,v_n}{y}{c}}\step c_i[v_1/x_1,\dots,v_n/x_n, (\fun{y}{\handle{h}{c}})/k]}\\
+    \judgement{}{\handle{h}\opcall{op}{v_1,\dots,v_n}{y}{c} \step \opcall{op}{v_1,\dots,v_n}{y}{\handle{h}{c}}}\\
+    \judgement{
+        c_i' = \handle{h}{c_i}
+    }{
+        \handle{h}\opcall{op_h}{c_1,\dots,c_n}{y}{c} \step \opcall{op_h}{c_1,\dots,c_n}{y}{\handle{h}{c}}
+    }
+\end{gather*}
+\begin{gather*}
+    \judgement{c \step c'}{\elaborate{e}{c} \step \elaborate{e}{c'}}\\
+    \judgement{}{\elaborate{e}{(\return{v})} \step \return{v} }\\
+    \judgement{
+        c_i' = \elaborate{e}{c_i}
+    }{\elaborate{e}{\opcall{op_i}{c_1,\dots,c_n}{y}{c}} \step c_i[c_1'/x_1,\dots,c_n'/x_n, (\fun{y}{\elaborate{e}{c}})/k]}\\
+    \judgement{}{\elaborate{e}\opcall{op}{c_1,\dots,c_n}{y}{c} \step \opcall{op}{c_1,\dots,c_n}{y}{\elaborate{e}{c}}}
+\end{gather*}
+
+\section{Typing judgements}
+
+\begin{gather*}
+    \judgement{(x: A) \in \Gamma}{\Gamma \vdash x : A}
+    \qquad
+    \judgement{}{\Gamma \vdash \true : \bool}
+    \qquad
+    \judgement{}{\Gamma \vdash \false : \bool}
+    \\\\
+    \judgement{\Gamma, x: A \vdash c : \comp{C}}{\Gamma \vdash \fun{x}{c} : A \to \comp{C}}
+    \\\\
+    \judgement{
+        \begin{gathered}
+            \Gamma, x : A \vdash c_r : B ! \Delta' \\
+            \big[
+                (op_i : A_i \to B_i) \in \Sigma
+                \quad\;
+                \Gamma, x : A_i, k : B_i \to B ! \Delta' \vdash c_i : B ! \Delta'
+            \big]_{1\leq i \leq n}\\
+            \Delta \backslash \{op_i \}_{1\leq i \leq n} \subseteq \Delta'
+        \end{gathered}
+    }{
+        \Gamma \vdash \handler{ \return{x} \mapsto c_2, \op{op_1}{x}{k}{c_1}, \dots, \op{op_n}{x}{k}{c_n}}: A!\Delta \Rightarrow B!\Delta'
+    }
+    \\\\
+    \judgement{\Gamma \vdash v : A}{\Gamma \vdash \return{v} : A!\Delta}
+    \\\\
+    \judgement{
+        (op: A_{op} \to B_{op})\in\Sigma
+        \quad
+        \Gamma \vdash v: A_{op}
+        \quad
+        \Gamma, y: B_{op} \vdash c : A!\Delta
+        \quad
+        op \in \Delta
+    }{
+        \Gamma \vdash \opcall{op}{v}{y}{c} : A!\Delta
+    }
+    \\\\
+    \judgement{
+        \Gamma \vdash c_1: A!\Delta
+        \quad
+        \Gamma x: A \vdash c_2 : B!\Delta
+    }{
+        \Gamma \vdash \seq{x}{c_1}{c_2} : B!\Delta
+    }
+    \qquad
+    \judgement{
+        \Gamma \vdash : A \to \comp{C}
+        \quad
+        \Gamma \vdash v_2 : A
+    }{
+        \Gamma \vdash v_1 v_2 : \comp{C}
+    }
+    \\\\
+    \judgement{
+        \Gamma \vdash v: \bool
+        \quad
+        \Gamma \vdash c_1 : \comp{C}
+        \quad
+        \Gamma \vdash c_2 : \comp{C}
+    }{
+        \Gamma \vdash \cond{v}{c_1}{c_2} : \comp{C}
+    }
+    \qquad
+    \judgement{
+        \Gamma \vdash : \comp{C} \Rightarrow \comp{D}
+        \quad
+        \Gamma \vdash c : \comp{C}
+    }{
+        \Gamma \vdash \handle{v}{c} : \comp{D}
+    }
+\end{gather*}
+\end{document}
