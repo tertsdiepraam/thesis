@@ -23,7 +23,7 @@ parseString :: String -> Text -> IO ()
 parseString name s = do
   let result = parse program name s
   case result of
-    Left err -> print err
+    Left bundle -> putStr (errorBundlePretty bundle)
     Right decs -> putStrLn $ pretty decs
 
 -- WHITESPACE & BASICS
@@ -49,8 +49,8 @@ braces = between (symbol "{") (symbol "}")
 -- angles :: Parser a -> Parser a
 -- angles = between (symbol "<") (symbol ">")
 
--- brackets :: Parser a -> Parser a
--- brackets = between (symbol "[") (symbol "]")
+brackets :: Parser a -> Parser a
+brackets = between (symbol "[") (symbol "]")
 
 semicolon :: Parser Text
 semicolon = symbol ";"
@@ -96,32 +96,32 @@ mod' = do
 -- DECLARATIONS
 declaration :: Parser Declaration
 declaration =
-  try import'
-    <|> try decFun
-    <|> try decType
-    <|> try decEffect
-    <|> try handler
+  import'
+    <|> decFun
+    <|> decType
+    <|> decEffect
+    <|> handler
     <|> elaboration
 
 import' :: Parser Declaration
-import' = Import <$> (symbol "import" >> ident)
+import' = Import <$> (try (symbol "import") >> ident)
 
 decFun :: Parser Declaration
-decFun = symbol "fun" >> Fun <$> function
+decFun = try (symbol "fun") >> Fun <$> function
 
 function :: Parser Function
 function = do
-  (name, p, ret) <- funSig
-  Function name p ret <$> braces do'
+  (name, tps, p, ret) <- funSig
+  Function name tps p ret <$> braces do'
 
 handler :: Parser Declaration
 handler = do
-  name <- symbol "handler" >> ident
+  name <- try (symbol "handler") >> ident
   Handler name <$> braces (many function)
 
 elaboration :: Parser Declaration
 elaboration = do
-  name <- symbol "elaboration" >> ident
+  name <- try (symbol "elaboration") >> ident
   Elaboration name <$> braces (many function)
 
 algEff :: Parser EffectType
@@ -135,37 +135,39 @@ effect = try highEff <|> algEff
 
 decEffect :: Parser Declaration
 decEffect = do
-  name <- symbol "effect" >> effect
+  name <- try (symbol "effect") >> effect
   Effect name <$> braces (many operation)
 
 operation :: Parser Operation
 operation = do
-  (name, p, ret) <- funSig
-  return $ Operation name p ret
+  (name, tps, p, ret) <- funSig
+  return $ Operation name tps p ret
 
 -- Function signature
-funSig :: Parser (Ident, [(Ident, Type)], Type)
+funSig :: Parser (Ident, TypeParams, [(Ident, Type)], Type)
 funSig = do
   name <- ident
-  p <- params
+  tps <- typeParams
+  p <- functionParams
   ret <- colon >> type'
-  return (name, p, ret)
+  return (name, tps, p, ret)
 
 decType :: Parser Declaration
 decType = do
-  name <- symbol "type" >> ident
-  TypeDec name <$> braces (many constructor)
+  name <- try (symbol "type") >> ident
+  tps <- typeParams
+  TypeDec name tps <$> braces (many constructor)
 
-params :: Parser [(Ident, Type)]
-params = parens (param `sepBy` comma)
+functionParams :: Parser [(Ident, Type)]
+functionParams = parens (functionParam `sepBy` comma)
 
 constructor :: Parser Constructor
 constructor = do
   name <- ident
-  Constructor name <$> params
+  Constructor name <$> parens (type' `sepBy` comma)
 
-param :: Parser (Ident, Type)
-param = do
+functionParam :: Parser (Ident, Type)
+functionParam = do
   name <- ident
   typ <- colon >> type'
   return (name, typ)
@@ -211,7 +213,10 @@ matchArm = do
   e <- symbol "=>" >> expr
   return $ MatchArm (Pattern name p) e
 
--- -- Literals
+typeParams :: Parser TypeParams
+typeParams = TypeParams <$> option [] (try (brackets (ident `sepBy` comma)))
+
+-- Literals
 lit :: Parser Lit
 lit = (Int <$> intLiteral) <|> (String <$> stringLiteral) <|> (Bool <$> boolLiteral)
 

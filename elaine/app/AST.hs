@@ -10,13 +10,13 @@ data Module = Mod String [Declaration]
 data Declaration
   = Import Ident
   | Fun Function
-  | TypeDec Ident [Constructor]
+  | TypeDec Ident TypeParams [Constructor]
   | Effect EffectType [Operation]
   | Handler Ident [Function]
   | Elaboration Ident [Function]
   deriving (Show)
 
-data Function = Function Ident [(Ident, Type)] Type Do
+data Function = Function Ident TypeParams [(Ident, Type)] Type Do
   deriving (Show)
 
 data EffectType = Algebraic Ident | HigherOrder Ident
@@ -27,13 +27,16 @@ data Do
   | Pure Expr
   deriving (Show)
 
-data Constructor = Constructor Ident [(Ident, Type)]
+data Constructor = Constructor Ident [Type]
   deriving (Show)
 
-data Operation = Operation Ident [(Ident, Type)] Type
+data Operation = Operation Ident TypeParams [(Ident, Type)] Type
   deriving (Show)
 
 data Let = Let Ident Expr
+  deriving (Show)
+
+newtype TypeParams = TypeParams [Ident]
   deriving (Show)
 
 data Lit

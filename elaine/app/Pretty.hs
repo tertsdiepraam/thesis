@@ -20,8 +20,8 @@ concatBlock as = pBlock $ concatMap pretty as
 instance Pretty Declaration where
   pretty (Import s) = "import " ++ s ++ "\n"
   pretty (Fun function) = "fun " ++ pretty function
-  pretty (TypeDec name constructors) =
-    "type " ++ name ++ " " ++ concatBlock constructors ++ "\n"
+  pretty (TypeDec name params constructors) =
+    "type " ++ name ++ pretty params ++ " " ++ concatBlock constructors ++ "\n"
   pretty (Effect name operations) =
     "effect " ++ pretty name ++ " " ++ concatBlock operations ++ "\n"
   pretty (Handler name functions) =
@@ -29,9 +29,14 @@ instance Pretty Declaration where
   pretty (Elaboration name functions) =
     "elaboration " ++ name ++ " " ++ concatBlock functions ++ "\n"
 
+instance Pretty TypeParams where
+  pretty (TypeParams []) = ""
+  pretty (TypeParams ids) = "[" ++ intercalate ", " ids ++ "]"
+
 instance Pretty Function where
-  pretty (Function name params ret do') =
+  pretty (Function name typeParams params ret do') =
     name
+      ++ pretty typeParams
       ++ "("
       ++ pParams params
       ++ ") : "
@@ -77,10 +82,10 @@ instance Pretty Program where
   pretty mods = intercalate "\n" $ map pretty mods
 
 instance Pretty Constructor where
-  pretty (Constructor name params) = name ++ "(" ++ pParams params ++ ")\n"
+  pretty (Constructor name params) = name ++ "(" ++ intercalate ", " (map pretty params) ++ ")\n"
 
 instance Pretty Operation where
-  pretty (Operation name params ret) = name ++ "(" ++ pParams params ++ "): " ++ pretty ret ++ "\n"
+  pretty (Operation name tps params ret) = name ++ pretty tps ++ "(" ++ pParams params ++ "): " ++ pretty ret ++ "\n"
 
 instance Pretty Type where
   pretty (Type name effs) = unwords $ name : map pretty effs
