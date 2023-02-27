@@ -1,0 +1,21 @@
+mod main {
+    type Maybe[a] {
+        Just(a)
+        Nothing()
+    }
+
+    effect !Abort {
+        abort(): a
+    }
+
+    # Question: What if the handler requires e.g. !State?
+    # TODO: Handler types
+    handler abort: a !Abort -> Maybe[a] {
+        return(x: a) {
+            Just(x)
+        }
+        abort(): a {
+            Nothing
+        }
+    }
+}

@@ -44,7 +44,7 @@ mod Main {
     # Defining an algebraic data type with a list of constructors
     # The parentheses are always required
     type Foo {
-        Bar(a: A)
+        Bar(A)
         Baz()
     }
 

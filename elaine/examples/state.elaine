@@ -1,0 +1,30 @@
+mod main {
+    effect !State {
+        get(): int
+        set(n: int): () 
+    }
+
+    # TODO in parser for this to work:
+    #  - Function expressions
+    #  - Handler types
+    #  - Function types
+    handler state: a !State -> int -> a {
+        return(x: a) {
+            fn(s: int): int {
+                x
+            }
+        }
+        get(): int -> a {
+            fn(s: int): a {
+                f <- resume(s)
+                f(s)
+            }
+        }
+        set(n: int): () {
+            fn(s: int): int -> a {
+                f <- resume(())
+                f(n)
+            }
+        }
+    }
+}
