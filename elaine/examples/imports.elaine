@@ -1,0 +1,64 @@
+# Each file consists of a flat list of modules
+# A main module, containing a main function is required and is the
+# entry point.
+# Also comments start with `#`
+
+mod Foo {
+
+}
+
+mod Bar {
+
+}
+
+mod Main {
+    # Importing all items from other modules
+    import Foo
+    import Bar
+
+    # Defining an algebraic effect
+    effect !Foo {}
+
+    # Defining a higher-order effect
+    # I like this syntax because it reflects the use of the type
+    effect !!Bar {
+        Aaaa(b: B): C
+        Dddd(e: E): F
+    }
+
+    handler blabla {
+        op(a: A) : A {
+            resume(a)
+        }
+    }
+
+    elaboration bob {
+        # Types with effects are the type followed by effects (marked with
+        # ! or !! for algebraic and higher-order, respectively).
+        # Operations are used like functions
+        flop(b: B): C !A {
+            resume(b)
+        }
+    }
+
+    # Defining an algebraic data type with a list of constructors
+    # The parentheses are always required
+    type Foo {
+        Bar(a: A)
+        Baz()
+    }
+
+    # Function definition
+    fun foo(a: A) : B !State !!Except {
+        # Nested expressions are not allowed (at the moment)
+        # Arguments must be vars or literals
+        x <- foo(bar);
+        y <- baz(bob);
+        y <- match hello {
+            One(x) => x
+            Two(b) => b
+        };
+        a <- "\"hello\nworld";
+        x
+    }
+}

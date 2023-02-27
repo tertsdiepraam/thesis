@@ -1,0 +1,30 @@
+cabal-version:      3.4
+name:               elaine
+version:            0.1.0.0
+-- synopsis:
+-- description:
+license:            MIT
+license-file:       LICENSE
+author:             Terts Diepraam
+maintainer:         terts.diepraam@gmail.com
+-- copyright:
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+-- extra-source-files:
+
+common warnings
+    ghc-options: -Wall
+    default-extensions:  FlexibleInstances
+
+executable elaine
+    import:           warnings
+    main-is:          Main.hs
+    other-modules:    AST
+                      Parse
+                      Pretty
+    build-depends:    base ^>=4.16.3.0,
+                      megaparsec ^>=9.3.0,
+                      ghc-prim == 0.8.0,
+                      text == 1.2.5.0
+    hs-source-dirs:   app
+    default-language: Haskell2010
