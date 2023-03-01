@@ -9,17 +9,26 @@ data Module = Mod String [Declaration]
 
 data Declaration
   = Import Ident
-  | Fun Function
-  | TypeDec Ident TypeParams [Constructor]
-  | Effect EffectType [Operation]
-  | Handler Ident [Function]
-  | Elaboration Ident [Function]
+  | DecFun Function
+  | DecType Ident TypeParams [Constructor]
+  | DecEffect Effect [Operation]
+  | DecHandler Handler
+  | DecElaboration Elaboration
   deriving (Show)
 
-data Function = Function Ident TypeParams [(Ident, Type)] Type Do
+data Elaboration = Elaboration Ident HandlerType [Function]
   deriving (Show)
 
-data EffectType = Algebraic Ident | HigherOrder Ident
+data Handler = Handler Ident HandlerType [Function]
+  deriving (Show)
+
+data Function = Function Ident FunSig Do
+  deriving (Show)
+
+data FunSig = FunSig TypeParams [(Ident, ComputationType)] ComputationType
+  deriving (Show)
+
+data Effect = Algebraic Ident | HigherOrder Ident
   deriving (Show)
 
 data Do
@@ -27,10 +36,10 @@ data Do
   | Pure Expr
   deriving (Show)
 
-data Constructor = Constructor Ident [Type]
+data Constructor = Constructor Ident [ComputationType]
   deriving (Show)
 
-data Operation = Operation Ident TypeParams [(Ident, Type)] Type
+data Operation = Operation Ident FunSig
   deriving (Show)
 
 data Let = Let Ident Expr
@@ -65,5 +74,16 @@ data MatchArm = MatchArm Pattern Expr
 data Pattern = Pattern Ident [Ident]
   deriving (Show)
 
-data Type = Type Ident [EffectType]
+data ComputationType = ComputationType ValueType [Effect]
+  deriving (Show)
+
+data ValueType
+  = TypeName Ident TypeParams
+  | ValueFunctionType FunctionType
+  deriving (Show)
+
+data FunctionType = FunctionType TypeParams [ComputationType] ComputationType
+  deriving (Show)
+
+data HandlerType = HandlerType ComputationType ComputationType
   deriving (Show)

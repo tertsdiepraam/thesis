@@ -26,7 +26,7 @@ parseString name s = do
     Left bundle -> putStr (errorBundlePretty bundle)
     Right decs -> putStrLn $ pretty decs
 
--- WHITESPACE & BASICS
+-- WHITESPACE & BASIC SYMBOLS
 space' :: Parser ()
 space' =
   L.space
@@ -39,6 +39,9 @@ lexeme = L.lexeme space'
 
 symbol :: Text -> Parser Text
 symbol = L.symbol space'
+
+keyword :: Text -> Parser Text
+keyword kw = lexeme (string kw <* notFollowedBy (oneOf otherIdentChars))
 
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
@@ -63,7 +66,7 @@ colon = symbol ":"
 
 -- dot = symbol "."
 
-
+-- IDENTIFIERS
 -- Identifiers can contain numbers, but may not start with them
 -- They may contain underscores, lowercase letters and uppercase letters
 -- They may end with ticks, like in Haskell
@@ -104,78 +107,84 @@ declaration =
     <|> elaboration
 
 import' :: Parser Declaration
-import' = Import <$> (try (symbol "import") >> ident)
+import' = Import <$> (try (keyword "import") >> ident)
 
 decFun :: Parser Declaration
-decFun = try (symbol "fun") >> Fun <$> function
+decFun = try (keyword "fn") >> DecFun <$> function
 
 function :: Parser Function
-function = do
-  (name, tps, p, ret) <- funSig
-  Function name tps p ret <$> braces do'
+function = Function <$> ident <*> funSig <*> braces do'
 
 handler :: Parser Declaration
 handler = do
-  name <- try (symbol "handler") >> ident
-  Handler name <$> braces (many function)
+  name <- try (keyword "handler") >> ident
+  t <- colon >> handlerType
+  DecHandler . Handler name t <$> braces (many function)
 
 elaboration :: Parser Declaration
 elaboration = do
-  name <- try (symbol "elaboration") >> ident
-  Elaboration name <$> braces (many function)
+  name <- try (keyword "elaboration") >> ident
+  t <- colon >> handlerType
+  DecElaboration . Elaboration name t <$> braces (many function)
 
-algEff :: Parser EffectType
+algEff :: Parser Effect
 algEff = Algebraic <$> (symbol "!" >> ident)
 
-highEff :: Parser EffectType
+highEff :: Parser Effect
 highEff = HigherOrder <$> (symbol "!!" >> ident)
 
-effect :: Parser EffectType
+effect :: Parser Effect
 effect = try highEff <|> algEff
 
 decEffect :: Parser Declaration
 decEffect = do
-  name <- try (symbol "effect") >> effect
-  Effect name <$> braces (many operation)
+  name <- try (keyword "effect") >> effect
+  DecEffect name <$> braces (many operation)
 
 operation :: Parser Operation
-operation = do
-  (name, tps, p, ret) <- funSig
-  return $ Operation name tps p ret
+operation = Operation <$> ident <*> funSig
 
 -- Function signature
-funSig :: Parser (Ident, TypeParams, [(Ident, Type)], Type)
-funSig = do
-  name <- ident
-  tps <- typeParams
-  p <- functionParams
-  ret <- colon >> type'
-  return (name, tps, p, ret)
+funSig :: Parser FunSig
+funSig = FunSig <$> typeParams <*> functionParams <*> (colon >> computationType)
 
 decType :: Parser Declaration
 decType = do
-  name <- try (symbol "type") >> ident
+  name <- try (keyword "type") >> ident
   tps <- typeParams
-  TypeDec name tps <$> braces (many constructor)
+  DecType name tps <$> braces (many constructor)
 
-functionParams :: Parser [(Ident, Type)]
+functionParams :: Parser [(Ident, ComputationType)]
 functionParams = parens (functionParam `sepBy` comma)
 
 constructor :: Parser Constructor
-constructor = do
-  name <- ident
-  Constructor name <$> parens (type' `sepBy` comma)
+constructor = Constructor <$> ident <*> parens (computationType `sepBy` comma)
 
-functionParam :: Parser (Ident, Type)
+functionParam :: Parser (Ident, ComputationType)
 functionParam = do
   name <- ident
-  typ <- colon >> type'
+  typ <- colon >> computationType
   return (name, typ)
 
-type' :: Parser Type
-type' = do
-  name <- ident
-  Type name <$> many effect
+computationType :: Parser ComputationType
+computationType = do
+  v <- valueType
+  ComputationType v <$> effectRow
+
+valueType :: Parser ValueType
+valueType =
+  try (parens valueType)
+    <|> (ValueFunctionType <$> functionType)
+    <|> TypeName <$> ident <*> typeParams
+
+functionType :: Parser FunctionType
+functionType = try (keyword "fn") >> FunctionType <$> typeParams <*> parens (computationType `sepBy` comma) <*> (colon >> computationType)
+
+handlerType :: Parser HandlerType
+handlerType = HandlerType <$> try computationType <*> (try (symbol "->") >> computationType)
+
+effectRow :: Parser [Effect]
+effectRow = many effect
 
 -- STATEMENTS
 do' :: Parser Do
@@ -203,7 +212,7 @@ app = do
 
 match' :: Parser Expr
 match' = do
-  l <- symbol "match" >> leaf
+  l <- keyword "match" >> leaf
   Match l <$> braces (many matchArm)
 
 matchArm :: Parser MatchArm
@@ -227,4 +236,4 @@ stringLiteral :: Parser String
 stringLiteral = char '\"' *> manyTill L.charLiteral (char '\"')
 
 boolLiteral :: Parser Bool
-boolLiteral = True <$ symbol "true" <|> False <$ symbol "false"
+boolLiteral = True <$ keyword "true" <|> False <$ keyword "false"

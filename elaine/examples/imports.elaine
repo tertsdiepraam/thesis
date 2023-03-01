@@ -13,6 +13,11 @@ mod Bar {
 
 mod Main {
     # Importing all items from other modules
+    # All declarations are independent of order, they are collected before
+    # type checking.
+    # All declarations start with a keyword. This has the advantage that we
+    # don't need to end lines with semicolons.
+    # TODO: Keywords are invalid identifiers
     import Foo
     import Bar
 
@@ -26,13 +31,26 @@ mod Main {
         Dddd(e: E): F
     }
 
-    handler blabla {
+    handler blabla: a !Abort -> Maybe[a] {
         op(a: A) : A {
             resume(a)
         }
     }
 
-    elaboration bob {
+    # # TODO: Defining constant values at the global scope
+    # const a: int = 5
+
+    # TODO
+    # # We can define aliases of types & effect rows
+    # # However, we can't define handlers/elaborations for aliases
+    # # They are syntactic only
+    # alias !IO = !Read !Write !FileSystem
+    # alias !!Foo = !!Bar
+
+    # # Type aliases can have an effect row
+    # alias A = B !Read
+
+    elaboration bob: a !!Hello -> a !Foo {
         # Types with effects are the type followed by effects (marked with
         # ! or !! for algebraic and higher-order, respectively).
         # Operations are used like functions
@@ -49,7 +67,7 @@ mod Main {
     }
 
     # Function definition
-    fun foo(a: A) : B !State !!Except {
+    fn foo(a: A) : B !State !!Except {
         # Nested expressions are not allowed (at the moment)
         # Arguments must be vars or literals
         x <- foo(bar);
@@ -60,5 +78,15 @@ mod Main {
         };
         a <- "\"hello\nworld";
         x
+    }
+
+    fn higher_order(f: fn(a): b !A, x: a): b !A {
+        f(x)
+    }
+
+    # This might not be necessary to support, but we can still parse it to give a good error
+    fn higher_order2(f: (fn(a): b !A) !B, x: a): b !A !B {
+        f' <- f;
+        f'(x)
     }
 }

@@ -11,7 +11,7 @@ pBlock :: String -> String
 pBlock "" = "{}"
 pBlock s = "{\n" ++ indent s ++ "}"
 
-pParams :: [(Ident, Type)] -> String
+pParams :: [(Ident, ComputationType)] -> String
 pParams = intercalate ", " . map (\(name, typ) -> name ++ ": " ++ pretty typ)
 
 concatBlock :: Pretty a => [a] -> String
@@ -19,32 +19,37 @@ concatBlock as = pBlock $ concatMap pretty as
 
 instance Pretty Declaration where
   pretty (Import s) = "import " ++ s ++ "\n"
-  pretty (Fun function) = "fun " ++ pretty function
-  pretty (TypeDec name params constructors) =
+  pretty (DecFun function) = "fn " ++ pretty function
+  pretty (DecType name params constructors) =
     "type " ++ name ++ pretty params ++ " " ++ concatBlock constructors ++ "\n"
-  pretty (Effect name operations) =
+  pretty (DecEffect name operations) =
     "effect " ++ pretty name ++ " " ++ concatBlock operations ++ "\n"
-  pretty (Handler name functions) =
-    "handler " ++ name ++ " " ++ concatBlock functions ++ "\n"
-  pretty (Elaboration name functions) =
-    "elaboration " ++ name ++ " " ++ concatBlock functions ++ "\n"
+  pretty (DecHandler (Handler name handlerType functions)) =
+    "handler " ++ name ++ ": " ++ pretty handlerType ++ " " ++ concatBlock functions ++ "\n"
+  pretty (DecElaboration (Elaboration name handlerType functions)) =
+    "elaboration " ++ name ++ ": " ++ pretty handlerType ++ " " ++ concatBlock functions ++ "\n"
 
 instance Pretty TypeParams where
   pretty (TypeParams []) = ""
   pretty (TypeParams ids) = "[" ++ intercalate ", " ids ++ "]"
 
 instance Pretty Function where
-  pretty (Function name typeParams params ret do') =
+  pretty (Function name sig do') =
     name
-      ++ pretty typeParams
+      ++ pretty sig
+      ++ " "
+      ++ pBlock (pretty do')
+      ++ "\n"
+
+instance Pretty FunSig where
+  pretty (FunSig typeParams params ret) =
+    pretty typeParams
       ++ "("
       ++ pParams params
       ++ ") : "
       ++ pretty ret
-      ++ " "
-      ++ pBlock (pretty do')
 
-instance Pretty EffectType where
+instance Pretty Effect where
   pretty (HigherOrder name) = "!!" ++ name
   pretty (Algebraic name) = "!" ++ name
 
@@ -85,10 +90,23 @@ instance Pretty Constructor where
   pretty (Constructor name params) = name ++ "(" ++ intercalate ", " (map pretty params) ++ ")\n"
 
 instance Pretty Operation where
-  pretty (Operation name tps params ret) = name ++ pretty tps ++ "(" ++ pParams params ++ "): " ++ pretty ret ++ "\n"
+  pretty (Operation name funSig) = name ++ pretty funSig ++ "\n"
 
-instance Pretty Type where
-  pretty (Type name effs) = unwords $ name : map pretty effs
+instance Pretty ComputationType where
+  -- In the case where we have a function type and effects, we need to disambiguate that the effects belong
+  -- outside the function with parentheses
+  pretty (ComputationType a@(ValueFunctionType _) (x:xs)) = unwords $ ("(" ++ pretty a ++ ")") : map pretty (x:xs)
+  pretty (ComputationType valueType effs) = unwords $ pretty valueType : map pretty effs
+
+instance Pretty ValueType where
+  pretty (TypeName name typeParams) = name ++ pretty typeParams
+  pretty (ValueFunctionType sig) = pretty sig
+
+instance Pretty HandlerType where
+  pretty (HandlerType from to) = pretty from ++ " -> " ++ pretty to
+
+instance Pretty FunctionType where
+  pretty (FunctionType typeParams params ret) = "fn" ++ pretty typeParams ++ "(" ++ intercalate ", " (map pretty params) ++ "): " ++ pretty ret
 
 indent :: String -> String
 indent s = concatMap (\s' -> "  " ++ s' ++ "\n") $ lines s
