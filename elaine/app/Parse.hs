@@ -14,17 +14,17 @@ import qualified Text.Megaparsec.Char.Lexer as L
 
 type Parser = Parsec Void Text
 
-parseFile :: FilePath -> IO ()
+parseFile :: FilePath -> IO (Maybe Program)
 parseFile filename = do
   contents <- readFile filename
   parseString filename (pack contents)
 
-parseString :: String -> Text -> IO ()
+parseString :: String -> Text -> IO (Maybe Program)
 parseString name s = do
   let result = parse program name s
   case result of
-    Left bundle -> putStr (errorBundlePretty bundle)
-    Right decs -> putStrLn $ pretty decs
+    Left bundle -> putStr (errorBundlePretty bundle) >> return Nothing
+    Right decs -> return $ Just decs
 
 -- WHITESPACE & BASIC SYMBOLS
 space' :: Parser ()

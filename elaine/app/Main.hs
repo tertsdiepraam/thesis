@@ -1,7 +1,9 @@
 module Main where
 import System.Environment
+import Text.Pretty.Simple (pPrint)
 
 import Parse
+import Pretty
 
 main :: IO ()
 main = do
@@ -12,6 +14,21 @@ main = do
         _ -> error "Invalid usage" 
 
 exec :: String -> String -> IO ()
-exec cmd file = case cmd of 
-    "parse" -> parseFile file
+exec cmd file = case cmd of
+    "parse" -> printPretty file
+    "ast" -> printAST file
     _ -> error ("Unknown command: " ++ cmd)
+
+printPretty :: FilePath -> IO ()
+printPretty filename = do
+  x <- parseFile filename
+  case x of
+    Just a -> putStrLn $ pretty a
+    Nothing -> return ()
+
+printAST :: FilePath -> IO ()
+printAST filename = do
+  x <- parseFile filename
+  case x of
+    Just a -> pPrint a
+    Nothing -> return ()
