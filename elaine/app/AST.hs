@@ -16,7 +16,7 @@ data Declaration
   | DecElaboration Elaboration
   deriving (Show)
 
-data Elaboration = Elaboration Ident HandlerType [Function]
+data Elaboration = Elaboration Ident HandlerType [HandleFunction]
   deriving (Show)
 
 data Handler = Handler Ident HandlerType HandleReturn [HandleFunction]
@@ -59,6 +59,7 @@ data Lit
   | String String
   | Bool Bool
   | Fn Function
+  | Computation Do
   | Unit
   deriving (Show)
 
@@ -67,6 +68,8 @@ data Leaf = Lit Lit | Var Ident
 
 data Expr
   = App Ident [Leaf]
+  | Handle Leaf Leaf
+  | Elab Leaf
   | Match Leaf [MatchArm]
   | Leaf Leaf
   deriving (Show)

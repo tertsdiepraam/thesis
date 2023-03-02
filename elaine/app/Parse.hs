@@ -5,9 +5,9 @@
 module Parse (parseFile, parseString) where
 
 import AST
+import Data.Either
 import Data.Text hiding (empty)
 import Data.Void
-import Data.Either
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
@@ -113,40 +113,38 @@ decFun :: Parser Declaration
 decFun = try (keyword "fn") >> DecFun <$> ident <*> function
 
 function :: Parser Function
-function = Function <$> funSig <*> braces do'
+function = Function <$> funSig <*> doBlock
 
 handler :: Parser Declaration
 handler = do
   name <- try (keyword "handler") >> ident
   t <- colon >> handlerType
   arms <- braces (many handlerArm)
-  let
-    (rets, functions) = partitionEithers arms
-    ret = case rets of
-      [r] -> r
-      [] -> error "Handler must have a return arm"
-      _ -> error "Handler cannot have multiple return arms"
+  let (rets, functions) = partitionEithers arms
+      ret = case rets of
+        [r] -> r
+        [] -> error "Handler must have a return arm"
+        _ -> error "Handler cannot have multiple return arms"
   return $ DecHandler $ Handler name t ret functions
 
 handlerArm :: Parser (Either HandleReturn HandleFunction)
 handlerArm =
   (Left <$> handleReturn)
     <|> (Right <$> handleFunction)
-  
+
 handleReturn :: Parser HandleReturn
 handleReturn = do
   var <- try (keyword "return") >> parens ident
-  body <- braces do'
-  return $ HandleReturn var body
+  HandleReturn var <$> doBlock
 
 handleFunction :: Parser HandleFunction
-handleFunction = HandleFunction <$> operation <*> braces do'
+handleFunction = HandleFunction <$> operation <*> doBlock
 
 elaboration :: Parser Declaration
 elaboration = do
   name <- try (keyword "elaboration") >> ident
   t <- colon >> handlerType
-  DecElaboration . Elaboration name t <$> braces (many function)
+  DecElaboration . Elaboration name t <$> braces (many handleFunction)
 
 algEff :: Parser Effect
 algEff = Algebraic <$> (symbol "!" >> ident)
@@ -210,21 +208,35 @@ effectRow = many effect
 
 -- STATEMENTS
 do' :: Parser Do
-do' = try let' <|> (Pure <$> expr)
+do' = let' <|> (Pure <$> expr)
+
+doBlock :: Parser Do
+doBlock = braces do'
 
 let' :: Parser Do
 let' = do
-  x <- ident
-  e <- symbol "<-" >> expr
+  x <- try (ident <* symbol "<-")
+  e <- expr
   d <- semicolon >> do'
   return $ Do (Let x e) d
 
 -- EXPRESSIONS
 expr :: Parser Expr
-expr = try app <|> try match' <|> (Leaf <$> leaf)
+expr =
+  try app
+    <|> try match'
+    <|> try handle
+    <|> try elab
+    <|> (Leaf <$> leaf)
 
 leaf :: Parser Leaf
 leaf = (Lit <$> lit) <|> (Var <$> ident)
+
+handle :: Parser Expr
+handle = keyword "handle" >> Handle <$> leaf <*> leaf
+
+elab :: Parser Expr
+elab = keyword "elab" >> Elab <$> leaf
 
 app :: Parser Expr
 app = do
@@ -255,6 +267,7 @@ lit =
     <|> (Bool <$> boolLiteral)
     <|> (Unit <$ unitLiteral)
     <|> (Fn <$> functionLiteral)
+    <|> (Computation <$> doBlock)
 
 intLiteral :: Parser Int
 intLiteral = lexeme L.decimal

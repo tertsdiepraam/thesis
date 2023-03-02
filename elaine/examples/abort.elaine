@@ -11,7 +11,7 @@ mod main {
     # Question: What if the handler requires e.g. !State?
     # TODO: Handler types
     handler abort: a !Abort -> Maybe[a] {
-        return(x: a) {
+        return(x) {
             Just(x)
         }
         abort(): a {

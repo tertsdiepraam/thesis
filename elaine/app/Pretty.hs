@@ -32,7 +32,7 @@ instance Pretty Declaration where
       ++ " "
       ++ pBlock (unlines (pretty ret : map pretty functions))
   pretty (DecElaboration (Elaboration name handlerType functions)) =
-    "elaboration " ++ name ++ ": " ++ pretty handlerType ++ " " ++ concatBlock functions ++ "\n"
+    "elaboration " ++ name ++ ": " ++ pretty handlerType ++ " " ++ concatBlock functions
 
 instance Pretty HandleReturn where
   pretty (HandleReturn var body) =
@@ -51,7 +51,6 @@ instance Pretty Function where
     pretty sig
       ++ " "
       ++ pBlock (pretty do')
-      ++ "\n"
 
 instance Pretty FunSig where
   pretty (FunSig typeParams params ret) =
@@ -77,6 +76,8 @@ instance Pretty Let where
 
 instance Pretty Expr where
   pretty (App name params) = name ++ "(" ++ intercalate ", " (map pretty params) ++ ")"
+  pretty (Handle handler computation) = "handle " ++ pretty handler ++ " " ++ pretty computation
+  pretty (Elab computation) = "elab " ++ pretty computation
   pretty (Leaf leaf) = pretty leaf
   pretty (Match e arms) = "match " ++ pretty e ++ " " ++ concatBlock arms
 
@@ -89,10 +90,11 @@ instance Pretty Lit where
   pretty (String s) = show s
   pretty (Bool b) = if b then "true" else "false"
   pretty (Fn f) = "fn" ++ pretty f
+  pretty (Computation d) = pBlock $ pretty d
   pretty Unit = "()"
 
 instance Pretty MatchArm where
-  pretty (MatchArm pat e) = pretty pat ++ " => " ++ pretty e ++ "\n"
+  pretty (MatchArm pat e) = pretty pat ++ " => " ++ pretty e
 
 instance Pretty Pattern where
   pretty (Pattern name vars) = name ++ "(" ++ intercalate ", " vars ++ ")"
@@ -101,7 +103,7 @@ instance Pretty Program where
   pretty mods = intercalate "\n" $ map pretty mods
 
 instance Pretty Constructor where
-  pretty (Constructor name params) = name ++ "(" ++ intercalate ", " (map pretty params) ++ ")\n"
+  pretty (Constructor name params) = name ++ "(" ++ intercalate ", " (map pretty params) ++ ")"
 
 instance Pretty Operation where
   pretty (Operation name funSig) = name ++ pretty funSig

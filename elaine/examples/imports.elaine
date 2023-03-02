@@ -31,9 +31,12 @@ mod Main {
         Dddd(e: E): F
     }
 
-    handler blabla: a !Abort -> Maybe[a] {
-        op(a: A) : A {
-            resume(a)
+    handler abort: a !Abort -> Maybe[a] {
+        return(x) {
+            Just(x)
+        }
+        abort() : a {
+            Nothing
         }
     }
 

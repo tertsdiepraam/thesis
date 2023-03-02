@@ -4,7 +4,9 @@ mod Main {
     }
 
     handler baz: a !Baz -> a {
-        ...
+        return(x) {
+            x
+        }
     }
 
     effect !!Foo {
@@ -17,7 +19,7 @@ mod Main {
         bar(a: () !a): () {
             b <- handle baz {
                 a
-            }
+            };
             b
         }
     }
