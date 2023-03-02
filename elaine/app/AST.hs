@@ -9,7 +9,7 @@ data Module = Mod String [Declaration]
 
 data Declaration
   = Import Ident
-  | DecFun Function
+  | DecFun Ident Function
   | DecType Ident TypeParams [Constructor]
   | DecEffect Effect [Operation]
   | DecHandler Handler
@@ -19,10 +19,13 @@ data Declaration
 data Elaboration = Elaboration Ident HandlerType [Function]
   deriving (Show)
 
-data Handler = Handler Ident HandlerType [Function]
+data Handler = Handler Ident HandlerType HandleReturn [HandleFunction]
   deriving (Show)
 
-data Function = Function Ident FunSig Do
+data HandleReturn = HandleReturn Ident Do
+  deriving (Show)
+
+data Function = Function FunSig Do
   deriving (Show)
 
 data FunSig = FunSig TypeParams [(Ident, ComputationType)] ComputationType
@@ -42,6 +45,9 @@ data Constructor = Constructor Ident [ComputationType]
 data Operation = Operation Ident FunSig
   deriving (Show)
 
+data HandleFunction = HandleFunction Operation Do
+  deriving (Show)
+
 data Let = Let Ident Expr
   deriving (Show)
 
@@ -52,6 +58,8 @@ data Lit
   = Int Int
   | String String
   | Bool Bool
+  | Fn Function
+  | Unit
   deriving (Show)
 
 data Leaf = Lit Lit | Var Ident
@@ -80,6 +88,7 @@ data ComputationType = ComputationType ValueType [Effect]
 data ValueType
   = TypeName Ident TypeParams
   | ValueFunctionType FunctionType
+  | UnitType
   deriving (Show)
 
 data FunctionType = FunctionType TypeParams [ComputationType] ComputationType

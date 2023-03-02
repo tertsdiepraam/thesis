@@ -7,7 +7,7 @@ module Parse (parseFile, parseString) where
 import AST
 import Data.Text hiding (empty)
 import Data.Void
-import Pretty (pretty)
+import Data.Either
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
@@ -110,16 +110,37 @@ import' :: Parser Declaration
 import' = Import <$> (try (keyword "import") >> ident)
 
 decFun :: Parser Declaration
-decFun = try (keyword "fn") >> DecFun <$> function
+decFun = try (keyword "fn") >> DecFun <$> ident <*> function
 
 function :: Parser Function
-function = Function <$> ident <*> funSig <*> braces do'
+function = Function <$> funSig <*> braces do'
 
 handler :: Parser Declaration
 handler = do
   name <- try (keyword "handler") >> ident
   t <- colon >> handlerType
-  DecHandler . Handler name t <$> braces (many function)
+  arms <- braces (many handlerArm)
+  let
+    (rets, functions) = partitionEithers arms
+    ret = case rets of
+      [r] -> r
+      [] -> error "Handler must have a return arm"
+      _ -> error "Handler cannot have multiple return arms"
+  return $ DecHandler $ Handler name t ret functions
+
+handlerArm :: Parser (Either HandleReturn HandleFunction)
+handlerArm =
+  (Left <$> handleReturn)
+    <|> (Right <$> handleFunction)
+  
+handleReturn :: Parser HandleReturn
+handleReturn = do
+  var <- try (keyword "return") >> parens ident
+  body <- braces do'
+  return $ HandleReturn var body
+
+handleFunction :: Parser HandleFunction
+handleFunction = HandleFunction <$> operation <*> braces do'
 
 elaboration :: Parser Declaration
 elaboration = do
@@ -173,7 +194,8 @@ computationType = do
 
 valueType :: Parser ValueType
 valueType =
-  try (parens valueType)
+  try (parens $ pure UnitType)
+    <|> try (parens valueType)
     <|> (ValueFunctionType <$> functionType)
     <|> TypeName <$> ident <*> typeParams
 
@@ -227,7 +249,12 @@ typeParams = TypeParams <$> option [] (try (brackets (ident `sepBy` comma)))
 
 -- Literals
 lit :: Parser Lit
-lit = (Int <$> intLiteral) <|> (String <$> stringLiteral) <|> (Bool <$> boolLiteral)
+lit =
+  (Int <$> intLiteral)
+    <|> (String <$> stringLiteral)
+    <|> (Bool <$> boolLiteral)
+    <|> (Unit <$ unitLiteral)
+    <|> (Fn <$> functionLiteral)
 
 intLiteral :: Parser Int
 intLiteral = lexeme L.decimal
@@ -237,3 +264,9 @@ stringLiteral = char '\"' *> manyTill L.charLiteral (char '\"')
 
 boolLiteral :: Parser Bool
 boolLiteral = True <$ keyword "true" <|> False <$ keyword "false"
+
+unitLiteral :: Parser ()
+unitLiteral = parens $ pure ()
+
+functionLiteral :: Parser Function
+functionLiteral = keyword "fn" >> function
