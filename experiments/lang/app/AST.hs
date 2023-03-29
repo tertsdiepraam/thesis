@@ -16,8 +16,7 @@ data TypeVal
   | TypeUnit
   | TypeTuple [TypeVal]
   | TypeFun [TypeVal] TypeComp
-  | TypeHan TypeComp TypeComp
-  | TypeElab TypeComp TypeComp
+  | TypeHan Ident TypeVal TypeVal
   deriving (Show, Eq)
 
 data TypeComp = TypeComp TypeVal (Set Op)

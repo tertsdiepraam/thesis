@@ -30,7 +30,7 @@ executable lang
     default-language: Haskell2010
 
 library
-    exposed-modules:  Effen
+    exposed-modules:  Effen, Sugar, AST
     hs-source-dirs:   app
     build-depends:    base ^>=4.16.3.0, containers
     default-language: Haskell2010

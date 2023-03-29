@@ -5,7 +5,7 @@ import Free
 import Elab
 import Free.State
 import Hefty.Lambda
-import Hefty.Lambda.CBV ()
+import Hefty.Lambda.CBV
 
 example :: forall fun c.
            Hefty (Lambda c fun ⊕ Lift (State Int) ⊕ Lift Nop) Int
@@ -26,9 +26,9 @@ testExampleCBV =
       $ example
 -- = 4
 
-testExampleCBN :: Int
-testExampleCBN =
-  fst $ un $ hState 0
-      $ hfold @(Free (State Int + Nop)) return elab
-      $ example
+-- testExampleCBN :: Int
+-- testExampleCBN =
+--   fst $ un $ hState 0
+--       $ hfold @(Free (State Int + Nop)) return elab
+--       $ example
 -- = 5

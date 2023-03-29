@@ -494,7 +494,7 @@ If I understand correctly, the $\delta$ rule is to define built-ins and constant
         & k = \f{y}{\handle h (X_{op}[y])}
     \end{aligned}\\
     \elab v \reduce& v\\
-    \elab (X_{op!}[op!(e_1, \dots, e_n)]) \reduce& X_{op!}[e[x_1 \mapsto e_1, \dots, x_n \mapsto e_n]] \\
+    \elab (X_{op!}[op!(e_1, \dots, e_n)]) \reduce& \elab X_{op!}[e[x_1 \mapsto e_1, \dots, x_n \mapsto e_n]] \\
     &\qquad \text{where } op!(x_1, \dots, x_n) \S{e} \in \Gamma_E \\
 \end{align*}
 
