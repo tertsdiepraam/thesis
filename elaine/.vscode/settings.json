@@ -1,9 +1,20 @@
 {
     "cSpell.words": [
         "concat",
+        "Decomp",
+        "Eithers",
+        "Elab",
+        "fmapbody",
+        "foldl",
+        "HLINT",
+        "Hspec",
+        "idents",
         "parens",
+        "Redex",
         "typeclass",
+        "unlines",
         "unrecognised",
-        "unwords"
+        "unwords",
+        "vals"
     ]
 }

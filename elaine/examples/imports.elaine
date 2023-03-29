@@ -27,8 +27,8 @@ mod Main {
     # Defining a higher-order effect
     # I like this syntax because it reflects the use of the type
     effect !!Bar {
-        Aaaa(b: B): C
-        Dddd(e: E): F
+        aaaa(b: B): C
+        dddd(e: E): F
     }
 
     handler abort: a !Abort -> Maybe[a] {
@@ -58,7 +58,7 @@ mod Main {
         # ! or !! for algebraic and higher-order, respectively).
         # Operations are used like functions
         flop(b: B): C !A {
-            resume(b)
+            handle foo b
         }
     }
 
@@ -91,5 +91,18 @@ mod Main {
     fn higher_order2(f: (fn(a): b !A) !B, x: a): b !A !B {
         f' <- f;
         f'(x)
+    }
+
+    f(g(x))
+
+    y <- g(x);
+    f(y)
+
+    handle state {
+        res <- handle state {
+            ...
+        }
+        get()
+        set()
     }
 }

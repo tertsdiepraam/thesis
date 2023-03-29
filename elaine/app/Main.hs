@@ -2,8 +2,8 @@ module Main where
 import System.Environment
 import Text.Pretty.Simple (pPrint)
 
-import Parse
-import Pretty
+import Elaine.Parse
+import Elaine.Pretty
 
 main :: IO ()
 main = do

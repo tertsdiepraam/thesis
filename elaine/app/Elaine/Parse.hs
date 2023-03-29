@@ -1,13 +1,14 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parse (parseFile, parseString) where
+module Elaine.Parse (parseFile, parseString) where
 
-import AST
-import Data.Either
-import Data.Text hiding (empty)
+import Data.Either (partitionEithers)
+import Data.Text (Text, pack)
 import Data.Void
+import Elaine.AST
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
@@ -49,11 +50,8 @@ parens = between (symbol "(") (symbol ")")
 braces :: Parser a -> Parser a
 braces = between (symbol "{") (symbol "}")
 
--- angles :: Parser a -> Parser a
--- angles = between (symbol "<") (symbol ">")
-
-brackets :: Parser a -> Parser a
-brackets = between (symbol "[") (symbol "]")
+angles :: Parser a -> Parser a
+angles = between (symbol "<") (symbol ">")
 
 semicolon :: Parser Text
 semicolon = symbol ";"
@@ -64,7 +62,8 @@ comma = symbol ","
 colon :: Parser Text
 colon = symbol ":"
 
--- dot = symbol "."
+equals :: Parser Text
+equals = symbol "="
 
 -- IDENTIFIERS
 -- Identifiers can contain numbers, but may not start with them
@@ -92,86 +91,86 @@ program = space' *> many mod' <* eof
 
 mod' :: Parser Module
 mod' = do
-  name <- symbol "mod" >> ident
+  name <- keyword "mod" >> ident
   decs <- braces (many declaration)
   return $ Mod name decs
 
 -- DECLARATIONS
 declaration :: Parser Declaration
-declaration =
-  import'
-    <|> decFun
-    <|> decType
-    <|> decEffect
-    <|> handler
-    <|> elaboration
+declaration = do
+  vis <- visibility
+  Declaration vis
+    <$> ( decImport
+            <|> decVal
+            <|> decType
+            <|> decEffect
+            <|> decElaboration
+        )
 
-import' :: Parser Declaration
-import' = Import <$> (try (keyword "import") >> ident)
+visibility :: Parser Visibility
+visibility = Public <$ try (keyword "pub") <|> return Private
 
-decFun :: Parser Declaration
-decFun = try (keyword "fn") >> DecFun <$> ident <*> function
+decImport :: Parser DeclarationType
+decImport = Import <$> try (keyword "import" >> ident)
+
+decElaboration :: Parser DeclarationType
+decElaboration = do
+  from <- try (keyword "elaboration") >> ident
+  to <- symbol "!" >> symbol "->" >> effectRow
+  DecElaboration . Elaboration from to <$> braces (many operationClause)
+
+decVal :: Parser DeclarationType
+decVal = do
+  name <- try (keyword "let") >> ident
+  DecLet name <$> (equals >> expr)
 
 function :: Parser Function
-function = Function <$> funSig <*> doBlock
+function = Function <$> functionParams <*> computationType <*> expr
 
-handler :: Parser Declaration
+handler :: Parser Expr
 handler = do
-  name <- try (keyword "handler") >> ident
-  t <- colon >> handlerType
-  arms <- braces (many handlerArm)
+  arms <- try (keyword "handler") >> braces (many handlerArm)
   let (rets, functions) = partitionEithers arms
       ret = case rets of
         [r] -> r
         [] -> error "Handler must have a return arm"
         _ -> error "Handler cannot have multiple return arms"
-  return $ DecHandler $ Handler name t ret functions
+  return $ Val $ Hdl $ Handler ret functions
 
-handlerArm :: Parser (Either HandleReturn HandleFunction)
+handlerArm :: Parser (Either HandleReturn OperationClause)
 handlerArm =
   (Left <$> handleReturn)
-    <|> (Right <$> handleFunction)
+    <|> (Right <$> operationClause)
 
 handleReturn :: Parser HandleReturn
 handleReturn = do
   var <- try (keyword "return") >> parens ident
-  HandleReturn var <$> doBlock
+  HandleReturn var <$> expr
 
-handleFunction :: Parser HandleFunction
-handleFunction = HandleFunction <$> operation <*> doBlock
-
-elaboration :: Parser Declaration
-elaboration = do
-  name <- try (keyword "elaboration") >> ident
-  t <- colon >> handlerType
-  DecElaboration . Elaboration name t <$> braces (many handleFunction)
+operationClause :: Parser OperationClause
+operationClause = OperationClause <$> ident <*> parens (ident `sepBy` comma) <*> expr
 
 algEff :: Parser Effect
-algEff = Algebraic <$> (symbol "!" >> ident)
+algEff = Algebraic <$> ident
 
 highEff :: Parser Effect
-highEff = HigherOrder <$> (symbol "!!" >> ident)
+highEff = HigherOrder <$> (ident <* symbol "!")
 
 effect :: Parser Effect
 effect = try highEff <|> algEff
 
-decEffect :: Parser Declaration
+decEffect :: Parser DeclarationType
 decEffect = do
   name <- try (keyword "effect") >> effect
-  DecEffect name <$> braces (many operation)
+  DecEffect name <$> braces (many operationSignature)
 
-operation :: Parser Operation
-operation = Operation <$> ident <*> funSig
+operationSignature :: Parser OperationSignature
+operationSignature = OperationSignature <$> ident <*> parens (valueType `sepBy` comma) <*> valueType
 
--- Function signature
-funSig :: Parser FunSig
-funSig = FunSig <$> typeParams <*> functionParams <*> (colon >> computationType)
-
-decType :: Parser Declaration
+decType :: Parser DeclarationType
 decType = do
   name <- try (keyword "type") >> ident
-  tps <- typeParams
-  DecType name tps <$> braces (many constructor)
+  DecType name <$> braces (many constructor)
 
 functionParams :: Parser [(Ident, ComputationType)]
 functionParams = parens (functionParam `sepBy` comma)
@@ -187,88 +186,80 @@ functionParam = do
 
 computationType :: Parser ComputationType
 computationType = do
+  effs <- effectRow
   v <- valueType
-  ComputationType v <$> effectRow
+  return $ ComputationType v effs
 
 valueType :: Parser ValueType
 valueType =
   try (parens $ pure UnitType)
     <|> try (parens valueType)
     <|> (ValueFunctionType <$> functionType)
-    <|> TypeName <$> ident <*> typeParams
+    <|> TypeName <$> ident
 
 functionType :: Parser FunctionType
-functionType = try (keyword "fn") >> FunctionType <$> typeParams <*> parens (computationType `sepBy` comma) <*> (colon >> computationType)
+functionType = try (keyword "fn") >> FunctionType <$> parens (computationType `sepBy` comma) <*> (colon >> computationType)
 
-handlerType :: Parser HandlerType
-handlerType = HandlerType <$> try computationType <*> (try (symbol "->") >> computationType)
-
-effectRow :: Parser [Effect]
-effectRow = many effect
-
--- STATEMENTS
-do' :: Parser Do
-do' = let' <|> (Pure <$> expr)
-
-doBlock :: Parser Do
-doBlock = braces do'
-
-let' :: Parser Do
-let' = do
-  x <- try (ident <* symbol "<-")
-  e <- expr
-  d <- semicolon >> do'
-  return $ Do (Let x e) d
+effectRow :: Parser EffectRow
+effectRow =
+  angles $ do
+    effects <- effect `sepBy` comma
+    extend <- (Extend <$> (symbol "|" >> ident)) <|> return Empty
+    return $ foldr Cons extend effects
 
 -- EXPRESSIONS
 expr :: Parser Expr
 expr =
-  try app
-    <|> try match'
-    <|> try handle
-    <|> try elab
-    <|> (Leaf <$> leaf)
+  braces expr
+    <|> (Fn <$> functionLiteral)
+    <|> Val <$> value
+    <|> let'
+    -- <|> match'
+    <|> handle
+    <|> elab
+    <|> handler
+    <|> try app
+    <|> (Var <$> ident)
 
-leaf :: Parser Leaf
-leaf = (Lit <$> lit) <|> (Var <$> ident)
-
-handle :: Parser Expr
-handle = keyword "handle" >> Handle <$> leaf <*> leaf
-
-elab :: Parser Expr
-elab = keyword "elab" >> Elab <$> leaf
-
-app :: Parser Expr
-app = do
-  name <- ident
-  arg <- parens (leaf `sepBy` comma)
-  return $ App name arg
-
-match' :: Parser Expr
-match' = do
-  l <- keyword "match" >> leaf
-  Match l <$> braces (many matchArm)
-
-matchArm :: Parser MatchArm
-matchArm = do
-  name <- ident
-  p <- parens (ident `sepBy` comma)
-  e <- symbol "=>" >> expr
-  return $ MatchArm (Pattern name p) e
-
-typeParams :: Parser TypeParams
-typeParams = TypeParams <$> option [] (try (brackets (ident `sepBy` comma)))
-
--- Literals
-lit :: Parser Lit
-lit =
+value :: Parser Value
+value =
   (Int <$> intLiteral)
     <|> (String <$> stringLiteral)
     <|> (Bool <$> boolLiteral)
     <|> (Unit <$ unitLiteral)
-    <|> (Fn <$> functionLiteral)
-    <|> (Computation <$> doBlock)
 
+let' :: Parser Expr
+let' = do
+  x <- try (keyword "let") >> ident
+  e1 <- equals >> expr
+  e2 <- semicolon >> expr
+  return $ Let x e1 e2
+
+handle :: Parser Expr
+handle = try (keyword "handle") >> Handle <$> expr <*> expr
+
+elab :: Parser Expr
+elab = try (keyword "elab") >> Elab <$> expr
+
+app :: Parser Expr
+app = do
+  name <- ident
+  arg <- parens (expr `sepBy` comma)
+  return $ App (Var name) arg
+
+-- match' :: Parser Expr
+-- match' = do
+--   l <- try (keyword "match") >> expr
+--   Match l <$> braces (many matchArm)
+
+-- matchArm :: Parser MatchArm
+-- matchArm = do
+--   name <- ident
+--   p <- parens (ident `sepBy` comma)
+--   e <- symbol "=>" >> expr
+--   return $ MatchArm (Pattern name p) e
+
+-- Literals
 intLiteral :: Parser Int
 intLiteral = lexeme L.decimal
 
@@ -276,10 +267,10 @@ stringLiteral :: Parser String
 stringLiteral = char '\"' *> manyTill L.charLiteral (char '\"')
 
 boolLiteral :: Parser Bool
-boolLiteral = True <$ keyword "true" <|> False <$ keyword "false"
+boolLiteral = True <$ try (keyword "true") <|> False <$ try (keyword "false")
 
 unitLiteral :: Parser ()
 unitLiteral = parens $ pure ()
 
 functionLiteral :: Parser Function
-functionLiteral = keyword "fn" >> function
+functionLiteral = try (keyword "fn") >> function
