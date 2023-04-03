@@ -4,15 +4,19 @@ module Elaine.AST where
 type Program = [Module]
 
 type Ident = String
+type Effect = String
 
 data Module = Mod String [Declaration]
-  deriving (Show)
+  deriving (Show, Eq)
+
+modName :: Module -> String
+modName (Mod x _) = x
 
 data Visibility = Private | Public
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Declaration = Declaration Visibility DeclarationType
-  deriving (Show)
+  deriving (Show, Eq)
 
 data DeclarationType
   = Import Ident
@@ -20,34 +24,37 @@ data DeclarationType
   | DecType Ident [Constructor]
   | DecEffect Effect [OperationSignature]
   | DecElaboration Elaboration
-  deriving (Show)
+  deriving (Show, Eq)
 
 data OperationSignature = OperationSignature Ident [ValueType] ValueType
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Elaboration = Elaboration Ident EffectRow [OperationClause]
-  deriving (Show)
+  deriving (Show, Eq)
+
+clauses :: Elaboration -> [OperationClause]
+clauses (Elaboration _ _ cs) = cs
 
 data Handler = Handler HandleReturn [OperationClause]
-  deriving (Show)
+  deriving (Show, Eq)
 
 data HandleReturn = HandleReturn Ident Expr
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Function = Function [(Ident, ComputationType)] ComputationType Expr
-  deriving (Show)
-
-data Effect = Algebraic Ident | HigherOrder Ident
-  deriving (Show)
+  deriving (Show, Eq)
 
 data EffectRow = Cons Effect EffectRow | Empty | Extend Ident
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Constructor = Constructor Ident [ComputationType]
-  deriving (Show)
+  deriving (Show, Eq)
 
 data OperationClause = OperationClause Ident [Ident] Expr
-  deriving (Show)
+  deriving (Show, Eq)
+
+clauseName :: OperationClause -> Ident
+clauseName (OperationClause name _ _) = name
 
 data Expr
   = App Expr [Expr]
@@ -58,7 +65,7 @@ data Expr
   | Var Ident
   | Let Ident Expr Expr
   | Val Value
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Value
   = Int Int
@@ -66,40 +73,40 @@ data Value
   | Bool Bool
   | Lam [Ident] Expr
   | Hdl Handler
+  | Constant BuiltIn
   | Unit
-  deriving (Show)
+  deriving (Show, Eq)
 
--- We define value equality by hand, because equality for lambdas and
--- handlers does not make sense.
-instance Eq Value where
-  (Int a) == (Int b) = a == b
-  (String a) == (String b) = a == b
-  (Bool a) == (Bool b) = a == b
-  Unit == Unit = True
-  _ == _ = False
+data BuiltIn = BuiltIn Ident ([Value] -> Value)
+
+instance Show BuiltIn where
+  show (BuiltIn x _) = "<built-in " ++ x ++ ">"
+
+instance Eq BuiltIn where
+  (BuiltIn x _) == (BuiltIn y _) = x == y
 
 -- A match is as simple as possible:
 --  - Only constructors can be matches
 --  - All constructors must be present
 data MatchArm = MatchArm Pattern Expr
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- A pattern consisting of a constructor identifier and
 -- and a list of variables to bind.
 data Pattern = Pattern Ident [Ident]
-  deriving (Show)
+  deriving (Show, Eq)
 
 data ComputationType = ComputationType ValueType EffectRow
-  deriving (Show)
+  deriving (Show, Eq)
 
 data ValueType
   = TypeName Ident
   | ValueFunctionType FunctionType
   | UnitType
-  deriving (Show)
+  deriving (Show, Eq)
 
 data FunctionType = FunctionType [ComputationType] ComputationType
-  deriving (Show)
+  deriving (Show, Eq)
 
 data HandlerType = HandlerType ComputationType ComputationType
-  deriving (Show)
+  deriving (Show, Eq)

@@ -31,7 +31,7 @@ instance Pretty DeclarationType where
   pretty (DecType name constructors) =
     "type " ++ name ++ " " ++ concatBlock constructors
   pretty (DecEffect name operations) =
-    "effect " ++ pretty name ++ " " ++ concatBlock operations
+    "effect " ++ name ++ " " ++ concatBlock operations
   pretty (DecElaboration (Elaboration from to functions)) =
     "elaboration " ++ from ++ " -> " ++ pretty to ++ " " ++ concatBlock functions
 
@@ -45,10 +45,6 @@ instance Pretty OperationSignature where
 
 instance Pretty Function where
   pretty (Function params ret do') = "fn" ++ parens (map pParam params) ++ pretty ret ++ " " ++ pBlock (pretty do')
-
-instance Pretty Effect where
-  pretty (HigherOrder name) = name ++ "!"
-  pretty (Algebraic name) = name
 
 instance Pretty Module where
   pretty (Mod s decs) = "mod " ++ s ++ " " ++ concatBlock decs ++ "\n"
@@ -99,8 +95,8 @@ instance Pretty EffectRow where
     where
       prettyRow Empty = ""
       prettyRow (Extend x) = "|" ++ x
-      prettyRow (Cons x xs@(Cons _ _)) = pretty x ++ ", " ++ prettyRow xs
-      prettyRow (Cons x xs) = pretty x ++ prettyRow xs
+      prettyRow (Cons x xs@(Cons _ _)) = x ++ ", " ++ prettyRow xs
+      prettyRow (Cons x xs) = x ++ prettyRow xs
 
 instance Pretty ValueType where
   pretty (TypeName name) = name

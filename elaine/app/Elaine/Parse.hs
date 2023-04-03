@@ -3,10 +3,10 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Elaine.Parse (parseFile, parseString) where
+module Elaine.Parse (parseFile, parseString, parseProgram, parseExpr, prettyError, ParseResult) where
 
 import Data.Either (partitionEithers)
-import Data.Text (Text, pack)
+import Data.Text (Text, pack, unpack)
 import Data.Void
 import Elaine.AST
 import Text.Megaparsec
@@ -14,6 +14,8 @@ import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 
 type Parser = Parsec Void Text
+
+type ParseResult a = Either (ParseErrorBundle Text Void) a
 
 parseFile :: FilePath -> IO (Maybe Program)
 parseFile filename = do
@@ -26,6 +28,18 @@ parseString name s = do
   case result of
     Left bundle -> putStr (errorBundlePretty bundle) >> return Nothing
     Right decs -> return $ Just decs
+
+-- This mostly exists for testing
+parseExpr :: String -> ParseResult Expr
+parseExpr s = parse expr s (pack s)
+
+-- For testing purposes
+parseProgram :: String -> ParseResult [Module]
+parseProgram s = parse program s (pack s)
+
+prettyError :: ParseResult a -> Either String a
+prettyError (Left a) = Left $ errorBundlePretty a
+prettyError (Right x) = Right x
 
 -- WHITESPACE & BASIC SYMBOLS
 space' :: Parser ()
@@ -44,14 +58,17 @@ symbol = L.symbol space'
 keyword :: Text -> Parser Text
 keyword kw = lexeme (string kw <* notFollowedBy (oneOf otherIdentChars))
 
+delimiters :: Text -> Text -> Parser a -> Parser a
+delimiters left right = between (symbol left) (symbol right)
+
 parens :: Parser a -> Parser a
-parens = between (symbol "(") (symbol ")")
+parens = delimiters "(" ")"
 
 braces :: Parser a -> Parser a
-braces = between (symbol "{") (symbol "}")
+braces = delimiters "{" "}"
 
 angles :: Parser a -> Parser a
-angles = between (symbol "<") (symbol ">")
+angles = delimiters "<" ">"
 
 semicolon :: Parser Text
 semicolon = symbol ";"
@@ -81,7 +98,8 @@ ident = lexeme $ do
   first <- oneOf firstIdentChars
   rest <- many (oneOf otherIdentChars)
   ticks <- many (char '\'')
-  return $ [first] ++ rest ++ ticks
+  exc <- option "" (symbol "!")
+  return $ [first] ++ rest ++ ticks ++ unpack exc
 
 -- PROGRAM
 -- A program is simply a sequence of modules, but the parser requires parsing
@@ -116,7 +134,7 @@ decImport = Import <$> try (keyword "import" >> ident)
 decElaboration :: Parser DeclarationType
 decElaboration = do
   from <- try (keyword "elaboration") >> ident
-  to <- symbol "!" >> symbol "->" >> effectRow
+  to <- symbol "->" >> effectRow
   DecElaboration . Elaboration from to <$> braces (many operationClause)
 
 decVal :: Parser DeclarationType
@@ -149,19 +167,11 @@ handleReturn = do
 
 operationClause :: Parser OperationClause
 operationClause = OperationClause <$> ident <*> parens (ident `sepBy` comma) <*> expr
-
-algEff :: Parser Effect
-algEff = Algebraic <$> ident
-
-highEff :: Parser Effect
-highEff = HigherOrder <$> (ident <* symbol "!")
-
-effect :: Parser Effect
-effect = try highEff <|> algEff
+  
 
 decEffect :: Parser DeclarationType
 decEffect = do
-  name <- try (keyword "effect") >> effect
+  name <- try (keyword "effect") >> ident
   DecEffect name <$> braces (many operationSignature)
 
 operationSignature :: Parser OperationSignature
@@ -203,7 +213,7 @@ functionType = try (keyword "fn") >> FunctionType <$> parens (computationType `s
 effectRow :: Parser EffectRow
 effectRow =
   angles $ do
-    effects <- effect `sepBy` comma
+    effects <- ident `sepBy` comma
     extend <- (Extend <$> (symbol "|" >> ident)) <|> return Empty
     return $ foldr Cons extend effects
 
@@ -214,6 +224,7 @@ expr =
     <|> (Fn <$> functionLiteral)
     <|> Val <$> value
     <|> let'
+    <|> if'
     -- <|> match'
     <|> handle
     <|> elab
@@ -234,6 +245,13 @@ let' = do
   e1 <- equals >> expr
   e2 <- semicolon >> expr
   return $ Let x e1 e2
+
+if' :: Parser Expr
+if' = do
+  cond <- try (keyword "if") >> expr
+  e1 <- keyword "then" >> expr
+  e2 <- keyword "else" >> expr
+  return $ If cond e1 e2
 
 handle :: Parser Expr
 handle = try (keyword "handle") >> Handle <$> expr <*> expr
@@ -264,7 +282,7 @@ intLiteral :: Parser Int
 intLiteral = lexeme L.decimal
 
 stringLiteral :: Parser String
-stringLiteral = char '\"' *> manyTill L.charLiteral (char '\"')
+stringLiteral = char '\"' *> manyTill L.charLiteral (char '\"') <* space
 
 boolLiteral :: Parser Bool
 boolLiteral = True <$ try (keyword "true") <|> False <$ try (keyword "false")
