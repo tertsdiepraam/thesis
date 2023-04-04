@@ -183,6 +183,9 @@ subst1 (x, new) = \case
   Handle e1 e2 -> Handle (f e1) (f e2)
   Elab e -> Elab (f e)
   Let y e1 e2 -> if x == y then Let y (f e1) e2 else Let y (f e1) (f e2)
+  fun@(Fn (Function params ret body)) -> if x `elem` map fst params
+    then fun
+    else Fn $ Function params ret (f body)
   Val (Lam params body) ->
     if x `elem` params
       then Val $ Lam params body
@@ -200,7 +203,7 @@ subst1 (x, new) = \case
     in
       Val $ Hdl $ Handler (HandleReturn retVar ret') clauses'
   Val y -> Val y
-  _ -> error "Whoops"
+  -- x' -> error ("Could not substitute" ++ show x')
   where
     f = subst1 (x, new)
 

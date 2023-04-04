@@ -288,3 +288,11 @@ testExec = describe "exec" $ do
         }
       }
     |] `shouldBeP` String "hello world"
+
+  it "can turn values into strings" $ do
+    f [r|
+      mod main {
+        import std
+        let main = show(5)
+      }
+    |] `shouldBeP` String "5"
