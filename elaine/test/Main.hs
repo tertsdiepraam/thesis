@@ -58,7 +58,7 @@ testParseExpr = describe "parseExpr" $ do
     f "handle h { if true then true else true }" `shouldBe` Right (Handle (Var "h") (If tt tt tt))
 
   it "parses let expressions" $ do
-    f "let x = if true then true else true; x" `shouldBe` Right (Let "x" (If tt tt tt) (Var "x"))
+    f "let x = if true then true else true\nx" `shouldBe` Right (Let "x" (If tt tt tt) (Var "x"))
 
   it "treats braces transparently" $ do
     f "{{{{ if {{ true }} then {{ true }} else {{ true }} }}}}" `shouldBe` Right (If tt tt tt)
@@ -77,11 +77,17 @@ testParseProgram = describe "parseProgram" $ do
         }
       }
     |]
-      `shouldBeP` [Mod "main" [Declaration Private $ DecEffect "A" [
-        OperationSignature "put" [TypeName "Int"] UnitType,
-        OperationSignature "get" [] (TypeName "Int")
-      ]]]
-  
+      `shouldBeP` [ Mod
+                      "main"
+                      [ Declaration Private $
+                          DecEffect
+                            "A"
+                            [ OperationSignature "put" [TypeName "Int"] UnitType,
+                              OperationSignature "get" [] (TypeName "Int")
+                            ]
+                      ]
+                  ]
+
   it "parses algebraic effects" $ do
     f
       [r|
@@ -92,10 +98,16 @@ testParseProgram = describe "parseProgram" $ do
         }
       }
     |]
-      `shouldBeP` [Mod "main" [Declaration Private $ DecEffect "A!" [
-        OperationSignature "put!" [TypeName "Int"] UnitType,
-        OperationSignature "get!" [] (TypeName "Int")
-      ]]]
+      `shouldBeP` [ Mod
+                      "main"
+                      [ Declaration Private $
+                          DecEffect
+                            "A!"
+                            [ OperationSignature "put!" [TypeName "Int"] UnitType,
+                              OperationSignature "get!" [] (TypeName "Int")
+                            ]
+                      ]
+                  ]
 
 testEval :: SpecWith ()
 testEval = describe "eval0" $ do
@@ -140,8 +152,8 @@ testExec = describe "exec" $ do
       [r|
       mod main {
         let main = {
-          let x = 5;
-          let y = 6;
+          let x = 5
+          let y = 6
           if true then x else y
         }
       }
@@ -168,9 +180,10 @@ testExec = describe "exec" $ do
       }
     |]
       `shouldBeP` Int 10
-  
+
   it "elaborates higher order effects into algebraic effects" $ do
-    f [r|
+    f
+      [r|
       mod main {
         effect A {
           a() Int
@@ -194,7 +207,7 @@ testExec = describe "exec" $ do
             a() {
               101
             }
-          };
+          }
           handle h {
             elab {
               b!()
@@ -202,67 +215,83 @@ testExec = describe "exec" $ do
           }
         }
       }
-    |] `shouldBeP` Int 101
+    |]
+      `shouldBeP` Int 101
 
   it "can access global values" $ do
-    f [r|
+    f
+      [r|
       mod main {
         let x = 5
         let y = 6
         let main = if true then x else y
       }
-    |] `shouldBeP` Int 5 
+    |]
+      `shouldBeP` Int 5
 
   it "can use functions from the standard library" $ do
-    f [r|
+    f
+      [r|
       mod main {
         import std
         let main = add(6, 5)
       }
-    |] `shouldBeP` Int 11
+    |]
+      `shouldBeP` Int 11
 
-    f [r|
+    f
+      [r|
       mod main {
         import std
         let main = sub(6, 5)
       }
-    |] `shouldBeP` Int 1
+    |]
+      `shouldBeP` Int 1
 
-    f [r|
+    f
+      [r|
       mod main {
         import std
         let main = mul(6, 5)
       }
-    |] `shouldBeP` Int 30
+    |]
+      `shouldBeP` Int 30
 
-    f [r|
+    f
+      [r|
       mod main {
         import std
         let main = concat(concat("hello", " "), "world")
       }
-    |] `shouldBeP` String "hello world"
+    |]
+      `shouldBeP` String "hello world"
 
-    f [r|
+    f
+      [r|
       mod main {
         import std
         let main = and(true, true)
       }
-    |] `shouldBeP` Bool True
+    |]
+      `shouldBeP` Bool True
 
   it "a" $ do
-    f [r|
+    f
+      [r|
       mod main {
         import std
         let main = {
-          let x = add(5, 10);
-          let y = add(x, 2);
+          let x = add(5, 10)
+          let y = add(x, 2)
           mul(2, y)
         }
       }
-    |] `shouldBeP` Int 34
+    |]
+      `shouldBeP` Int 34
 
   it "handler the Out effect" $ do
-    f [r|
+    f
+      [r|
       mod main {
         import std
 
@@ -275,24 +304,182 @@ testExec = describe "exec" $ do
             ""
           }
           write(m) {
-            let rest = resume(());
+            let rest = resume(())
             concat(m, rest)
           }
         }
 
         let main = handle h {
-          let x = write("hello");
-          let x = write(" ");
-          let x = write("world");
+          let x = write("hello")
+          let x = write(" ")
+          let x = write("world")
           ()
         }
       }
-    |] `shouldBeP` String "hello world"
+    |]
+      `shouldBeP` String "hello world"
+
+  -- it "can handle a logger with context" $ do
+  --   f [r|
+  --     mod main {
+  --       effect Write {
+  --         write(String) ()
+  --       }
+
+  --       effect Log! {
+  --         context!(String, a) a
+  --         log!(String)
+  --       }
+
+  --       # TODO: Fix return type
+  --       let h = fn(prefix: String) () {
+  --         handler {
+  --           return(x) {
+  --             ""
+  --           }
+  --           write(m) {
+  --             let rest = resume(());
+  --             let prefixed = concat(prefix, m);
+  --             concat(concat(prefixed, "\n"), rest)
+  --           }
+  --         }
+  --       }
+
+  --       elaboration Log! -> Write {
+  --         context!(s, c) {
+
+  --         }
+  --       }
+  --     }
+  --   |]
 
   it "can turn values into strings" $ do
-    f [r|
+    f
+      [r|
       mod main {
         import std
         let main = show(5)
       }
-    |] `shouldBeP` String "5"
+    |]
+      `shouldBeP` String "5"
+
+  it "can use construct data types" $ do
+    f
+      [r|
+      mod main {
+        type Either {
+          Left(<> a)
+          Right(<> b)
+        }
+
+        let main = Left(5)
+      }
+    |]
+      `shouldBeP` Data "Either" "Left" [Val $ Int 5]
+
+  it "can represent a list" $ do
+    f
+      [r|
+      mod main {
+        type List {
+          Nil()
+          Cons(<> a, <> List)
+        }
+
+        let main = Cons(1, Cons(2, Nil()))
+      }
+    |]
+      `shouldBeP` Data "List" "Cons" [Val $ Int 1, Val $ Data "List" "Cons" [Val $ Int 2, Val $ Data "List" "Nil" []]]
+
+  it "can match on custom data types" $ do
+    f
+      [r|
+      mod main {
+        type Bool {
+          False()
+          True()
+        }
+
+        let main = match True() {
+          True() => 5
+          False() => 10
+        }
+      }
+    |]
+      `shouldBeP` Int 5
+
+  it "can call a defined function" $ do
+    f
+      [r|
+      mod main {
+        import std
+        let add3 = fn(a: <>Int, b: <>Int, c: <>Int) <> Int {
+          add(a, add(b, c))
+        }
+
+        let main = add3(1, 2, 3)
+      }
+    |]
+      `shouldBeP` Int 6
+
+  it "can call a function returning a custom datatype" $ do
+    f
+      [r|
+      mod main {
+        import std
+
+        type Maybe {
+          Just(<> a)
+          Nothing()
+        }
+
+        let safediv = fn(x: <>Int, y: <>Int) <> Maybe {
+          if eq(y, 0) then
+            Nothing()
+          else
+            Just(div(x,y))
+        }
+
+        let main = safediv(6, 0)
+      }
+    |]
+      `shouldBeP` Data "Maybe" "Nothing" []
+
+  it "can handle the abort effect" $ do
+    f
+      [r|
+      mod main {
+        import std
+        
+        type Maybe {
+          Just(<> a)
+          Nothing()
+        }
+
+        effect Abort {
+          abort() ()
+        }
+
+        let hAbort = handler {
+          return(x) { Just(x) }
+          abort() { Nothing() }
+        }
+
+        let safediv = fn(x: <> Int, y: <> Int) <Abort> Int {
+          if eq(y, 0) then
+            abort()
+          else
+            div(x, y)
+        }
+
+        let main = match handle hAbort {
+          let x = 6
+          let y = 0
+          safediv(x, y)
+        } {
+          Nothing() => "cannot divide by zero"
+          Just(a) => concat("the answer is: ", show(a))
+        }
+      }
+    |]
+      `shouldBeP` String "cannot divide by zero"

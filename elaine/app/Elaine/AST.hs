@@ -61,6 +61,7 @@ data Expr
   | If Expr Expr Expr
   | Fn Function
   | Handle Expr Expr
+  | Match Expr [MatchArm]
   | Elab Expr
   | Var Ident
   | Let Ident Expr Expr
@@ -74,6 +75,7 @@ data Value
   | Lam [Ident] Expr
   | Hdl Handler
   | Constant BuiltIn
+  | Data String String [Expr]
   | Unit
   deriving (Show, Eq)
 

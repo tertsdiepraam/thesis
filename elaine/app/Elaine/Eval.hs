@@ -8,7 +8,7 @@ module Elaine.Eval (evalExpr, evalModule, envName, envBindings, newEnv, Env) whe
 import Control.Applicative ((<|>))
 import Data.Bifunctor (second)
 import Data.List (find, isSuffixOf)
-import Data.Map (Map, assocs, empty, insert, member, union)
+import Data.Map (Map, assocs, empty, fromList, insert, member, union)
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Debug.Trace
 import Elaine.AST
@@ -51,7 +51,7 @@ reduce env = \case
   App (Val v) args | all isVal args ->
     Just $ case v of
       Lam params body -> subst (zip params args) body
-      Constant (BuiltIn _ body) -> Val $ body (map (fromJust . toVal) args) 
+      Constant (BuiltIn _ body) -> Val $ body (map (fromJust . toVal) args)
       _ -> error "Tried to call a non-function"
   Let x (Val v) e -> Just $ subst [(x, Val v)] e
   Handle (Val v) e ->
@@ -62,7 +62,23 @@ reduce env = \case
      in traceShowId reduced
   Elab (Val v) -> Just $ Val v
   Elab e -> reduceElab env e
-  _ -> Nothing
+  Match (Val v) arms ->
+    -- so what do we want to do:
+    --  - find the arm that matches the expression
+    --  - that gives us two lists, which we then match
+    --  - that yields new bindings for in the arm expression
+    let (variant, args) =
+          case v of
+            Data _ i p -> (i, p)
+            _ -> error "Can only match on custom data types"
+        matchingArm = find (\(MatchArm (Pattern x _) _) -> x == variant) arms
+        MatchArm (Pattern _ params) exp = case matchingArm of
+          Just arm -> arm
+          Nothing -> error "Expression did not match"
+     in if length params == length args
+          then Just $ subst (zip params args) exp
+          else error "Number of arguments in pattern do not match expression"
+  x -> snd $ traceShowId (x, Nothing)
 
 reduceState :: Env -> State -> Maybe State
 reduceState env (e, c) = case reduce env e of
@@ -77,7 +93,7 @@ decompose1 ctx (e, decomp) = do
   return (e', d' : decomp)
 
 -- Decompose as much as possible
--- Beware if implemented poorly this right go beyond reductions
+-- Beware if implemented poorly this might go beyond reductions
 decompose :: Ctx -> Expr -> State
 decompose ctx s = f (s, [])
   where
@@ -87,9 +103,12 @@ ctxCommon :: Ctx
 ctxCommon (If e1 e2 e3) = Just (e1, \x -> If x e2 e3)
 ctxCommon (App (Val v) args) = case span isVal args of
   (vals, e : es) -> Just (e, \x -> App (Val v) (vals ++ [x] ++ es))
-  (_, []) -> error "ICE at function application should have been reduced"
+  (_, []) -> Nothing
 ctxCommon (App e args) = Just (e, \x -> App x args)
 ctxCommon (Let var e1 e2) = Just (e1, \x -> Let var x e2)
+ctxCommon (Match e arms) = case e of
+  Val _ -> Nothing
+  _ -> Just (e, \x -> Match x arms)
 ctxCommon _ = Nothing
 
 ctxE :: Ctx
@@ -183,25 +202,33 @@ subst1 (x, new) = \case
   Handle e1 e2 -> Handle (f e1) (f e2)
   Elab e -> Elab (f e)
   Let y e1 e2 -> if x == y then Let y (f e1) e2 else Let y (f e1) (f e2)
-  fun@(Fn (Function params ret body)) -> if x `elem` map fst params
-    then fun
-    else Fn $ Function params ret (f body)
+  -- TODO prevent name shadowing in match arms
+  Match e arms -> Match (f e) (map mapArms arms)
+    where
+      mapArms (MatchArm (Pattern y params) exp) = MatchArm (Pattern y params) (if x `elem` params then exp else f exp)
+  fun@(Fn (Function params ret body)) ->
+    if x `elem` map fst params
+      then fun
+      else Fn $ Function params ret (f body)
   Val (Lam params body) ->
     if x `elem` params
       then Val $ Lam params body
       else Val $ Lam params $ f body
   Val (Hdl (Handler (HandleReturn retVar retExpr) hClauses)) ->
-    let
-      ret' = if x == retVar
-        then retExpr
-        else f retExpr
-      clauses' = map (\c@(OperationClause name params body) -> 
-          if x `elem` params
-            then c
-            else OperationClause name params (f body)
-          ) hClauses
-    in
-      Val $ Hdl $ Handler (HandleReturn retVar ret') clauses'
+    let ret' =
+          if x == retVar
+            then retExpr
+            else f retExpr
+        clauses' =
+          map
+            ( \c@(OperationClause name params body) ->
+                if x `elem` params
+                  then c
+                  else OperationClause name params (f body)
+            )
+            hClauses
+     in Val $ Hdl $ Handler (HandleReturn retVar ret') clauses'
+  Val (Data y i args) -> Val $ Data y i (map f args)
   Val y -> Val y
   -- x' -> error ("Could not substitute" ++ show x')
   where
@@ -222,7 +249,7 @@ reduceHandler h e = case e of
     reduceRet (Handler (HandleReturn x body) _) v = subst [(x, Val v)] body
 
     applyOps [] = Nothing
-    applyOps (o : os) = case trace (show o) applyOp o of
+    applyOps (o : os) = case traceShowId (applyOp (traceShowId o)) of
       Just e' -> Just e'
       Nothing -> applyOps os
 
@@ -270,7 +297,13 @@ updateEnv envs m (Import x) = case lookup x envs of
         envBindings = envBindings m `union` envBindings imported
       }
   Nothing -> error $ "Could not import module " ++ x
-updateEnv _ _ (DecType _ _) = error "Custom types are unimplemented"
+updateEnv _ m (DecType typeIdent decs) =
+  let -- We create a function for every constructor returning a Data value
+      -- The parameters are called param0, param1, param2, etc.
+      lamParams params = map (\i -> "param" ++ show i) (take (length params) [0 ..] :: [Int])
+      f (Constructor x params) = (x, Lam (lamParams params) (Val $ Data typeIdent x (map Var (lamParams params))))
+      decBindings = fromList $ map f decs
+   in m {envBindings = envBindings m `union` decBindings}
 updateEnv _ env (DecLet x expr) =
   let bindings = assocs $ envBindings env
       exprBindings = map (second Val) bindings

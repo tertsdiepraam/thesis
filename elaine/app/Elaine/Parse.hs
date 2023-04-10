@@ -11,7 +11,7 @@ import Data.Void
 import Elaine.AST
 import Text.Megaparsec
 import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer as L
+import Text.Megaparsec.Char.Lexer qualified as L
 
 type Parser = Parsec Void Text
 
@@ -167,7 +167,6 @@ handleReturn = do
 
 operationClause :: Parser OperationClause
 operationClause = OperationClause <$> ident <*> parens (ident `sepBy` comma) <*> expr
-  
 
 decEffect :: Parser DeclarationType
 decEffect = do
@@ -225,7 +224,7 @@ expr =
     <|> Val <$> value
     <|> let'
     <|> if'
-    -- <|> match'
+    <|> match'
     <|> handle
     <|> elab
     <|> handler
@@ -243,8 +242,7 @@ let' :: Parser Expr
 let' = do
   x <- try (keyword "let") >> ident
   e1 <- equals >> expr
-  e2 <- semicolon >> expr
-  return $ Let x e1 e2
+  Let x e1 <$> expr
 
 if' :: Parser Expr
 if' = do
@@ -265,17 +263,17 @@ app = do
   arg <- parens (expr `sepBy` comma)
   return $ App (Var name) arg
 
--- match' :: Parser Expr
--- match' = do
---   l <- try (keyword "match") >> expr
---   Match l <$> braces (many matchArm)
+match' :: Parser Expr
+match' = do
+  l <- try (keyword "match") >> expr
+  Match l <$> braces (many matchArm)
 
--- matchArm :: Parser MatchArm
--- matchArm = do
---   name <- ident
---   p <- parens (ident `sepBy` comma)
---   e <- symbol "=>" >> expr
---   return $ MatchArm (Pattern name p) e
+matchArm :: Parser MatchArm
+matchArm = do
+  name <- ident
+  p <- parens (ident `sepBy` comma)
+  e <- symbol "=>" >> expr
+  return $ MatchArm (Pattern name p) e
 
 -- Literals
 intLiteral :: Parser Int
