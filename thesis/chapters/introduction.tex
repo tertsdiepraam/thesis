@@ -1,0 +1,32 @@
+\section{Introduction}
+\todo[inline]{This is currently mostly a short history of effects, not quite an introduction yet.}
+
+In standard $\lambda$-calculus, there is no model for effects of the computation, only of the result. Speaking broadly, effects concern the aspects of the program besides the pure computation. \cite{moggi_computational_1989}
+
+In their seminal paper, \textcite{moggi_computational_1989} unified monads with computational effects, or notions of computation as they call it. Functional programming languages often rely on monads to perform effectful computations. Haskell, for example, uses an \texttt{IO} monad for printing output and reading input. The computation is then kept pure and impure operations (like reading and printing) are delegated to the system. However, a limitation of treating effects as monads is that monads do not compose well.
+
+\textcite{goos_adequacy_2001} then showed that effects can be represented as equational theories. The effects that can be represented in this framework are called algebraic effects. The \texttt{State} and the \texttt{Maybe} monads can for example be expressed in this framework.
+
+\textcite{castagna_handlers_2009} then introduced effect handlers, allowing the programmer to destruct effects by placing handlers around effectful expressions. This provides a way to treat exception handling using effects. However, the scope in which an effect is handled can only be changed by adding handlers. Effect operations cannot define their own scope. To support this, a system for higher-order effects is required, which are effects that take effectful operations as parameters.
+
+A solution to this was the framework of scoped effects \cite{wu_effect_2014}. However, scoped effects require a significant increase in complexity and cannot express effects that are neither algebraic nor scoped, such as lambda abstractions \cite{oh_latent_2021}. Latent effects \cite{oh_latent_2021} were subsequently introduced as an alternative that encapsulates a larger set of effects.
+
+As an alternative approach to latent effects, \textcite{bach_poulsen_hefty_2023} introduced hefty algebras. With hefty algebras, higher-order effects are treated separately from algebraic effects. Higher-order effects are not handled, but elaborated into algebraic effects, which can then be handled. The advantage is that the treatment of algebraic effects remains intact and that the process of elaboration is relatively simple.
+
+In parallel with the work to define theoretical frameworks for effects, several libraries and languages have been designed that include effects as first-class concepts, allowing the programmer to define their own effects and handlers. For example, there are some libraries available for Haskell, like \lib{fused-effects}{https://github.com/fused-effects/fused-effects}, \lib{polysemy}{https://github.com/polysemy-research/polysemy}, \lib{freer-simple}{https://github.com/lexi-lambda/freer-simple} and \lib{eff}{https://github.com/hasura/eff}, each encoding effects in a slightly different way.
+
+Notable examples of languages with support for algebraic effects are Eff \cite{bauer_programming_2015}, Koka \cite{leijen_type_2017} and Frank \cite{lindley_be_2017}. OCaml also gained support for effects \cite{sivaramakrishnan_retrofitting_2021}. By building algebraic effects into the language, instead of delegating to a library, is advantageous because the language can provide more convenient syntax. In these languages, some concepts that were traditionally only available with language support, can be expressed by the programmer. This includes exception handling and asynchronous programming.
+
+These languages either only support algebraic effects or scoped effects. This means that their support for higher-order effects is limited. The exception is \lib{heft}{https://github.com/heft-lang/heft}, which is produced in conjunction with the work in \cite{bach_poulsen_hefty_2023}.
+
+The aim of this thesis is to build on the work by \citeauthor{bach_poulsen_hefty_2023} and create a new language which
+
+\begin{itemize}
+    \item supports higher-order effects using hefty algebras, with separate elaborations and handlers,
+    \item implicitly resolves elaborations, and
+    \item can be compiled to a representation with only algebraic effects.
+\end{itemize}
+
+To this end, we need to show that the compilation of implicitly resolved effects is equivalent to the operational semantics for elaborations. By showing that elaborations can be removed at compile-time, we show that it is possible to compile programs in our language using the techniques from \cite{leijen_type_2017}.
+
+In addition, we provide an implementation of this language, which is published on GitHub under the name \lib{elaine}{https://github.com/tertsdiepraam/thesis/tree/main/elaine} (sharing a prefix with ``elaboration'') as part  of the repository that hosts this thesis.
