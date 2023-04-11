@@ -26,3 +26,8 @@ cabal.project.local~
 *.log
 *.synctex.gz
 *.tdo
+*.nlo
+*.bbl
+*.bcf
+*.blg
+*.run.xml

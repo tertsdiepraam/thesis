@@ -483,3 +483,146 @@ testExec = describe "exec" $ do
       }
     |]
       `shouldBeP` String "cannot divide by zero"
+  
+  it "can elaborate and handle exceptions" $ do
+    f [r|
+      mod main {
+        import std
+
+        type Maybe {
+          Just(<> a)
+          Nothing()
+        }
+
+        effect Abort {
+          abort() ()
+        }
+
+        effect Exc! {
+          catch!(a) a
+          throw!() b
+        }
+
+        let h = handler {
+          return(x) { Just(x) }
+          abort() { Nothing() }
+        }
+
+        elaboration Exc! -> <Abort> {
+          catch!(e) {
+            handle h e
+          }
+          throw!() {
+            abort()
+          }
+        }
+
+        let safediv = fn(x: <> Int, y: <> Int) <Exc!> Int {
+          if eq(y, 0) then
+            throw!()
+          else
+            div(x, y)
+        }
+
+        let main = handle h {
+          elab {
+            match catch!(safediv(5, 0)) {
+              Just(x) => concat("the answer is: ", show(x))
+              Nothing() => "cannot divide by 0"
+            }
+          }
+        }
+      }
+    |] `shouldBeP` Data "Maybe" "Just" [Val $ String "cannot divide by 0"]
+  
+  it "can do a state effect" $ do
+    f [r|
+      mod main {
+        import std
+
+        effect State {
+          get() Int
+          put(Int) ()
+        }
+
+        let h = handler {
+          return(x) {
+            fn(n: <> Int) <> a { x }
+          }
+          get() {
+            fn(n: <> Int) <> a { 
+              let f = resume(n)
+              f(n)
+            }
+          }
+          put(x) {
+            fn(n: <> Int) <> a { 
+              let f = resume(())
+              f(x)
+            } 
+          }
+        }
+
+        let main = {
+          let f = handle h {
+            let x = get()
+            let _ = put(6)
+            let y = get()
+            concat(show(x), concat(", ", show(y)))
+          }
+          f(5)
+        }
+      }
+    |] `shouldBeP` String "5, 6"
+  
+  it "can do the reader effect" $ do
+    f [r|
+      mod main {
+        import std
+
+        effect Reader! {
+          ask!() a
+          # TODO fix function type
+          local!(f, b) b
+        }
+
+        effect Reader {
+          ask() a
+        }
+
+        let h = fn(x: <> a) <> c {
+          handler {
+            return(y) { y }
+            ask() { resume(x) }
+          }
+        }
+
+        elaboration Reader! -> <Reader> {
+          ask!() { ask() }
+          local!(f, c) {
+            handle h(f(ask())) { c }
+          }
+        }
+
+        type Triple {
+          t(<> Int, <> Int, <> Int)
+        }
+
+        let double = fn(x: <> Int) <> Int {
+          mul(2, x)
+        }
+
+        let main = {
+          handle h(1) elab {
+            let x = ask!()
+            local!(double, {
+              let y = ask!()
+              local!(double, {
+                let z = ask!()
+                t(x, y, z)
+              })
+            })
+          }
+        }
+      }
+    |] `shouldBeP` Data "Triple" "t" [Val $ Int 1, Val $ Int 2, Val $ Int 4]

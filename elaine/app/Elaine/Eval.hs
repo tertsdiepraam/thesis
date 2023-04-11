@@ -59,9 +59,9 @@ reduce env = \case
           Hdl h' -> h'
           _ -> error "First argument to handle must be a handler"
         reduced = reduceHandler h e
-     in traceShowId reduced
+     in reduced
   Elab (Val v) -> Just $ Val v
-  Elab e -> reduceElab env e
+  Elab e -> Elab <$> reduceElab env e
   Match (Val v) arms ->
     -- so what do we want to do:
     --  - find the arm that matches the expression
@@ -78,7 +78,7 @@ reduce env = \case
      in if length params == length args
           then Just $ subst (zip params args) exp
           else error "Number of arguments in pattern do not match expression"
-  x -> snd $ traceShowId (x, Nothing)
+  _ -> Nothing
 
 reduceState :: Env -> State -> Maybe State
 reduceState env (e, c) = case reduce env e of
@@ -164,7 +164,7 @@ compose (e, c : cs) = compose (c e, cs)
 -- than we need to, but that's OK. Because we have the "atomic" operations above,
 -- we can define more complex schemes if necessary.
 step :: Env -> State -> State
-step env s = fromMaybe ((compose1 . step env . fromJust . decompose1 ctxE) s) (trace ("reduceState " ++ show (fst s)) reduceState env s)
+step env s = fromMaybe ((compose1 . step env . fromJust . decompose1 ctxE) s) (reduceState env s)
 
 evalExpr :: Env -> Expr -> Value
 evalExpr _ (Val v) = v
@@ -249,7 +249,7 @@ reduceHandler h e = case e of
     reduceRet (Handler (HandleReturn x body) _) v = subst [(x, Val v)] body
 
     applyOps [] = Nothing
-    applyOps (o : os) = case traceShowId (applyOp (traceShowId o)) of
+    applyOps (o : os) = case applyOp o of
       Just e' -> Just e'
       Nothing -> applyOps os
 
@@ -270,13 +270,13 @@ reduceHandler h e = case e of
       _ -> Nothing
 
 reduceElab :: Env -> Expr -> Maybe Expr
-reduceElab env e = case decompose ctxElab e of
-  (Var x, c : cs) | isHigherOrder x ->
+reduceElab env e = case decompose ctxElab (traceShowId e) of
+  (Var x, c : cs) | isHigherOrder (traceShowId x) ->
     case c (Var x) of
       App (Var _) args -> do
         let allClauses = concatMap clauses (envElaborations env)
         OperationClause _ params body <- find (\c' -> clauseName c' == x) allClauses
-        Just $ compose (subst (zip params args) body, cs)
+        Just $ traceShowId (compose (subst (zip params args) body, cs))
       _ -> Nothing
   _ -> Nothing
 
@@ -314,7 +314,14 @@ updateEnv _ env (DecLet x expr) =
         }
 -- Effects mostly matter for type checking, not in evaluation, so skip 'em
 updateEnv _ m (DecEffect _ _) = m
-updateEnv _ m (DecElaboration e@(Elaboration x _ _)) = m {envElaborations = insertOrError x e (envElaborations m)}
+updateEnv _ m (DecElaboration (Elaboration x y elabClauses)) = 
+  let
+    bindings = assocs $ envBindings m
+    exprBindings = map (second Val) bindings
+    sub = subst exprBindings
+    clauses' = map (\(OperationClause x' xs e) -> OperationClause x' xs $ sub e) elabClauses
+  in
+    m {envElaborations = insertOrError x (Elaboration x y clauses') (envElaborations m)}
 
 insertOrError :: (Show k, Ord k) => k -> v -> Map k v -> Map k v
 insertOrError k v m =
