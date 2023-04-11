@@ -164,7 +164,10 @@ compose (e, c : cs) = compose (c e, cs)
 -- than we need to, but that's OK. Because we have the "atomic" operations above,
 -- we can define more complex schemes if necessary.
 step :: Env -> State -> State
-step env s = fromMaybe ((compose1 . step env . fromJust . decompose1 ctxE) s) (reduceState env s)
+step env s = fromMaybe ((compose1 . step env . f . decompose1 ctxE) s) (reduceState env s)
+  where
+    f (Just a) = a
+    f Nothing = error ("could not reduce or decompose: " ++ show (fst s))
 
 evalExpr :: Env -> Expr -> Value
 evalExpr _ (Val v) = v
@@ -276,7 +279,7 @@ reduceElab env e = case decompose ctxElab (traceShowId e) of
       App (Var _) args -> do
         let allClauses = concatMap clauses (envElaborations env)
         OperationClause _ params body <- find (\c' -> clauseName c' == x) allClauses
-        Just $ traceShowId (compose (subst (zip params args) body, cs))
+        Just $ traceShowId (compose (subst (zip params (map Elab args)) body, cs))
       _ -> Nothing
   _ -> Nothing
 

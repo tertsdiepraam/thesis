@@ -483,9 +483,10 @@ testExec = describe "exec" $ do
       }
     |]
       `shouldBeP` String "cannot divide by zero"
-  
+
   it "can elaborate and handle exceptions" $ do
-    f [r|
+    f
+      [r|
       mod main {
         import std
 
@@ -533,10 +534,12 @@ testExec = describe "exec" $ do
           }
         }
       }
-    |] `shouldBeP` Data "Maybe" "Just" [Val $ String "cannot divide by 0"]
-  
+    |]
+      `shouldBeP` Data "Maybe" "Just" [Val $ String "cannot divide by 0"]
+
   it "can do a state effect" $ do
-    f [r|
+    f
+      [r|
       mod main {
         import std
 
@@ -573,10 +576,12 @@ testExec = describe "exec" $ do
           f(5)
         }
       }
-    |] `shouldBeP` String "5, 6"
-  
+    |]
+      `shouldBeP` String "5, 6"
+
   it "can do the reader effect" $ do
-    f [r|
+    f
+      [r|
       mod main {
         import std
 
@@ -625,4 +630,66 @@ testExec = describe "exec" $ do
           }
         }
       }
-    |] `shouldBeP` Data "Triple" "t" [Val $ Int 1, Val $ Int 2, Val $ Int 4]
+    |]
+      `shouldBeP` Data "Triple" "t" [Val $ Int 1, Val $ Int 2, Val $ Int 4]
+
+  it "can do the log effect" $ do
+    f
+      [r|
+      mod main {
+        import std
+
+        effect Log! {
+          context!(String, a) a
+          log!(String) ()
+        }
+
+        effect Log {
+          log(String, String) ()
+          getCtx() String
+        }
+
+        effect Reader {
+          ask() String
+        }
+
+        # TODO handler type
+        let hLog = handler {
+          return(x) { "" }
+          log(x) {
+            let rest = resume(())
+            let line = concat(x, "\n")
+            concat(line, rest)
+          }
+        }
+
+        let hRead = fn(x: <> String) <> h {
+          handler {
+            return(y) { y }
+            ask() { resume(x) }
+          }
+        }
+
+        elaboration Log! -> <Log,Reader> {
+          context!(s, c) {
+            let newCtx = concat(concat(ask(), ":"), s)
+            handle hRead(newCtx) c
+          }
+          log!(s) { 
+            let msg = concat(concat(ask(), ": "), s)
+            log(msg)
+          }
+        }
+
+        let main = handle hRead("root") handle hLog elab {
+          let _ = log!("one")
+          context!("foo", {
+            let _ = log!("two")
+            context!("bar", {
+              log!("three")
+            })
+          })
+        }
+      }
+    |]
+      `shouldBeP` String "root: one\nroot:foo: two\nroot:foo:bar: three\n"
