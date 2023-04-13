@@ -31,7 +31,7 @@
 \newcommand\seq[3]{\kw{do}\;#1 \gets #2\;\kw{in}\;#3}
 \newcommand\cond[3]{\kw{if} #1\;\kw{then} #2\;\kw{else} #3}
 \newcommand\handle[2]{\kw{handle} #1\;#2}
-\newcommand\elab[1]{\kw{elab}#1}
+\newcommand\elab[2][]{\kw{elab_{#1}}#2}
 \newcommand\comp[1]{\underline{#1}}
 \newcommand\f[2]{\lambda #1\;.\;#2}
 
@@ -109,7 +109,7 @@ In the sections below, the built-in type are restricted $\Bool$and $\unit$. This
     \text{expression}\;e
         \IS & x\\
         \OR & () \OR \true\!\! \OR \false \\
-        \OR & \fn x (x: T, \dots, x: T)\;\S{e} \\
+        \OR & \fn(x: T, \dots, x: T)\;\S{e} \\
         \OR & \cond{e}{e}{e}\\
         \OR & e(e,\dots, e) \\
         \OR & x!(e, \dots, e) \\
@@ -439,6 +439,19 @@ The elab expression then checks that a elaboration for all higher-order effects 
     \\\\
 \end{gather*}
 
+\section{Desugaring}
+
+Before we move on to semantics, we remove some of the typing information and higher-level features by desugaring.
+
+To desugar fold the operation $D$ over the syntax tree of an expression, where $D$ is defined by the following equations:
+
+\begin{align*}
+    D(\fn(x_1: T_1, \dots, x_n: T_n)\;T\;\{e\}) &= \lambda x_1,\dots,x_n . e \\
+    D(\val x = e_1; e_2) &= (\lambda x . e_2)(e_1)\\
+    D(\S{e}) &= e\\
+    D(e) &= e
+\end{align*}
+
 \section{Semantics}
 
 \remark{I'm only specifying the expression reduction. The declarations should be fairly self-explanatory, because they are basically the same as the typing rules, but with values instead of values.}
@@ -472,6 +485,9 @@ There are two very similar contexts, one for general expressions and one that do
         \OR & \elab X_{op} \text{ if } A(op)
 \end{align*}
 
+\subsection{Elaboration resolution}
+\todo[inline]{Elaboration resolution}
+
 \subsection{Reduction rules}
 
 If I understand correctly, the $\delta$ rule is to define built-ins and constants, or something. Anyway it's probably useful.
@@ -481,8 +497,6 @@ If I understand correctly, the $\delta$ rule is to define built-ins and constant
     c(v_1, \dots, v_n) \reduce& \delta(c, v_1, \dots, v_n) \\
     &\qquad\text{if } \delta(c, v_1, \dots, v_n) \text{ defined}\\
     (\lambda x_1, \dots, x_n . e) (v_1, \dots, v_n) \reduce& e[x_1 \mapsto v_1, \dots, x_n \mapsto v_n] \\
-    \val x = v; e \reduce& e[x \mapsto v] \\
-    \fn x(x_1: T_1, \dots, x_n: T_n)\;T\;\S{ e } \reduce& \f{x_1,\dots,x_n}{e}\\
     \cond{\true}{e_1}{e_2} \reduce& e_1 \\
     \cond{\false}{e_1}{e_2} \reduce& e_2 \\
     \\
@@ -500,4 +514,175 @@ If I understand correctly, the $\delta$ rule is to define built-ins and constant
 
 We need some sort of context for the elaborations, because they are implicit. Assume that it's populated with the elaborations that are in scope.
 
+\section{Desugaring/Compilation of Elaborations}
+
+We want to define a transformation which removes all elaborations from the program, while retaining the semantics.
+
+\subsection{The Syntax Approach}
+Silly idea 1:
+\begin{itemize}
+\item Wrap everything in elabs recursively.
+\item This removes a ``scope": each elab now only goes one level deep.
+\item Then we fold over this, by applying modified versions of each elab.
+\end{itemize}
+Silly idea 2:
+\begin{itemize}
+    \item We distribute each elab down using some algebraic laws
+    \item We need to prove those or take them from the hefty algebras paper?
+    \item Which means only higher-order operations are wrapped in elab
+    \item Now, we can use the same rule as our operational semantics to reduce the elab/operation combo.
+    \item This is great because if we prove first laws to be equivalent in semantics, then we're only left with the same rule applied at different times. 
+\end{itemize}
+
+Each elab below is resolved and carries the elaborations that it performs.
+
+\newcommand\To{\Rightarrow}
+\begin{align*}
+    T(\elab[x]{x}) &\To x\\
+    T(\elab[x]{\unit}) &\To \unit\\
+    T(\elab[x]{\true}) &\To \true\\
+    T(\elab[x]{\false}) &\To \false\\
+    T(\elab[x]{\lambda x_1,\dots,x_n . e}) &\To \lambda x_1,\dots,x_n . e\\
+    T(\elab[x]{\cond{e_1}{e_2}{e_3}}) &\To \cond{\elab[x]{e_1}}{\elab[x]{e_2}}{\elab[x]{e_3}}\\
+    T(\elab[x]{e(e_1,\dots,e_n)}) &\To (T'(\elab[x]{e}))(\elab[x]{e_1},\dots,\elab[x]{e_n})\\
+    T(\elab[x]{\handler{\return(x) \{e\}, s_1 \{e_1\}, \dots, s_n \{e_n\}}}) &\To \handler{\return(x) \{\elab{e}\}, s_1 \{\elab{e_1}\}, \dots, s_n \{\elab{e_n}\}}\\
+    T(\elab[x]{\handle{e_1}{e_2}}) &\To \handle{\elab[x]{e_1}}{\elab[x]{e_2}}\\
+    T(e) &\To e\\
+    \\
+    T'(\elab[x]{\lambda x_1,\dots,x_n . e}) &= \lambda x_1,\dots,x_n . T(\elab[x]{e})\\
+    T'(e) &= T(e)
+\end{align*}
+
+Both $T$ and $T'$ are folds i don't know how to write that nicely.
+
+Note that $\elab[x]{x!(e_1,\dots,e_n)}$ is the only expression wrapped in an $\elab\!\!$ that is preserved. So now we can elaborate those (assuming that by well-typedness $\elab[x]$ contains the elaboration for $x!$). Under this assumption, the reduction rule for elab becomes:
+\begin{align*}
+    \elab[\Gamma]{x!(e_1, \dots, e_n)} \reduce& \elab[\Gamma]{e[x_1\mapsto e_1, \dots, x_n\mapsto e_n]}\\
+    &\qquad\text{where } x!(x_1, \dots, x_n)\;e \in \Gamma
+\end{align*}
+Because we are just applying the rule from the reduction semantics, this is guaranteed to preserve semantics\todo{Is this always true? Is there known proof for this?}.
+
+Now we repeat this operation until there are no more elabs in the program.
+
+If we now show that each of these operations preserve semantics, we prove that the entire compilation procedure preserves semantics.
+
+\textbf{So that was a dead end.}
+
+The problem lies with the following case:
+
+\[
+    \elab[1]{\S{\elab[2]{\S{\lambda x. x()}}(\lambda x. a!())}}
+\]
+
+First not how, if we just return a lambda value, no elaboration takes place in the body, because the lambda is not evaluated in that context. So $\elab[1]{}$ does not elaborate $a!$, but, it should, because the lambda with $a!$ is passed to the other lambda and applied within $\elab[1]{}$. Hence, figuring out which elaboration should be applied to each operation becomes a whole program analysis and is therefore infeasible.
+
+\subsection{The Type Approach}
+
+It turns out that there is a correlation between the types and which elaborations should be applied. Take the previous example. If we add unique identifiers to each higher-order operation, we get:
+
+\[
+    \elab[1]{\S{\elab[2]{\S{\lambda x. x()}}(\lambda x. a_1!())}}
+\]
+
+Now we add those identifiers to the effect row. So the type for $a_1!()$ is $\row{A!: \S{1}} ()$ and we keep those identifiers throughout the type analysis. The type of the subexpression of $\elab[1]{}$ is then also $\row{A!: \S{1}} ()$ and we can substitute the each indentifier in the effect row with the elaboration.
+
+This works quite well, because it will always find an appropriate elaboration, but it still breaks down.
+
+The problem is that one operation in the syntax tree might be associated with multiple elaborations. Take this program for example:
+
+\begin{align*}
+    &\elab[1]{\{\\
+    &\quad\val g = \elab[2]{\{\\
+    &\quad\quad\val f = \lambda x. a!()\\
+    &\quad\quad\kw{if} k\;\kw{then}\\
+    &\quad\quad\quad f\\
+    &\quad\quad\kw{else}\{\\
+    &\quad\quad\quad\val r = f()\\
+    &\quad\quad\quad\lambda x. ()\\
+    &\quad\quad\}\\
+    &\quad\}}\\
+    &\quad g()\\
+    &\}}
+\end{align*}
+
+Following the type analysis we just established, the subexpression of $\elab[2]{}$ has the type:
+\[
+    \row{A!: \S{1}} \Big(\unit \to \row{A!: \S{1}} \unit\Big).
+\]
+
+The identifier $1$ shows up multiple times in the signature and could therefore be elaborated by either $\elab[1]$ or $\elab[2]$, depending on the value of $k$. This means that it's impossible in general to find a unique elaboration for each operation in the program, which definitely throws a wrench in our plans.
+
+Of course, we could still remove \emph{most} higher-order effects with this approach, as long as the identifiers are unique in signature.
+
+\subsection{The Handler Approach}
+
+So now we know that some elaborations need to be determined at runtime, but that does not mean that we can't desugar them. The idea is as follows.
+
+Let's see what we learned from the previous attempt: figuring out the right elaboration is hard (or impossible), but elab and handle use very similar reduction semantics, so we might be able to exploit that.
+
+So we leave the ``decision" on the elaboration to the runtime evaluation. Imagine a function that takes an elaboration identifier and evaluates the result of applying that elaboration. Now we just need some way to determine which elaboration to apply. We can use (algebraic) effects for that, because of the similar reduction semantics.
+
+Say we have an effect $A!$ with operation $a!$ and elaborations $E_1, \dots, E_N$. Let $E_i[a!(\dots)]$ be the elaboration of $a!$ by $E_i$. We then substitute each operation $a!(\dots)$ with
+
+\begin{align*}
+    &\{\\
+    &\quad \val e = ask_{A!}()\\
+    &\quad \kw{if} eq(e, 1)\;\kw{then} E_1[a!(\dots)]\\
+    &\quad \kw{else}\kw{if} eq(e, 2)\;\kw{then} E_2[a!(\dots)]\\
+    &\quad \dots\\
+    &\quad \kw{else}\kw{if} eq(e, N-1)\;\kw{then} E_{N-1}[a!(\dots)]\\
+    &\quad \kw{else} E_N[a!(\dots)]\\
+    &\}
+\end{align*}
+\todo[inline]{We might need to make $e$ a unique variable here. It could of course also be inlined, but this clearer for demonstration purposes.}
+Note that this expression depends on the subexpression of the operation. It cannot be expressed as a function, only as a macro, but those are not in the language.
+
+Then, we substitute each $\elab\S{e}$ with an elaboration $E_i$ with
+\begin{align*}
+    &\handle{H_{A!}(i)}{\{e\}}
+\end{align*}
+where $H$ is defined as
+\begin{align*}
+    &\val H_{A!} =\lambda i. \handler \{\\
+    &\quad\return(x) \S{x}\\
+    &\quad ask_{A!}() \S{ resume(i) }\\
+    &\}\\
+\end{align*}
+
+The $ask$ operation is used to evoke the semantics of the reader effect (without $local$, so just the algebraic part). It essentially checks what handler is being used.
+
+From here, we can then simplify if we want to by reasoning about which handlers apply in which situations, but that is not necessary.
+
+Of course, $\elab\!$ could elaborate multiple effects, which means that it would compile to nested handlers.
+
+\remark{Alternatively, there is a single $Elab$ effect, with an operation $ask$ which takes two arguments: the higher-order effect indentifier and the elaboration identifier. It remains to be seens which one is easier. The semantics should be equivalent.}
+
+What's nice about this approach is that it is purely local and it exploits the similarities between the evaluation of handlers and elaborations. It does not require a full analysis of the program. It only requires collecting all the elaborations and giving them unique identifiers.
+
+What's weird is that this adds additional effects, so we need some additional arguments to prove that the transformation is not just correct but also well-typed. Proving the operational semantics equivalent should be fairly straightforward though, because handlers and elaborations depend on the same context in the reduction semantics.
+
+Another cool thing here is that $\elab\!$ can be partial, i.e. elaborate only some effects, not all of them.
+
+This could still be combined with the type approach, where the type approach is applied when the elaboration is unambiguous and the handler approach is used as fallback in more difficult cases. But that means that we would have to prove both approaches correct (and their combination), which is much harder of course.
+
+\subsection{How do we prove the handler approach to be correct}
+
+Let $P$ be the original program and $Q$ the transformed program.
+
+Obviously, any program without higher-order effects and elaborations will behave the same, before and after the transformation. Similarly, any subexpression without elab and higher-order effects will behave the same.
+
+By well-typedness any higher-order operation is a subexpression of an elab.
+
+We should be able to make the following arguments:
+\begin{itemize}
+\item Until the transformed elab $P$ and $Q$ have the same trace.
+\item Inside the elab in $P$ and handlers in $Q$, the trace is the same until the context focuses on an operation.
+\item With a few steps in $Q$ we then transform the expression into the same expression as in $P$.
+\item We repeat the last two steps.
+\item When the subexpression of the elab/handlers reduces to a value, they both reduce to the value.
+\item Then we again have identical traces until the next elab.
+\end{itemize}
+
+Now actually doing this proof is difficult. Let's see if we can write this down somehow:
+\todo{Actually write this out.}
 \end{document}
