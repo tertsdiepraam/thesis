@@ -67,11 +67,14 @@ parens = delimiters "(" ")"
 braces :: Parser a -> Parser a
 braces = delimiters "{" "}"
 
+brackets :: Parser a -> Parser a
+brackets = delimiters "[" "]"
+
 angles :: Parser a -> Parser a
 angles = delimiters "<" ">"
 
-semicolon :: Parser Text
-semicolon = symbol ";"
+-- semicolon :: Parser Text
+-- semicolon = symbol ";"
 
 comma :: Parser Text
 comma = symbol ","
@@ -122,7 +125,6 @@ declaration = do
             <|> decVal
             <|> decType
             <|> decEffect
-            <|> decElaboration
         )
 
 visibility :: Parser Visibility
@@ -131,11 +133,11 @@ visibility = Public <$ try (keyword "pub") <|> return Private
 decImport :: Parser DeclarationType
 decImport = Import <$> try (keyword "import" >> ident)
 
-decElaboration :: Parser DeclarationType
-decElaboration = do
+elaboration :: Parser Expr
+elaboration = do
   from <- try (keyword "elaboration") >> ident
   to <- symbol "->" >> effectRow
-  DecElaboration . Elaboration from to <$> braces (many operationClause)
+  Val . Elb . Elaboration from to <$> braces (many operationClause)
 
 decVal :: Parser DeclarationType
 decVal = do
@@ -228,6 +230,7 @@ expr =
     <|> handle
     <|> elab
     <|> handler
+    <|> elaboration
     <|> try app
     <|> (Var <$> ident)
 
@@ -255,7 +258,12 @@ handle :: Parser Expr
 handle = try (keyword "handle") >> Handle <$> expr <*> expr
 
 elab :: Parser Expr
-elab = try (keyword "elab") >> Elab <$> expr
+elab = do
+  _ <- try (keyword "elab")
+  elaborationExpr <- optional (brackets expr)
+  case elaborationExpr of
+    Just a -> Elab a <$> expr
+    Nothing -> ImplicitElab <$> expr
 
 app :: Parser Expr
 app = do

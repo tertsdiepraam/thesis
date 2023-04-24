@@ -23,7 +23,6 @@ data DeclarationType
   | DecLet Ident Expr
   | DecType Ident [Constructor]
   | DecEffect Effect [OperationSignature]
-  | DecElaboration Elaboration
   deriving (Show, Eq)
 
 data OperationSignature = OperationSignature Ident [ValueType] ValueType
@@ -62,7 +61,8 @@ data Expr
   | Fn Function
   | Handle Expr Expr
   | Match Expr [MatchArm]
-  | Elab Expr
+  | ImplicitElab Expr
+  | Elab Expr Expr
   | Var Ident
   | Let Ident Expr Expr
   | Val Value
@@ -74,6 +74,7 @@ data Value
   | Bool Bool
   | Lam [Ident] Expr
   | Hdl Handler
+  | Elb Elaboration
   | Constant BuiltIn
   | Data String String [Expr]
   | Unit

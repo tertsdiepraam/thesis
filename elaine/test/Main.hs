@@ -168,14 +168,14 @@ testExec = describe "exec" $ do
           a!() Int
         }
 
-        elaboration A! -> <> {
+        let elabA = elaboration A! -> <> {
           a!() {
             10
           }
         }
 
         let main = {
-          elab { a!() }
+          elab[elabA] { a!() }
         }
       }
     |]
@@ -193,7 +193,7 @@ testExec = describe "exec" $ do
           b!() Int
         }
 
-        elaboration B! -> <A> {
+        let eB = elaboration B! -> <A> {
           b!() {
             a()
           }
@@ -209,7 +209,7 @@ testExec = describe "exec" $ do
             }
           }
           handle h {
-            elab {
+            elab[eB] {
               b!()
             }
           }
@@ -319,40 +319,6 @@ testExec = describe "exec" $ do
     |]
       `shouldBeP` String "hello world"
 
-  -- it "can handle a logger with context" $ do
-  --   f [r|
-  --     mod main {
-  --       effect Write {
-  --         write(String) ()
-  --       }
-
-  --       effect Log! {
-  --         context!(String, a) a
-  --         log!(String)
-  --       }
-
-  --       # TODO: Fix return type
-  --       let h = fn(prefix: String) () {
-  --         handler {
-  --           return(x) {
-  --             ""
-  --           }
-  --           write(m) {
-  --             let rest = resume(());
-  --             let prefixed = concat(prefix, m);
-  --             concat(concat(prefixed, "\n"), rest)
-  --           }
-  --         }
-  --       }
-
-  --       elaboration Log! -> Write {
-  --         context!(s, c) {
-
-  --         }
-  --       }
-  --     }
-  --   |]
-
   it "can turn values into strings" $ do
     f
       [r|
@@ -363,7 +329,7 @@ testExec = describe "exec" $ do
     |]
       `shouldBeP` String "5"
 
-  it "can use construct data types" $ do
+  it "can construct data types" $ do
     f
       [r|
       mod main {
@@ -509,7 +475,7 @@ testExec = describe "exec" $ do
           abort() { Nothing() }
         }
 
-        elaboration Exc! -> <Abort> {
+        let e = elaboration Exc! -> <Abort> {
           catch!(e) {
             handle h e
           }
@@ -526,7 +492,7 @@ testExec = describe "exec" $ do
         }
 
         let main = handle h {
-          elab {
+          elab[e] {
             match catch!(safediv(5, 0)) {
               Just(x) => concat("the answer is: ", show(x))
               Nothing() => "cannot divide by 0"
@@ -602,7 +568,7 @@ testExec = describe "exec" $ do
           }
         }
 
-        elaboration Reader! -> <Reader> {
+        let eReader = elaboration Reader! -> <Reader> {
           ask!() { ask() }
           local!(f, c) {
             handle h(f(ask())) { c }
@@ -618,7 +584,7 @@ testExec = describe "exec" $ do
         }
 
         let main = {
-          handle h(1) elab {
+          handle h(1) elab[eReader] {
             let x = ask!()
             local!(double, {
               let y = ask!()
@@ -644,17 +610,15 @@ testExec = describe "exec" $ do
           log!(String) ()
         }
 
-        effect Log {
-          log(String, String) ()
-          getCtx() String
+        effect Writer {
+          write(String) ()
         }
 
         effect Reader {
           ask() String
         }
 
-        # TODO handler type
-        let hLog = handler {
+        let hWrite = handler {
           return(x) { "" }
           log(x) {
             let rest = resume(())
@@ -663,6 +627,7 @@ testExec = describe "exec" $ do
           }
         }
 
+        # TODO handler type
         let hRead = fn(x: <> String) <> h {
           handler {
             return(y) { y }
@@ -670,7 +635,7 @@ testExec = describe "exec" $ do
           }
         }
 
-        elaboration Log! -> <Log,Reader> {
+        let eLog = elaboration Log! -> <Writer,Reader> {
           context!(s, c) {
             let newCtx = concat(concat(ask(), ":"), s)
             handle hRead(newCtx) c
@@ -681,7 +646,7 @@ testExec = describe "exec" $ do
           }
         }
 
-        let main = handle hRead("root") handle hLog elab {
+        let main = handle hRead("root") handle hWrite elab[eLog] {
           let _ = log!("one")
           context!("foo", {
             let _ = log!("two")

@@ -32,8 +32,6 @@ instance Pretty DeclarationType where
     "type " ++ name ++ " " ++ concatBlock constructors
   pretty (DecEffect name operations) =
     "effect " ++ name ++ " " ++ concatBlock operations
-  pretty (DecElaboration (Elaboration from to functions)) =
-    "elaboration " ++ from ++ " -> " ++ pretty to ++ " " ++ concatBlock functions
 
 instance Pretty HandleReturn where
   pretty (HandleReturn var body) =
@@ -55,7 +53,7 @@ instance Pretty Expr where
   pretty (Fn function) = pretty function 
   pretty (App name params) = pretty name ++ "(" ++ intercalate ", " (map pretty params) ++ ")"
   pretty (Handle handler computation) = "handle " ++ pretty handler ++ " " ++ pretty computation
-  pretty (Elab computation) = "elab " ++ pretty computation
+  pretty (Elab e computation) = "elab[" ++ pretty e ++ "] " ++ pretty computation
   -- pretty (Match e arms) = "match " ++ pretty e ++ " " ++ concatBlock arms
   pretty (Var var) = var
   pretty (Val v) = pretty v

@@ -42,8 +42,8 @@ data Env = Env
 --
 -- The reductions are not recursive. Instead they only check the outermost
 -- expression. However, they may require the operands to be values.
-reduce :: Env -> Expr -> Maybe Expr
-reduce env = \case
+reduce :: Expr -> Maybe Expr
+reduce = \case
   Fn (Function params _ e) -> Just $ Val $ Lam (map fst params) e
   If (Val v) e1 e2 -> Just $ case v of
     Bool b -> if b then e1 else e2
@@ -60,8 +60,8 @@ reduce env = \case
           _ -> error "First argument to handle must be a handler"
         reduced = reduceHandler h e
      in reduced
-  Elab (Val v) -> Just $ Val v
-  Elab e -> Elab <$> reduceElab env e
+  Elab (Val _) (Val v) -> Just $ Val v
+  Elab (Val (Elb elab)) e -> Elab (Val $ Elb elab) <$> reduceElab elab e
   Match (Val v) arms ->
     -- so what do we want to do:
     --  - find the arm that matches the expression
@@ -80,8 +80,8 @@ reduce env = \case
           else error "Number of arguments in pattern do not match expression"
   _ -> Nothing
 
-reduceState :: Env -> State -> Maybe State
-reduceState env (e, c) = case reduce env e of
+reduceState :: State -> Maybe State
+reduceState (e, c) = case reduce e of
   Just e' -> Just (e', c)
   Nothing -> Nothing
 
@@ -117,7 +117,7 @@ ctxE exp = ctxCommon exp <|> ctxE' exp
     ctxE' = \case
       Handle (Val h) e' -> Just (e', Handle $ Val h)
       Handle e1 e2 -> Just (e1, \x -> Handle x e2)
-      Elab e' -> Just (e', Elab)
+      Elab e1' e2' -> Just (e2', Elab e1')
       _ -> Nothing
 
 ctxHandler :: Ident -> Ctx
@@ -129,7 +129,8 @@ ctxHandler op exp = ctxCommon exp <|> ctxHandler' exp
           then Just (e, Handle $ Val $ Hdl h)
           else Nothing
       Handle e1 e2 -> Just (e1, \x -> Handle x e2)
-      Elab e -> if isAlgebraic op then Just (e, Elab) else Nothing
+      Elab (Val elab) e -> if isAlgebraic op then Just (e, Elab (Val elab)) else Nothing
+      Elab e1 e2 -> if isAlgebraic op then Just (e1, \x -> Elab x e2) else Nothing
       _ -> Nothing
 
 -- The context for an elaboration can go into handles, but not other elabs.
@@ -141,7 +142,7 @@ ctxElab exp = ctxCommon exp <|> ctxElab' exp
     ctxElab' = \case
       Handle (Val h) e -> Just (e, Handle $ Val h)
       Handle e1 e2 -> Just (e1, \x -> Handle x e2)
-      Elab _ -> Nothing
+      Elab _ _ -> Nothing
       _ -> Nothing
 
 -- Step out of the current expression, by popping the head of the context
@@ -164,7 +165,7 @@ compose (e, c : cs) = compose (c e, cs)
 -- than we need to, but that's OK. Because we have the "atomic" operations above,
 -- we can define more complex schemes if necessary.
 step :: Env -> State -> State
-step env s = fromMaybe ((compose1 . step env . f . decompose1 ctxE) s) (reduceState env s)
+step env s = fromMaybe ((compose1 . step env . f . decompose1 ctxE) s) (reduceState s)
   where
     f (Just a) = a
     f Nothing = error ("could not reduce or decompose: " ++ show (fst s))
@@ -203,7 +204,7 @@ subst1 (x, new) = \case
   App e es -> App (f e) (map f es)
   If e1 e2 e3 -> If (f e1) (f e2) (f e3)
   Handle e1 e2 -> Handle (f e1) (f e2)
-  Elab e -> Elab (f e)
+  Elab e1 e2 -> Elab (f e1) (f e2)
   Let y e1 e2 -> if x == y then Let y (f e1) e2 else Let y (f e1) (f e2)
   -- TODO prevent name shadowing in match arms
   Match e arms -> Match (f e) (map mapArms arms)
@@ -231,9 +232,24 @@ subst1 (x, new) = \case
             )
             hClauses
      in Val $ Hdl $ Handler (HandleReturn retVar ret') clauses'
+  Val (Elb (Elaboration eff row elabClauses)) ->
+    Val $
+      Elb $
+        Elaboration
+          eff
+          row
+          ( map
+              ( \c@(OperationClause name params body) ->
+                  if x `elem` params
+                    then c
+                    else OperationClause name params (f body)
+              )
+              elabClauses
+          )
   Val (Data y i args) -> Val $ Data y i (map f args)
   Val y -> Val y
   -- x' -> error ("Could not substitute" ++ show x')
+  ImplicitElab _ -> error "Implicit elab should have been made explicit"
   where
     f = subst1 (x, new)
 
@@ -272,14 +288,13 @@ reduceHandler h e = case e of
           cont = [("resume", k)]
       _ -> Nothing
 
-reduceElab :: Env -> Expr -> Maybe Expr
-reduceElab env e = case decompose ctxElab (traceShowId e) of
-  (Var x, c : cs) | isHigherOrder (traceShowId x) ->
+reduceElab :: Elaboration -> Expr -> Maybe Expr
+reduceElab elab e = case decompose ctxElab (traceShowId e) of
+  (Var x, c : cs) -> do
+    OperationClause _ params body <- find (\c' -> clauseName c' == x) (clauses elab)
     case c (Var x) of
-      App (Var _) args -> do
-        let allClauses = concatMap clauses (envElaborations env)
-        OperationClause _ params body <- find (\c' -> clauseName c' == x) allClauses
-        Just $ traceShowId (compose (subst (zip params (map Elab args)) body, cs))
+      App (Var _) args ->
+        Just $ compose (subst (zip params (map (Elab (Val $ Elb elab)) args)) body, cs)
       _ -> Nothing
   _ -> Nothing
 
@@ -317,14 +332,6 @@ updateEnv _ env (DecLet x expr) =
         }
 -- Effects mostly matter for type checking, not in evaluation, so skip 'em
 updateEnv _ m (DecEffect _ _) = m
-updateEnv _ m (DecElaboration (Elaboration x y elabClauses)) = 
-  let
-    bindings = assocs $ envBindings m
-    exprBindings = map (second Val) bindings
-    sub = subst exprBindings
-    clauses' = map (\(OperationClause x' xs e) -> OperationClause x' xs $ sub e) elabClauses
-  in
-    m {envElaborations = insertOrError x (Elaboration x y clauses') (envElaborations m)}
 
 insertOrError :: (Show k, Ord k) => k -> v -> Map k v -> Map k v
 insertOrError k v m =
