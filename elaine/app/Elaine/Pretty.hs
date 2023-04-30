@@ -52,9 +52,12 @@ instance Pretty Expr where
   pretty (If c e1 e2) = "if " ++ pretty c ++ " then " ++ pBlock (pretty e1) ++ " else " ++ pBlock (pretty e2)
   pretty (Fn function) = pretty function 
   pretty (App name params) = pretty name ++ "(" ++ intercalate ", " (map pretty params) ++ ")"
-  pretty (Handle handler computation) = "handle " ++ pretty handler ++ " " ++ pretty computation
-  pretty (Elab e computation) = "elab[" ++ pretty e ++ "] " ++ pretty computation
-  -- pretty (Match e arms) = "match " ++ pretty e ++ " " ++ concatBlock arms
+  -- pretty (Handle handler computation) = "handle " ++ pretty handler ++ " " ++ pretty computation
+  pretty (Handle _ computation) = "handle ... " ++ pretty computation
+  -- pretty (Elab e computation) = "elab[" ++ pretty e ++ "] " ++ pretty computation
+  pretty (Elab _ computation) = "elab[...] " ++ pretty computation
+  pretty (ImplicitElab e) = "elab " ++ pretty e
+  pretty (Match e arms) = "match " ++ pretty e ++ " " ++ concatBlock arms
   pretty (Var var) = var
   pretty (Val v) = pretty v
 
@@ -66,7 +69,14 @@ instance Pretty Value where
   pretty (Hdl (Handler ret functions)) =
     "handler "
       ++ pBlock (unlines (pretty ret : map pretty functions))
+  pretty (Elb (Elaboration from to clauses)) =
+    "elaboration " ++ from ++ " -> " ++ pretty to ++ pBlock (unlines (map pretty clauses))
+  pretty (Data type' variant args) = type' ++ "." ++ variant ++ "(" ++ concatMap pretty args ++ ")"
+  pretty (Constant x) = pretty x
   pretty Unit = "()"
+
+instance Pretty BuiltIn where
+  pretty (BuiltIn name _) = "<|" ++ name ++ "|>"
 
 instance Pretty MatchArm where
   pretty (MatchArm pat e) = pretty pat ++ " => " ++ pretty e

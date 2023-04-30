@@ -31,9 +31,6 @@ data OperationSignature = OperationSignature Ident [ValueType] ValueType
 data Elaboration = Elaboration Ident EffectRow [OperationClause]
   deriving (Show, Eq)
 
-clauses :: Elaboration -> [OperationClause]
-clauses (Elaboration _ _ cs) = cs
-
 data Handler = Handler HandleReturn [OperationClause]
   deriving (Show, Eq)
 

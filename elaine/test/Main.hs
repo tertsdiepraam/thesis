@@ -7,6 +7,7 @@ import Elaine.AST
 import Elaine.Eval (evalExpr, evalModule, newEnv)
 import Elaine.Exec (exec)
 import Elaine.Parse (ParseResult, parseExpr, parseProgram, prettyError)
+import Elaine.Pretty (pretty)
 import Test.Hspec
   ( Expectation,
     SpecWith,
@@ -16,6 +17,7 @@ import Test.Hspec
     shouldBe,
   )
 import Text.RawString.QQ
+import Elaine.ElabTransform (elabTrans)
 
 tt :: Expr
 tt = Val $ Bool True
@@ -32,6 +34,19 @@ result `shouldBeP` e = do
     Left a -> putStr a
     Right a -> pure ()
   prettyError result `shouldBe` Right e
+
+-- Check transformed
+shouldEvalTo :: String -> Value -> Expectation
+x `shouldEvalTo` e = case prettyError (parseProgram x) of
+    Left a -> putStr a
+    Right parsed -> do
+      putStrLn "======= Original ======="
+      putStrLn (pretty parsed)
+      exec parsed `shouldBe` e
+      let transformed = elabTrans parsed
+      putStrLn "====== Transformed ======"
+      putStrLn (pretty transformed)
+      exec transformed `shouldBe` e
 
 main :: IO ()
 main = hspec $ do
@@ -144,12 +159,12 @@ testEval = describe "eval0" $ do
 
 testExec :: SpecWith ()
 testExec = describe "exec" $ do
-  let f x = fmap exec (parseProgram x)
-
   it "interprets a simple main module" $ do
-    f "mod main { let main = 5 }" `shouldBe` Right (Int 5)
-    f
-      [r|
+    "mod main { let main = 5 }"
+      `shouldEvalTo` Int
+        5
+    
+    [r|
       mod main {
         let main = {
           let x = 5
@@ -158,11 +173,10 @@ testExec = describe "exec" $ do
         }
       }
     |]
-      `shouldBeP` Int 5
+      `shouldEvalTo` Int 5
 
   it "elaborates higher order effects into values" $ do
-    f
-      [r|
+    [r|
       mod main {
         effect A! {
           a!() Int
@@ -179,11 +193,10 @@ testExec = describe "exec" $ do
         }
       }
     |]
-      `shouldBeP` Int 10
+      `shouldEvalTo` Int 10
 
   it "elaborates higher order effects into algebraic effects" $ do
-    f
-      [r|
+    [r|
       mod main {
         effect A {
           a() Int
@@ -216,68 +229,61 @@ testExec = describe "exec" $ do
         }
       }
     |]
-      `shouldBeP` Int 101
+      `shouldEvalTo` Int 101
 
   it "can access global values" $ do
-    f
-      [r|
+    [r|
       mod main {
         let x = 5
         let y = 6
         let main = if true then x else y
       }
     |]
-      `shouldBeP` Int 5
+      `shouldEvalTo` Int 5
 
   it "can use functions from the standard library" $ do
-    f
-      [r|
+    [r|
       mod main {
         import std
         let main = add(6, 5)
       }
     |]
-      `shouldBeP` Int 11
+      `shouldEvalTo` Int 11
 
-    f
-      [r|
+    [r|
       mod main {
         import std
         let main = sub(6, 5)
       }
     |]
-      `shouldBeP` Int 1
+      `shouldEvalTo` Int 1
 
-    f
-      [r|
+    [r|
       mod main {
         import std
         let main = mul(6, 5)
       }
     |]
-      `shouldBeP` Int 30
-
-    f
-      [r|
+      `shouldEvalTo` Int 30
+    
+    [r|
       mod main {
         import std
         let main = concat(concat("hello", " "), "world")
       }
     |]
-      `shouldBeP` String "hello world"
+      `shouldEvalTo` String "hello world"
 
-    f
-      [r|
+    [r|
       mod main {
         import std
         let main = and(true, true)
       }
     |]
-      `shouldBeP` Bool True
+      `shouldEvalTo` Bool True
 
   it "a" $ do
-    f
-      [r|
+    [r|
       mod main {
         import std
         let main = {
@@ -287,11 +293,10 @@ testExec = describe "exec" $ do
         }
       }
     |]
-      `shouldBeP` Int 34
+      `shouldEvalTo` Int 34
 
   it "handler the Out effect" $ do
-    f
-      [r|
+    [r|
       mod main {
         import std
 
@@ -305,7 +310,6 @@ testExec = describe "exec" $ do
           }
           write(m) {
             let rest = resume(())
-            concat(m, rest)
           }
         }
 
@@ -317,21 +321,19 @@ testExec = describe "exec" $ do
         }
       }
     |]
-      `shouldBeP` String "hello world"
+      `shouldEvalTo` String "hello world"
 
   it "can turn values into strings" $ do
-    f
-      [r|
+    [r|
       mod main {
         import std
         let main = show(5)
       }
     |]
-      `shouldBeP` String "5"
+      `shouldEvalTo` String "5"
 
   it "can construct data types" $ do
-    f
-      [r|
+    [r|
       mod main {
         type Either {
           Left(<> a)
@@ -341,11 +343,10 @@ testExec = describe "exec" $ do
         let main = Left(5)
       }
     |]
-      `shouldBeP` Data "Either" "Left" [Val $ Int 5]
+      `shouldEvalTo` Data "Either" "Left" [Val $ Int 5]
 
   it "can represent a list" $ do
-    f
-      [r|
+    [r|
       mod main {
         type List {
           Nil()
@@ -355,11 +356,10 @@ testExec = describe "exec" $ do
         let main = Cons(1, Cons(2, Nil()))
       }
     |]
-      `shouldBeP` Data "List" "Cons" [Val $ Int 1, Val $ Data "List" "Cons" [Val $ Int 2, Val $ Data "List" "Nil" []]]
+      `shouldEvalTo` Data "List" "Cons" [Val $ Int 1, Val $ Data "List" "Cons" [Val $ Int 2, Val $ Data "List" "Nil" []]]
 
   it "can match on custom data types" $ do
-    f
-      [r|
+    [r|
       mod main {
         type Bool {
           False()
@@ -372,11 +372,10 @@ testExec = describe "exec" $ do
         }
       }
     |]
-      `shouldBeP` Int 5
+      `shouldEvalTo` Int 5
 
   it "can call a defined function" $ do
-    f
-      [r|
+    [r|
       mod main {
         import std
         let add3 = fn(a: <>Int, b: <>Int, c: <>Int) <> Int {
@@ -386,11 +385,10 @@ testExec = describe "exec" $ do
         let main = add3(1, 2, 3)
       }
     |]
-      `shouldBeP` Int 6
+      `shouldEvalTo` Int 6
 
   it "can call a function returning a custom datatype" $ do
-    f
-      [r|
+    [r|
       mod main {
         import std
 
@@ -409,11 +407,10 @@ testExec = describe "exec" $ do
         let main = safediv(6, 0)
       }
     |]
-      `shouldBeP` Data "Maybe" "Nothing" []
+      `shouldEvalTo` Data "Maybe" "Nothing" []
 
   it "can handle the abort effect" $ do
-    f
-      [r|
+    [r|
       mod main {
         import std
         
@@ -444,15 +441,13 @@ testExec = describe "exec" $ do
           safediv(x, y)
         } {
           Nothing() => "cannot divide by zero"
-          Just(a) => concat("the answer is: ", show(a))
         }
       }
     |]
-      `shouldBeP` String "cannot divide by zero"
+      `shouldEvalTo` String "cannot divide by zero"
 
   it "can elaborate and handle exceptions" $ do
-    f
-      [r|
+    [r|
       mod main {
         import std
 
@@ -494,18 +489,16 @@ testExec = describe "exec" $ do
         let main = handle h {
           elab[e] {
             match catch!(safediv(5, 0)) {
-              Just(x) => concat("the answer is: ", show(x))
               Nothing() => "cannot divide by 0"
             }
           }
         }
       }
     |]
-      `shouldBeP` Data "Maybe" "Just" [Val $ String "cannot divide by 0"]
+      `shouldEvalTo` Data "Maybe" "Just" [Val $ String "cannot divide by 0"]
 
   it "can do a state effect" $ do
-    f
-      [r|
+    [r|
       mod main {
         import std
 
@@ -537,17 +530,35 @@ testExec = describe "exec" $ do
             let x = get()
             let _ = put(6)
             let y = get()
-            concat(show(x), concat(", ", show(y)))
           }
           f(5)
         }
       }
     |]
-      `shouldBeP` String "5, 6"
+      `shouldEvalTo` String "5, 6"
 
+  it "can do some funky stuff" $ do
+    [r|
+      mod main {
+        import std
+        let hVal = handler {
+          return(x) { x }
+          val(f) {
+            resume(fn () <> Int { f(5) })
+          }
+        }
+        let timesTwo = fn(x: <> Int) <> Int {
+          mul(2, x)
+        }
+        let main = handle hVal {
+          let f = val(timesTwo)
+          f()
+        }
+      }
+    |] `shouldEvalTo` Int 10
+  
   it "can do the reader effect" $ do
-    f
-      [r|
+    [r|
       mod main {
         import std
 
@@ -597,11 +608,43 @@ testExec = describe "exec" $ do
         }
       }
     |]
-      `shouldBeP` Data "Triple" "t" [Val $ Int 1, Val $ Int 2, Val $ Int 4]
+      `shouldEvalTo` Data "Triple" "t" [Val $ Int 1, Val $ Int 2, Val $ Int 4]
+  
+  it "readsimple" $ do
+    [r|
+    mod main {
+        import std
+
+        let h = fn(x: <> a) <> c {
+          handler {
+            return(y) { y }
+            ask() { resume(x) }
+          }
+        }
+
+        let eReader = elaboration Reader! -> <Reader> {
+          ask!() { ask() }
+          local!(f, c) {
+            handle h(f(ask())) { c }
+          }
+        }
+
+        let double = fn(x: <> Int) <> Int {
+          mul(2, x)
+        }
+
+        let main = {
+          handle h(1) elab[eReader] {
+            local!(double, {
+              ask!()
+            })
+          }
+        }
+      }
+    |] `shouldEvalTo` Int 2
 
   it "can do the log effect" $ do
-    f
-      [r|
+    [r|
       mod main {
         import std
 
@@ -657,4 +700,5 @@ testExec = describe "exec" $ do
         }
       }
     |]
-      `shouldBeP` String "root: one\nroot:foo: two\nroot:foo:bar: three\n"
+      `shouldEvalTo` String "root: one\nroot:foo: two\nroot:foo:bar: three\n"
+

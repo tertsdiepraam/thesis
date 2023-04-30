@@ -3,16 +3,17 @@
 
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
 
-module Elaine.Eval (evalExpr, evalModule, envName, envBindings, newEnv, Env) where
+module Elaine.Eval (evalExpr, evalModule, envName, envBindings, newEnv, Env, subst) where
 
 import Control.Applicative ((<|>))
 import Data.Bifunctor (second)
-import Data.List (find, isSuffixOf)
+import Data.List (find)
 import Data.Map (Map, assocs, empty, fromList, insert, member, union)
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Debug.Trace
 import Elaine.AST
 import Prelude hiding (exp)
+import Elaine.Pretty (pretty)
 
 -- The decomposition is a list of functions that plug an expression into
 -- another expression. Composing them gives back the original expression
@@ -44,7 +45,6 @@ data Env = Env
 -- expression. However, they may require the operands to be values.
 reduce :: Expr -> Maybe Expr
 reduce = \case
-  Fn (Function params _ e) -> Just $ Val $ Lam (map fst params) e
   If (Val v) e1 e2 -> Just $ case v of
     Bool b -> if b then e1 else e2
     _ -> error "Invalid condition for if expression"
@@ -52,7 +52,7 @@ reduce = \case
     Just $ case v of
       Lam params body -> subst (zip params args) body
       Constant (BuiltIn _ body) -> Val $ body (map (fromJust . toVal) args)
-      _ -> error "Tried to call a non-function"
+      _ -> error ("Tried to call a non-function: " ++ pretty v)
   Let x (Val v) e -> Just $ subst [(x, Val v)] e
   Handle (Val v) e ->
     let h = case v of
@@ -129,8 +129,8 @@ ctxHandler op exp = ctxCommon exp <|> ctxHandler' exp
           then Just (e, Handle $ Val $ Hdl h)
           else Nothing
       Handle e1 e2 -> Just (e1, \x -> Handle x e2)
-      Elab (Val elab) e -> if isAlgebraic op then Just (e, Elab (Val elab)) else Nothing
-      Elab e1 e2 -> if isAlgebraic op then Just (e1, \x -> Elab x e2) else Nothing
+      Elab (Val elab) e -> Just (e, Elab (Val elab))
+      Elab e1 e2 -> Just (e1, \x -> Elab x e2)
       _ -> Nothing
 
 -- The context for an elaboration can go into handles, but not other elabs.
@@ -165,10 +165,12 @@ compose (e, c : cs) = compose (c e, cs)
 -- than we need to, but that's OK. Because we have the "atomic" operations above,
 -- we can define more complex schemes if necessary.
 step :: Env -> State -> State
-step env s = fromMaybe ((compose1 . step env . f . decompose1 ctxE) s) (reduceState s)
+step env s =
+  -- trace ("====== Step ======\n" ++ pretty (compose s))
+  fromMaybe ((compose1 . step env . f . decompose1 ctxE) s) (reduceState s)
   where
     f (Just a) = a
-    f Nothing = error ("could not reduce or decompose: " ++ show (fst s))
+    f Nothing = error ("could not reduce or decompose: " ++ show (fst s) ++ "\n" ++ show (compose s))
 
 evalExpr :: Env -> Expr -> Value
 evalExpr _ (Val v) = v
@@ -177,12 +179,6 @@ evalExpr env e = evalExpr env . fst $ step env (e, [])
 -------------------------
 -- Helper functions
 -------------------------
-
-isAlgebraic :: Ident -> Bool
-isAlgebraic = not . isHigherOrder
-
-isHigherOrder :: Ident -> Bool
-isHigherOrder x = "!" `isSuffixOf` x
 
 isOpIn :: Ident -> Handler -> Bool
 isOpIn x h = x `elem` map opName (ops h)
@@ -226,7 +222,7 @@ subst1 (x, new) = \case
         clauses' =
           map
             ( \c@(OperationClause name params body) ->
-                if x `elem` params
+                if (x `elem` params) || (x == "resume")
                   then c
                   else OperationClause name params (f body)
             )
@@ -289,9 +285,10 @@ reduceHandler h e = case e of
       _ -> Nothing
 
 reduceElab :: Elaboration -> Expr -> Maybe Expr
-reduceElab elab e = case decompose ctxElab (traceShowId e) of
+reduceElab elab e = case decompose ctxElab e of
   (Var x, c : cs) -> do
-    OperationClause _ params body <- find (\c' -> clauseName c' == x) (clauses elab)
+    let Elaboration _ _ clauses = elab
+    OperationClause _ params body <- find (\c' -> clauseName c' == x) clauses
     case c (Var x) of
       App (Var _) args ->
         Just $ compose (subst (zip params (map (Elab (Val $ Elb elab)) args)) body, cs)
