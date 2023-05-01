@@ -14,7 +14,7 @@ import Test.Hspec
     describe,
     hspec,
     it,
-    shouldBe,
+    shouldBe, expectationFailure,
   )
 import Text.RawString.QQ
 import Elaine.ElabTransform (elabTrans)
@@ -38,13 +38,13 @@ result `shouldBeP` e = do
 -- Check transformed
 shouldEvalTo :: String -> Value -> Expectation
 x `shouldEvalTo` e = case prettyError (parseProgram x) of
-    Left a -> putStr a
+    Left a -> expectationFailure a
     Right parsed -> do
       putStrLn "======= Original ======="
       putStrLn (pretty parsed)
       exec parsed `shouldBe` e
       let transformed = elabTrans parsed
-      putStrLn "====== Transformed ======"
+      putStrLn "====== Transformed ===z==="
       putStrLn (pretty transformed)
       exec transformed `shouldBe` e
 
@@ -64,19 +64,22 @@ testParseExpr = describe "parseExpr" $ do
     f "10" `shouldBe` Right (Val $ Int 10)
     f "\"hello\"" `shouldBe` Right (Val $ String "hello")
     f "()" `shouldBe` Right (Val Unit)
+  
+  it "parses applications" $ do
+    f "hello()(5)" `shouldBe` Right (App (App (Var "hello") []) [Val $ Int 5])
 
   it "parses if expressions" $ do
-    f "if true then false else true" `shouldBe` Right (If tt ff tt)
-    f "if true then 5 else if false then 6 else 7" `shouldBe` Right (If tt (iv 5) (If ff (iv 6) (iv 7)))
+    f "if true { false } else { true }" `shouldBe` Right (If tt ff tt)
+    f "if true { 5 } else { if false { 6 } else { 7 } }" `shouldBe` Right (If tt (iv 5) (If ff (iv 6) (iv 7)))
 
   it "parses handle expressions" $ do
-    f "handle h { if true then true else true }" `shouldBe` Right (Handle (Var "h") (If tt tt tt))
+    f "handle h { if true { true } else { true } }" `shouldBe` Right (Handle (Var "h") (If tt tt tt))
 
   it "parses let expressions" $ do
-    f "let x = if true then true else true\nx" `shouldBe` Right (Let "x" (If tt tt tt) (Var "x"))
+    f "{ let x = if true { true } else { true }; x }" `shouldBe` Right (Let "x" (If tt tt tt) (Var "x"))
 
   it "treats braces transparently" $ do
-    f "{{{{ if {{ true }} then {{ true }} else {{ true }} }}}}" `shouldBe` Right (If tt tt tt)
+    f "{{{{ if {{ true }} {{ true }} else {{ true }} }}}}" `shouldBe` Right (If tt tt tt)
 
 testParseProgram :: SpecWith ()
 testParseProgram = describe "parseProgram" $ do
@@ -160,17 +163,17 @@ testEval = describe "eval0" $ do
 testExec :: SpecWith ()
 testExec = describe "exec" $ do
   it "interprets a simple main module" $ do
-    "mod main { let main = 5 }"
+    "mod main { let main = 5; }"
       `shouldEvalTo` Int
         5
     
     [r|
       mod main {
         let main = {
-          let x = 5
-          let y = 6
-          if true then x else y
-        }
+          let x = 5;
+          let y = 6;
+          if true { x } else { y }
+        };
       }
     |]
       `shouldEvalTo` Int 5
@@ -186,11 +189,11 @@ testExec = describe "exec" $ do
           a!() {
             10
           }
-        }
+        };
 
         let main = {
           elab[elabA] { a!() }
-        }
+        };
       }
     |]
       `shouldEvalTo` Int 10
@@ -210,7 +213,7 @@ testExec = describe "exec" $ do
           b!() {
             a()
           }
-        }
+        };
 
         let main = {
           let h = handler {
@@ -220,13 +223,13 @@ testExec = describe "exec" $ do
             a() {
               101
             }
-          }
+          };
           handle h {
             elab[eB] {
               b!()
             }
           }
-        }
+        };
       }
     |]
       `shouldEvalTo` Int 101
@@ -234,9 +237,9 @@ testExec = describe "exec" $ do
   it "can access global values" $ do
     [r|
       mod main {
-        let x = 5
-        let y = 6
-        let main = if true then x else y
+        let x = 5;
+        let y = 6;
+        let main = if true { x } else { y };
       }
     |]
       `shouldEvalTo` Int 5
@@ -244,40 +247,40 @@ testExec = describe "exec" $ do
   it "can use functions from the standard library" $ do
     [r|
       mod main {
-        import std
-        let main = add(6, 5)
+        import std;
+        let main = add(6, 5);
       }
     |]
       `shouldEvalTo` Int 11
 
     [r|
       mod main {
-        import std
-        let main = sub(6, 5)
+        import std;
+        let main = sub(6, 5);
       }
     |]
       `shouldEvalTo` Int 1
 
     [r|
       mod main {
-        import std
-        let main = mul(6, 5)
+        import std;
+        let main = mul(6, 5);
       }
     |]
       `shouldEvalTo` Int 30
     
     [r|
       mod main {
-        import std
-        let main = concat(concat("hello", " "), "world")
+        import std;
+        let main = concat(concat("hello", " "), "world");
       }
     |]
       `shouldEvalTo` String "hello world"
 
     [r|
       mod main {
-        import std
-        let main = and(true, true)
+        import std;
+        let main = and(true, true);
       }
     |]
       `shouldEvalTo` Bool True
@@ -285,20 +288,20 @@ testExec = describe "exec" $ do
   it "a" $ do
     [r|
       mod main {
-        import std
+        import std;
         let main = {
-          let x = add(5, 10)
-          let y = add(x, 2)
+          let x = add(5, 10);
+          let y = add(x, 2);
           mul(2, y)
-        }
+        };
       }
     |]
       `shouldEvalTo` Int 34
 
-  it "handler the Out effect" $ do
+  it "handles the Out effect" $ do
     [r|
       mod main {
-        import std
+        import std;
 
         effect Out {
           write(String) ()
@@ -309,16 +312,17 @@ testExec = describe "exec" $ do
             ""
           }
           write(m) {
-            let rest = resume(())
+            let rest = resume(());
+            concat(m, rest)
           }
-        }
+        };
 
         let main = handle h {
-          let x = write("hello")
-          let x = write(" ")
-          let x = write("world")
+          write("hello");
+          write(" ");
+          write("world");
           ()
-        }
+        };
       }
     |]
       `shouldEvalTo` String "hello world"
@@ -326,8 +330,8 @@ testExec = describe "exec" $ do
   it "can turn values into strings" $ do
     [r|
       mod main {
-        import std
-        let main = show(5)
+        import std;
+        let main = show(5);
       }
     |]
       `shouldEvalTo` String "5"
@@ -340,7 +344,7 @@ testExec = describe "exec" $ do
           Right(<> b)
         }
 
-        let main = Left(5)
+        let main = Left(5);
       }
     |]
       `shouldEvalTo` Data "Either" "Left" [Val $ Int 5]
@@ -350,10 +354,10 @@ testExec = describe "exec" $ do
       mod main {
         type List {
           Nil()
-          Cons(<> a, <> List)
+          Cons(a, List)
         }
 
-        let main = Cons(1, Cons(2, Nil()))
+        let main = Cons(1, Cons(2, Nil()));
       }
     |]
       `shouldEvalTo` Data "List" "Cons" [Val $ Int 1, Val $ Data "List" "Cons" [Val $ Int 2, Val $ Data "List" "Nil" []]]
@@ -369,7 +373,7 @@ testExec = describe "exec" $ do
         let main = match True() {
           True() => 5
           False() => 10
-        }
+        };
       }
     |]
       `shouldEvalTo` Int 5
@@ -377,12 +381,12 @@ testExec = describe "exec" $ do
   it "can call a defined function" $ do
     [r|
       mod main {
-        import std
-        let add3 = fn(a: <>Int, b: <>Int, c: <>Int) <> Int {
+        import std;
+        let add3 = fn(a: Int, b: Int, c: Int) <> Int {
           add(a, add(b, c))
-        }
+        };
 
-        let main = add3(1, 2, 3)
+        let main = add3(1, 2, 3);
       }
     |]
       `shouldEvalTo` Int 6
@@ -390,21 +394,22 @@ testExec = describe "exec" $ do
   it "can call a function returning a custom datatype" $ do
     [r|
       mod main {
-        import std
+        import std;
 
         type Maybe {
           Just(<> a)
           Nothing()
         }
 
-        let safediv = fn(x: <>Int, y: <>Int) <> Maybe {
-          if eq(y, 0) then
+        let safediv = fn(x: Int, y: Int) <> Maybe {
+          if eq(y, 0) {
             Nothing()
-          else
+          } else {
             Just(div(x,y))
-        }
+          }
+        };
 
-        let main = safediv(6, 0)
+        let main = safediv(6, 0);
       }
     |]
       `shouldEvalTo` Data "Maybe" "Nothing" []
@@ -412,7 +417,7 @@ testExec = describe "exec" $ do
   it "can handle the abort effect" $ do
     [r|
       mod main {
-        import std
+        import std;
         
         type Maybe {
           Just(<> a)
@@ -426,22 +431,23 @@ testExec = describe "exec" $ do
         let hAbort = handler {
           return(x) { Just(x) }
           abort() { Nothing() }
-        }
+        };
 
         let safediv = fn(x: <> Int, y: <> Int) <Abort> Int {
-          if eq(y, 0) then
+          if eq(y, 0) {
             abort()
-          else
+          } else {
             div(x, y)
-        }
+          }
+        };
 
         let main = match handle hAbort {
-          let x = 6
-          let y = 0
+          let x = 6;
+          let y = 0;
           safediv(x, y)
         } {
           Nothing() => "cannot divide by zero"
-        }
+        };
       }
     |]
       `shouldEvalTo` String "cannot divide by zero"
@@ -449,7 +455,7 @@ testExec = describe "exec" $ do
   it "can elaborate and handle exceptions" $ do
     [r|
       mod main {
-        import std
+        import std;
 
         type Maybe {
           Just(<> a)
@@ -468,7 +474,7 @@ testExec = describe "exec" $ do
         let h = handler {
           return(x) { Just(x) }
           abort() { Nothing() }
-        }
+        };
 
         let e = elaboration Exc! -> <Abort> {
           catch!(e) {
@@ -477,14 +483,15 @@ testExec = describe "exec" $ do
           throw!() {
             abort()
           }
-        }
+        };
 
-        let safediv = fn(x: <> Int, y: <> Int) <Exc!> Int {
-          if eq(y, 0) then
+        let safediv = fn(x: Int, y: Int) <Exc!> Int {
+          if eq(y, 0) {
             throw!()
-          else
+          } else {
             div(x, y)
-        }
+          }
+        };
 
         let main = handle h {
           elab[e] {
@@ -492,7 +499,7 @@ testExec = describe "exec" $ do
               Nothing() => "cannot divide by 0"
             }
           }
-        }
+        };
       }
     |]
       `shouldEvalTo` Data "Maybe" "Just" [Val $ String "cannot divide by 0"]
@@ -500,7 +507,7 @@ testExec = describe "exec" $ do
   it "can do a state effect" $ do
     [r|
       mod main {
-        import std
+        import std;
 
         effect State {
           get() Int
@@ -509,58 +516,55 @@ testExec = describe "exec" $ do
 
         let h = handler {
           return(x) {
-            fn(n: <> Int) <> a { x }
+            fn(n: Int) <> a { x }
           }
           get() {
-            fn(n: <> Int) <> a { 
-              let f = resume(n)
-              f(n)
+            fn(n: Int) <> a {
+              resume(n)(n)
             }
           }
           put(x) {
-            fn(n: <> Int) <> a { 
-              let f = resume(())
-              f(x)
+            fn(n: Int) <> a { 
+              resume(())(x)
             } 
           }
-        }
+        };
 
         let main = {
           let f = handle h {
-            let x = get()
-            let _ = put(6)
-            let y = get()
-          }
+            let x = get();
+            put(add(x, 1));
+            get()
+          };
           f(5)
-        }
+        };
       }
     |]
-      `shouldEvalTo` String "5, 6"
+      `shouldEvalTo` Int 6
 
   it "can do some funky stuff" $ do
     [r|
       mod main {
-        import std
+        import std;
         let hVal = handler {
           return(x) { x }
           val(f) {
-            resume(fn () <> Int { f(5) })
+            resume(fn() <> Int { f(5) })
           }
-        }
-        let timesTwo = fn(x: <> Int) <> Int {
+        };
+        let timesTwo = fn(x: Int) <> Int {
           mul(2, x)
-        }
+        };
         let main = handle hVal {
-          let f = val(timesTwo)
-          f()
-        }
+          val(timesTwo)()
+        };
       }
     |] `shouldEvalTo` Int 10
   
   it "can do the reader effect" $ do
     [r|
       mod main {
-        import std
+        import std;
 
         effect Reader! {
           ask!() a
@@ -572,81 +576,48 @@ testExec = describe "exec" $ do
           ask() a
         }
 
-        let h = fn(x: <> a) <> c {
+        let h = fn(x: a) <> c {
           handler {
             return(y) { y }
             ask() { resume(x) }
           }
-        }
+        };
 
         let eReader = elaboration Reader! -> <Reader> {
           ask!() { ask() }
           local!(f, c) {
             handle h(f(ask())) { c }
           }
-        }
+        };
 
         type Triple {
-          t(<> Int, <> Int, <> Int)
+          t(Int, Int, Int)
         }
 
-        let double = fn(x: <> Int) <> Int {
+        let double = fn(x: Int) <> Int {
           mul(2, x)
-        }
+        };
 
         let main = {
           handle h(1) elab[eReader] {
-            let x = ask!()
+            let x = ask!();
             local!(double, {
-              let y = ask!()
+              let y = ask!();
               local!(double, {
-                let z = ask!()
+                let z = ask!();
                 t(x, y, z)
               })
             })
           }
-        }
+        };
       }
     |]
       `shouldEvalTo` Data "Triple" "t" [Val $ Int 1, Val $ Int 2, Val $ Int 4]
-  
-  it "readsimple" $ do
-    [r|
-    mod main {
-        import std
-
-        let h = fn(x: <> a) <> c {
-          handler {
-            return(y) { y }
-            ask() { resume(x) }
-          }
-        }
-
-        let eReader = elaboration Reader! -> <Reader> {
-          ask!() { ask() }
-          local!(f, c) {
-            handle h(f(ask())) { c }
-          }
-        }
-
-        let double = fn(x: <> Int) <> Int {
-          mul(2, x)
-        }
-
-        let main = {
-          handle h(1) elab[eReader] {
-            local!(double, {
-              ask!()
-            })
-          }
-        }
-      }
-    |] `shouldEvalTo` Int 2
 
   it "can do the log effect" $ do
     [r|
       mod main {
-        import std
+        import std;
 
         effect Log! {
           context!(String, a) a
@@ -664,11 +635,10 @@ testExec = describe "exec" $ do
         let hWrite = handler {
           return(x) { "" }
           log(x) {
-            let rest = resume(())
-            let line = concat(x, "\n")
-            concat(line, rest)
+            let line = concat(x, "\n");
+            concat(line, resume(()))
           }
-        }
+        };
 
         # TODO handler type
         let hRead = fn(x: <> String) <> h {
@@ -676,28 +646,28 @@ testExec = describe "exec" $ do
             return(y) { y }
             ask() { resume(x) }
           }
-        }
+        };
 
         let eLog = elaboration Log! -> <Writer,Reader> {
           context!(s, c) {
-            let newCtx = concat(concat(ask(), ":"), s)
+            let newCtx = concat(concat(ask(), ":"), s);
             handle hRead(newCtx) c
           }
           log!(s) { 
-            let msg = concat(concat(ask(), ": "), s)
+            let msg = concat(concat(ask(), ": "), s);
             log(msg)
           }
-        }
+        };
 
         let main = handle hRead("root") handle hWrite elab[eLog] {
-          let _ = log!("one")
+          log!("one");
           context!("foo", {
-            let _ = log!("two")
+            log!("two");
             context!("bar", {
               log!("three")
             })
           })
-        }
+        };
       }
     |]
       `shouldEvalTo` String "root: one\nroot:foo: two\nroot:foo:bar: three\n"

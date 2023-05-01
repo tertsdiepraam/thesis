@@ -12,6 +12,7 @@ import Elaine.AST
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
+import Data.Maybe (fromMaybe)
 
 type Parser = Parsec Void Text
 
@@ -73,8 +74,8 @@ brackets = delimiters "[" "]"
 angles :: Parser a -> Parser a
 angles = delimiters "<" ">"
 
--- semicolon :: Parser Text
--- semicolon = symbol ";"
+semicolon :: Parser Text
+semicolon = symbol ";"
 
 comma :: Parser Text
 comma = symbol ","
@@ -131,7 +132,7 @@ visibility :: Parser Visibility
 visibility = Public <$ try (keyword "pub") <|> return Private
 
 decImport :: Parser DeclarationType
-decImport = Import <$> try (keyword "import" >> ident)
+decImport = Import <$> try (keyword "import" >> ident <* semicolon)
 
 elaboration :: Parser Expr
 elaboration = do
@@ -142,7 +143,7 @@ elaboration = do
 decVal :: Parser DeclarationType
 decVal = do
   name <- try (keyword "let") >> ident
-  DecLet name <$> (equals >> expr)
+  DecLet name <$> (equals >> expr <* semicolon)
 
 function :: Parser Function
 function = Function <$> functionParams <*> computationType <*> expr
@@ -197,9 +198,9 @@ functionParam = do
 
 computationType :: Parser ComputationType
 computationType = do
-  effs <- effectRow
+  effs <- optional effectRow
   v <- valueType
-  return $ ComputationType v effs
+  return $ ComputationType v (fromMaybe Empty effs)
 
 valueType :: Parser ValueType
 valueType =
@@ -219,20 +220,37 @@ effectRow =
     return $ foldr Cons extend effects
 
 -- EXPRESSIONS
+data LetOrExpr = Let' String Expr | Expr' Expr
+
+exprBlock :: Parser Expr
+exprBlock = do
+  exprs <- braces (letOrExpr `sepBy` semicolon)
+  case foldr f Nothing exprs of
+    Just a -> return a
+    Nothing -> return $ Val Unit
+  where
+    f (Expr' e1) Nothing = Just e1
+    f (Let' _ _) Nothing = error "last expression in a block cannot be let"
+    f (Expr' e1) (Just e2) = Just $ Let "_" e1 e2
+    f (Let' x e1) (Just e2) = Just $ Let x e1 e2
+
+letOrExpr :: Parser LetOrExpr
+letOrExpr = let' <|> Expr' <$> expr
+
 expr :: Parser Expr
-expr =
-  braces expr
+expr = do
+  root <- exprBlock
+    <|> if'
     <|> (Fn <$> functionLiteral)
     <|> Val <$> value
-    <|> let'
-    <|> if'
     <|> match'
     <|> handle
     <|> elab
     <|> handler
     <|> elaboration
-    <|> try app
     <|> (Var <$> ident)
+  applications <- many (parens (expr `sepBy` comma))
+  return $ foldl App root applications
 
 value :: Parser Value
 value =
@@ -241,17 +259,16 @@ value =
     <|> (Bool <$> boolLiteral)
     <|> (Unit <$ unitLiteral)
 
-let' :: Parser Expr
+let' :: Parser LetOrExpr
 let' = do
   x <- try (keyword "let") >> ident
-  e1 <- equals >> expr
-  Let x e1 <$> expr
+  Let' x <$> (equals >> expr)
 
 if' :: Parser Expr
 if' = do
   cond <- try (keyword "if") >> expr
-  e1 <- keyword "then" >> expr
-  e2 <- keyword "else" >> expr
+  e1 <- exprBlock
+  e2 <- keyword "else" >> exprBlock
   return $ If cond e1 e2
 
 handle :: Parser Expr
@@ -264,12 +281,6 @@ elab = do
   case elaborationExpr of
     Just a -> Elab a <$> expr
     Nothing -> ImplicitElab <$> expr
-
-app :: Parser Expr
-app = do
-  name <- ident
-  arg <- parens (expr `sepBy` comma)
-  return $ App (Var name) arg
 
 match' :: Parser Expr
 match' = do
