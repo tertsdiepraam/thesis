@@ -1,5 +1,5 @@
 % !TeX root = ../thesis.tex
-\chapter{Elaine Specification}
+\chapter{Elaine Specification}\label{apdx:spec}
 \section{Syntax definition}
 \begin{align*}
     \text{program}\;p
@@ -345,14 +345,12 @@ The elab expression then checks that a elaboration for all higher-order effects 
 \end{gather*}
 
 \section{Desugaring}
-
-Before we move on to semantics, we remove some of the typing information and higher-level features by desugaring.
-
-To desugar fold the operation $D$ over the syntax tree of an expression, where $D$ is defined by the following equations:
+Fold over the syntax tree with the following operation:
 
 \begin{align*}
     D(\fn(x_1: T_1, \dots, x_n: T_n)\;T\;\{e\}) &= \lambda x_1,\dots,x_n . e \\
-    D(\kw{let} x = e_1; e_2) &= (\lambda x . e_2)(e_1)\\
+    D(\kw{let}\;x = e_1;\;e_2) &= (\lambda x . e_2)(e_1)\\
+    D(e_1; e_2) &= (\lambda \_ . e_2)(e_1)\\
     D(\S{e}) &= e\\
     D(e) &= e
 \end{align*}
