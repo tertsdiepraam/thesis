@@ -15,6 +15,16 @@
 }
 \lstset{
     mathescape,
+    basicstyle=\rmfamily,
+    keywordstyle=\bfseries\upshape,
+    columns=fullflexible,
+    literate={
+        {lambda}{$\lambda$}{1}
+    },
+    language=elaine
+}
+\lstdefinestyle{fancy}{
+    backgroundcolor=\color{background},
     numbers=left,
     numberstyle=\small\color{gray},
     numbersep=10pt,
@@ -24,14 +34,6 @@
     framesep=4pt,
     framextopmargin=8pt,
     framexbottommargin=8pt,
-    basicstyle=\rmfamily\itshape,
-    keywordstyle=\bfseries\upshape,
-    columns=fullflexible,
-    backgroundcolor=\color{background},
-    literate={
-        {lambda}{$\lambda$}{1}
-    },
-    language=elaine
 }
 
 \newcommand\kw[1]{\ensuremath{\mathbf{\mathtt{#1}}}}
@@ -492,7 +494,7 @@ To desugar fold the operation $D$ over the syntax tree of an expression, where $
 
 \section{Semantics}
 
-\remark{I'm only specifying the expression reduction. The declarations should be fairly self-explanatory, because they are basically the same as the typing rules, but with values instead of values.}
+\info{I'm only specifying the expression reduction. The declarations should be fairly self-explanatory, because they are basically the same as the typing rules, but with values instead of values.}
 
 Some informal remarks:
 
@@ -703,24 +705,48 @@ Another cool thing here is that $\elab$ can be partial, i.e. elaborate only some
 
 This could still be combined with the type approach, where the type approach is applied when the elaboration is unambiguous and the handler approach is used as fallback in more difficult cases. But that means that we would have to prove both approaches correct (and their combination), which is much harder of course.
 
-\subsection{How do we prove the handler approach to be correct}
+\textbf{This approach also fails because it cannot deal with variables inside the elaboration which are defined outside of the elaboration.}
 
-Let $P$ be the original program and $Q$ the transformed program.
+\subsection{The Second Handler Approach}
 
-Obviously, any program without higher-order effects and elaborations will behave the same, before and after the transformation. Similarly, any subexpression without elab and higher-order effects will behave the same.
+So, new approach. This approach is based on the fact that we could implement elaborations in a dictionary-passing-like style, much like typeclasses. Tiny problem: we don't have dictionaries. But here we go.
 
-By well-typedness any higher-order operation is a subexpression of an elab.
+\begin{figure}[h]
+\begin{tabular}{rcl}
+\lstinline|elab[$e_1$] {$e_2$}|
+& $\implies$
+& \lstinline|handle $e_1$ {$e_2$}|
+\\\\
+\begin{lstlisting}
+elaboration {
+    $op_1!(x_{1,1}, ..., x_{k_1,1})$ { $e_1$ }
+    ...
+    $op_n!(x_{1,n}, ..., x_{k_n,n})$ { $e_n$ }
+}
+\end{lstlisting}
+&$\implies$
+&\begin{lstlisting}
+handler {
+    $op_1(x_{1,1}, ..., x_{k_1,1})$ {
+        resume($e_1$[$x_{i,1} \mapsto x_{i,1}()$])
+    }
+    ...
+    $op_n(x_{1,n}, ..., x_{k_n,n})$ {
+        resume($e_1$[$x_{i,n} \mapsto x_{i,n}()$])
+    }
+}
+\end{lstlisting}
+\\\\
+\lstinline|$op_j$!($e_1,...,e_k$)|
+& $\implies$
+& \lstinline|$op_j$(lambda. $e_1$, ..., lambda. $e_k$)|
+\end{tabular}
+\end{figure}
 
-We should be able to make the following arguments:
-\begin{itemize}
-\item Until the transformed elab $P$ and $Q$ have the same trace.
-\item Inside the elab in $P$ and handlers in $Q$, the trace is the same until the context focuses on an operation.
-\item With a few steps in $Q$ we then transform the expression into the same expression as in $P$.
-\item We repeat the last two steps.
-\item When the subexpression of the elab/handlers reduces to a value, they both reduce to the value.
-\item Then we again have identical traces until the next elab.
-\end{itemize}
+The idea here is simple, even more simple than previous approaches, but it makes elaborations kind of useless maybe? Why do we need them if we can just do this? Guess I'll have to implement it to show it makes sense.
 
-Now actually doing this proof is difficult. Let's see if we can write this down somehow:
-\todo{Actually write this out.}
+The idea is as follows: we thunk all the expressions and change occurrences of the variables with function calls, meaning we can use a handler. But elaborations always resume.
+
+This also makes me think we don't need functions and variables if you can just represent them as operations, which is, ehm, interesting.
+
 \end{document}

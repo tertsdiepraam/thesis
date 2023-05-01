@@ -1,4 +1,4 @@
-\section{Introduction}
+\chapter{Introduction}
 \todo[inline]{This is currently mostly a short history of effects, not quite an introduction yet.}
 
 In standard $\lambda$-calculus, there is no model for effects of the computation, only of the result. Speaking broadly, effects concern the aspects of the program besides the pure computation. \cite{moggi_computational_1989}
@@ -30,3 +30,22 @@ The aim of this thesis is to build on the work by \citeauthor{bach_poulsen_hefty
 To this end, we need to show that the compilation of implicitly resolved effects is equivalent to the operational semantics for elaborations. By showing that elaborations can be removed at compile-time, we show that it is possible to compile programs in our language using the techniques from \cite{leijen_type_2017}.
 
 In addition, we provide an implementation of this language, which is published on GitHub under the name \lib{elaine}{https://github.com/tertsdiepraam/thesis/tree/main/elaine} (sharing a prefix with ``elaboration'') as part  of the repository that hosts this thesis.
+
+
+\begin{lstlisting}[style=fancy]
+let f = lambda x . {
+    let _ = a!()
+    ()
+}
+elab[e1] {
+    let g = elab[e2] {
+        if <runtime condition> then
+            f
+        else {
+            f()
+            lambda x . ()
+        }
+    }
+    g()
+}
+\end{lstlisting}
