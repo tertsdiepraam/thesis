@@ -3,6 +3,7 @@ module Elaine.Pretty where
 
 import Elaine.AST
 import Data.List (intercalate)
+import Data.Maybe (fromMaybe)
 
 -- Special typeclass for pretty printing the code
 class Pretty a where
@@ -12,8 +13,8 @@ pBlock :: String -> String
 pBlock "" = "{}"
 pBlock s = "{\n" ++ indent s ++ "}"
 
-pParam :: (Ident, ComputationType) -> String
-pParam (name, typ) = name ++ ": " ++ pretty typ
+pParam :: (Ident, Maybe ComputationType) -> String
+pParam (name, typ) = name ++ ": " ++ maybe "_" pretty typ
 
 concatBlock :: Pretty a => [a] -> String
 concatBlock as = pBlock $ unlines (map pretty as)
@@ -42,7 +43,7 @@ instance Pretty OperationSignature where
     name ++ parens (map pretty args) ++ pretty ret
 
 instance Pretty Function where
-  pretty (Function params ret do') = "fn" ++ parens (map pParam params) ++ pretty ret ++ " " ++ pBlock (pretty do')
+  pretty (Function params ret do') = "fn" ++ parens (map pParam params) ++ maybe "_" pretty ret ++ " " ++ pBlock (pretty do')
 
 instance Pretty Module where
   pretty (Mod s decs) = "mod " ++ s ++ " " ++ concatBlock decs ++ "\n"

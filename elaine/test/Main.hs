@@ -672,3 +672,23 @@ testExec = describe "exec" $ do
     |]
       `shouldEvalTo` String "root: one\nroot:foo: two\nroot:foo:bar: three\n"
 
+  it "does an import" $ do
+    [r|
+    mod math {
+      import std;
+      pub let double = fn(x) {
+        mul(2, x)
+      };
+      pub let abs = fn(x) {
+        if lt(x, 0) {
+          sub(0, x)
+        } else {
+          x
+        }
+      };
+    }
+    mod main {
+      import math;
+      let main = abs(double(-10));
+    }
+    |] `shouldEvalTo` Int 20

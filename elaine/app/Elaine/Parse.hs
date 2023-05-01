@@ -146,7 +146,7 @@ decVal = do
   DecLet name <$> (equals >> expr <* semicolon)
 
 function :: Parser Function
-function = Function <$> functionParams <*> computationType <*> expr
+function = Function <$> functionParams <*> optional computationType <*> exprBlock
 
 handler :: Parser Expr
 handler = do
@@ -166,10 +166,10 @@ handlerArm =
 handleReturn :: Parser HandleReturn
 handleReturn = do
   var <- try (keyword "return") >> parens ident
-  HandleReturn var <$> expr
+  HandleReturn var <$> exprBlock
 
 operationClause :: Parser OperationClause
-operationClause = OperationClause <$> ident <*> parens (ident `sepBy` comma) <*> expr
+operationClause = OperationClause <$> ident <*> parens (ident `sepBy` comma) <*> exprBlock
 
 decEffect :: Parser DeclarationType
 decEffect = do
@@ -184,16 +184,16 @@ decType = do
   name <- try (keyword "type") >> ident
   DecType name <$> braces (many constructor)
 
-functionParams :: Parser [(Ident, ComputationType)]
+functionParams :: Parser [(Ident, Maybe ComputationType)]
 functionParams = parens (functionParam `sepBy` comma)
 
 constructor :: Parser Constructor
 constructor = Constructor <$> ident <*> parens (computationType `sepBy` comma)
 
-functionParam :: Parser (Ident, ComputationType)
+functionParam :: Parser (Ident, Maybe ComputationType)
 functionParam = do
   name <- ident
-  typ <- colon >> computationType
+  typ <- optional (colon >> computationType)
   return (name, typ)
 
 computationType :: Parser ComputationType
@@ -296,7 +296,13 @@ matchArm = do
 
 -- Literals
 intLiteral :: Parser Int
-intLiteral = lexeme L.decimal
+intLiteral = do
+  negative <- optional (symbol "-")
+  let
+    mul = case negative of
+      Just _ -> negate
+      Nothing -> id
+  mul <$> lexeme L.decimal
 
 stringLiteral :: Parser String
 stringLiteral = char '\"' *> manyTill L.charLiteral (char '\"') <* space

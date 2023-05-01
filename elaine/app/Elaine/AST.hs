@@ -37,7 +37,7 @@ data Handler = Handler HandleReturn [OperationClause]
 data HandleReturn = HandleReturn Ident Expr
   deriving (Show, Eq)
 
-data Function = Function [(Ident, ComputationType)] ComputationType Expr
+data Function = Function [(Ident, Maybe ComputationType)] (Maybe ComputationType) Expr
   deriving (Show, Eq)
 
 data EffectRow = Cons Effect EffectRow | Empty | Extend Ident
