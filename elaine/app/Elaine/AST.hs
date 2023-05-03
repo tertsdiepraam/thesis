@@ -1,16 +1,10 @@
 {-# LANGUAGE DataKinds #-}
 module Elaine.AST where
 
-type Program = [Module]
+type Program = [Declaration]
 
 type Ident = String
 type Effect = String
-
-data Module = Mod String [Declaration]
-  deriving (Show, Eq)
-
-modName :: Module -> String
-modName (Mod x _) = x
 
 data Visibility = Private | Public
   deriving (Show, Eq)
@@ -19,7 +13,8 @@ data Declaration = Declaration Visibility DeclarationType
   deriving (Show, Eq)
 
 data DeclarationType
-  = Import Ident
+  = Use Ident
+  | Module String [Declaration]
   | DecLet Ident Expr
   | DecType Ident [Constructor]
   | DecEffect Effect [OperationSignature]

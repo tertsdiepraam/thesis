@@ -35,7 +35,7 @@ parseExpr :: String -> ParseResult Expr
 parseExpr s = parse expr s (pack s)
 
 -- For testing purposes
-parseProgram :: String -> ParseResult [Module]
+parseProgram :: String -> ParseResult [Declaration]
 parseProgram s = parse program s (pack s)
 
 prettyError :: ParseResult a -> Either String a
@@ -108,21 +108,22 @@ ident = lexeme $ do
 -- PROGRAM
 -- A program is simply a sequence of modules, but the parser requires parsing
 -- the entire source code.
-program :: Parser [Module]
-program = space' *> many mod' <* eof
+program :: Parser [Declaration]
+program = space' *> many declaration <* eof
 
-mod' :: Parser Module
+mod' :: Parser DeclarationType
 mod' = do
   name <- keyword "mod" >> ident
   decs <- braces (many declaration)
-  return $ Mod name decs
+  return $ Module name decs
 
 -- DECLARATIONS
 declaration :: Parser Declaration
 declaration = do
   vis <- visibility
   Declaration vis
-    <$> ( decImport
+    <$> ( decUse
+            <|> mod'
             <|> decVal
             <|> decType
             <|> decEffect
@@ -131,8 +132,8 @@ declaration = do
 visibility :: Parser Visibility
 visibility = Public <$ try (keyword "pub") <|> return Private
 
-decImport :: Parser DeclarationType
-decImport = Import <$> try (keyword "import" >> ident <* semicolon)
+decUse :: Parser DeclarationType
+decUse = Use <$> try (keyword "use" >> ident <* semicolon)
 
 elaboration :: Parser Expr
 elaboration = do
@@ -272,7 +273,7 @@ if' = do
   return $ If cond e1 e2
 
 handle :: Parser Expr
-handle = try (keyword "handle") >> Handle <$> expr <*> expr
+handle = try (keyword "handle") >> Handle <$> brackets expr <*> expr
 
 elab :: Parser Expr
 elab = do

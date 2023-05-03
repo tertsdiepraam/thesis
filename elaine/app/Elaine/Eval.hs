@@ -3,17 +3,16 @@
 
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
 
-module Elaine.Eval (evalExpr, evalModule, envName, envBindings, newEnv, Env, subst) where
+module Elaine.Eval (evalExpr, privateEnv, evalModule, envBindings, envModules, newEnv, Env, subst) where
 
 import Control.Applicative ((<|>))
 import Data.Bifunctor (second)
 import Data.List (find)
-import Data.Map (Map, assocs, empty, fromList, insert, member, union)
+import Data.Map (Map, assocs, empty, fromList, lookup, union, singleton)
 import Data.Maybe (fromJust, fromMaybe, isJust)
-import Debug.Trace
 import Elaine.AST
-import Prelude hiding (exp)
 import Elaine.Pretty (pretty)
+import Prelude hiding (exp, lookup)
 
 -- The decomposition is a list of functions that plug an expression into
 -- another expression. Composing them gives back the original expression
@@ -28,9 +27,8 @@ type Ctx = Expr -> Maybe (Expr, Expr -> Expr)
 
 -- This is the environment for the evaluation
 data Env = Env
-  { envName :: Ident,
-    envElaborations :: Map Ident Elaboration,
-    envBindings :: Map Ident Value
+  { envBindings :: Map Ident Value,
+    envModules :: Map Ident Env
   }
   deriving (Show)
 
@@ -295,49 +293,64 @@ reduceElab elab e = case decompose ctxElab e of
       _ -> Nothing
   _ -> Nothing
 
--- Module stuff
-newEnv :: Ident -> Env
-newEnv name =
+-- And environment represents a module
+newEnv :: Env
+newEnv =
   Env
-    { envName = name,
-      envElaborations = empty,
-      envBindings = empty
+    { envBindings = empty,
+      envModules = empty
     }
 
-updateEnv :: [(Ident, Env)] -> Env -> DeclarationType -> Env
-updateEnv envs m (Import x) = case lookup x envs of
-  Just imported ->
-    m
-      { envElaborations = envElaborations m `union` envElaborations imported,
-        envBindings = envBindings m `union` envBindings imported
-      }
+-- Returns an environment that should be merged with the existing environment
+updateEnv :: Env -> DeclarationType -> Env
+-- Import adds the imported module to the current environment
+updateEnv m (Use x) = case lookup x (envModules m) of
+  Just imported -> imported
   Nothing -> error $ "Could not import module " ++ x
-updateEnv _ m (DecType typeIdent decs) =
+-- Type adds type constructors
+updateEnv _ (DecType typeIdent decs) =
   let -- We create a function for every constructor returning a Data value
       -- The parameters are called param0, param1, param2, etc.
       lamParams params = map (\i -> "param" ++ show i) (take (length params) [0 ..] :: [Int])
       f (Constructor x params) = (x, Lam (lamParams params) (Val $ Data typeIdent x (map Var (lamParams params))))
       decBindings = fromList $ map f decs
-   in m {envBindings = envBindings m `union` decBindings}
-updateEnv _ env (DecLet x expr) =
+   in newEnv {envBindings = decBindings}
+-- Let adds a single binding
+updateEnv env (DecLet x expr) =
   let bindings = assocs $ envBindings env
       exprBindings = map (second Val) bindings
       substituted = subst exprBindings expr
       value = evalExpr env substituted
-   in env
-        { envBindings = insertOrError x value (envBindings env)
-        }
+   in newEnv {envBindings = singleton x value}
 -- Effects mostly matter for type checking, not in evaluation, so skip 'em
-updateEnv _ m (DecEffect _ _) = m
+updateEnv m (DecEffect _ _) = m
+updateEnv m (Module x decs) =
+  let xEnv = publicEnv $ evalModule m decs
+   in newEnv {envModules = singleton x xEnv}
 
-insertOrError :: (Show k, Ord k) => k -> v -> Map k v -> Map k v
-insertOrError k v m =
-  if member k m
-    then error (show k ++ " is defined multiple times")
-    else insert k v m
+data EvalResult = EvalResult
+  { publicEnv :: Env,
+    privateEnv :: Env
+  }
 
-ignoreVisibility :: Declaration -> DeclarationType
-ignoreVisibility (Declaration _ d) = d
+mergeEnv :: Env -> Env -> Env
+mergeEnv a b =
+  newEnv
+    { envBindings = envBindings a `union` envBindings b,
+      envModules = envModules a `union` envModules b
+    }
 
-evalModule :: [(Ident, Env)] -> Module -> Env
-evalModule envs (Mod x decs) = foldl (updateEnv envs) (newEnv x) (map ignoreVisibility decs)
+evalModule :: Env -> [Declaration] -> EvalResult
+evalModule env = foldl updateResult initialResult
+  where
+    initialResult = EvalResult {publicEnv = env, privateEnv = env}
+    updateResult result dec =
+      let Declaration vis decType = dec
+          envDelta = updateEnv (privateEnv result) decType
+       in EvalResult
+            { publicEnv =
+                if vis == Public
+                  then mergeEnv (publicEnv result) envDelta
+                  else publicEnv result,
+              privateEnv = mergeEnv (privateEnv result) envDelta
+            }

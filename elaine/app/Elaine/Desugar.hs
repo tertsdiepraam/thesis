@@ -4,15 +4,13 @@ module Elaine.Desugar (desugar) where
 
 import Elaine.AST
 
-desugar :: Program -> Program
-desugar = map desugarMod
-
-desugarMod :: Module -> Module
-desugarMod (Mod x decs) = Mod x (map desugarDec decs)
+desugar :: [Declaration] -> [Declaration]
+desugar = map desugarDec
 
 desugarDec :: Declaration -> Declaration
 desugarDec (Declaration vis decType) = Declaration vis $ case decType of
   DecLet x e -> DecLet x (desugarExpr e)
+  Module x decs -> Module x (desugar decs)
   x -> x
 
 desugarExpr :: Expr -> Expr

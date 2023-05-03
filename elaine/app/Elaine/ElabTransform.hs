@@ -7,14 +7,12 @@ import Elaine.AST
 import Elaine.Eval (subst)
 
 elabTrans :: Program -> Program
-elabTrans = map elabTransMod
-
-elabTransMod :: Module -> Module
-elabTransMod (Mod x decs) = Mod x (map elabTransDec decs)
+elabTrans = map elabTransDec
 
 elabTransDec :: Declaration -> Declaration
 elabTransDec (Declaration vis decType) = Declaration vis $ case decType of
   DecLet x e -> DecLet x (elabTransExpr e)
+  Module x decs -> Module x (elabTrans decs)
   x -> x
 
 -- TODO define some generic fold over the syntax tree to make this easier

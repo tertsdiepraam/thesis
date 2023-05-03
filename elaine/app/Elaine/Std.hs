@@ -13,7 +13,7 @@ newBuiltIn name f = BuiltIn name $ \x -> case f x of
   Nothing -> error ("incorrect arguments for <" ++ name ++ ">")
 
 stdEnv :: Env
-stdEnv = (newEnv "std") { envBindings = bindings }
+stdEnv = newEnv { envBindings = bindings }
 
 bindings :: Map Ident Value
 bindings =

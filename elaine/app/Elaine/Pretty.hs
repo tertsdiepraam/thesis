@@ -3,7 +3,6 @@ module Elaine.Pretty where
 
 import Elaine.AST
 import Data.List (intercalate)
-import Data.Maybe (fromMaybe)
 
 -- Special typeclass for pretty printing the code
 class Pretty a where
@@ -27,7 +26,8 @@ instance Pretty Declaration where
   pretty (Declaration Private decType) = pretty decType
 
 instance Pretty DeclarationType where
-  pretty (Import s) = "import " ++ s
+  pretty (Use s) = "use " ++ s ++ ";"
+  pretty (Module x decs) = "mod " ++ x ++ concatBlock decs
   pretty (DecLet name expr) = "let " ++ name ++ " = " ++ pretty expr
   pretty (DecType name constructors) =
     "type " ++ name ++ " " ++ concatBlock constructors
@@ -44,9 +44,6 @@ instance Pretty OperationSignature where
 
 instance Pretty Function where
   pretty (Function params ret do') = "fn" ++ parens (map pParam params) ++ maybe "_" pretty ret ++ " " ++ pBlock (pretty do')
-
-instance Pretty Module where
-  pretty (Mod s decs) = "mod " ++ s ++ " " ++ concatBlock decs ++ "\n"
 
 instance Pretty Expr where
   pretty (Let x e1 e2) = "let " ++ x ++ " = " ++ pretty e1 ++ "\n" ++ pretty e2
