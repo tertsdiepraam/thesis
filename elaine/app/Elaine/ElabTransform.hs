@@ -11,7 +11,7 @@ elabTrans = map elabTransDec
 
 elabTransDec :: Declaration -> Declaration
 elabTransDec (Declaration vis decType) = Declaration vis $ case decType of
-  DecLet x e -> DecLet x (elabTransExpr e)
+  DecLet x t e -> DecLet x t (elabTransExpr e)
   Module x decs -> Module x (elabTrans decs)
   x -> x
 
@@ -39,7 +39,7 @@ elabTransExpr = \case
   Handle e1 e2 -> Handle (f e1) (f e2)
   Match e1 arms -> Match (f e1) (map (\(MatchArm p e) -> MatchArm p (f e)) arms)
   Var x -> Var x
-  Let x e1 e2 -> Let x (f e1) (f e2)
+  Let x t e1 e2 -> Let x t (f e1) (f e2)
   Val v -> Val $ elabTransVal v
   _ -> error "Invalid expression"
   where

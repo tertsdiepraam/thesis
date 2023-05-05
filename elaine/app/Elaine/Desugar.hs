@@ -9,7 +9,7 @@ desugar = map desugarDec
 
 desugarDec :: Declaration -> Declaration
 desugarDec (Declaration vis decType) = Declaration vis $ case decType of
-  DecLet x e -> DecLet x (desugarExpr e)
+  DecLet x t e -> DecLet x t (desugarExpr e)
   Module x decs -> Module x (desugar decs)
   x -> x
 
@@ -22,7 +22,7 @@ desugarExpr = \case
   Match e1 arms -> Match (f e1) (map (\(MatchArm p e) -> MatchArm p (f e)) arms)
   Elab e1 e2 -> Elab (f e1) (f e2)
   Var x -> Var x
-  Let x e1 e2 -> Let x (f e1) (f e2)
+  Let x t e1 e2 -> Let x t (f e1) (f e2)
   Val v -> Val $ desugarVal v
   _ -> error "Invalid expression"
   where

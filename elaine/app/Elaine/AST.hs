@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 module Elaine.AST where
+import Data.Functor.Compose (Compose(Compose))
 
 type Program = [Declaration]
 
@@ -15,7 +16,7 @@ data Declaration = Declaration Visibility DeclarationType
 data DeclarationType
   = Use Ident
   | Module String [Declaration]
-  | DecLet Ident Expr
+  | DecLet Ident (Maybe ValueType) Expr
   | DecType Ident [Constructor]
   | DecEffect Effect [OperationSignature]
   deriving (Show, Eq)
@@ -36,7 +37,7 @@ data Function = Function [(Ident, Maybe ComputationType)] (Maybe ComputationType
   deriving (Show, Eq)
 
 data EffectRow = Cons Effect EffectRow | Empty | Extend Ident
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data Constructor = Constructor Ident [ComputationType]
   deriving (Show, Eq)
@@ -56,7 +57,7 @@ data Expr
   | ImplicitElab Expr
   | Elab Expr Expr
   | Var Ident
-  | Let Ident Expr Expr
+  | Let Ident (Maybe ValueType) Expr Expr
   | Val Value
   deriving (Show, Eq)
 
@@ -92,7 +93,7 @@ data Pattern = Pattern Ident [Ident]
   deriving (Show, Eq)
 
 data ComputationType = ComputationType ValueType EffectRow
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data ValueType
   = TypeInt

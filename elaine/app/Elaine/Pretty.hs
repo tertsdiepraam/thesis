@@ -1,8 +1,9 @@
 {-# LANGUAGE GADTs #-}
+
 module Elaine.Pretty where
 
-import Elaine.AST
 import Data.List (intercalate)
+import Elaine.AST
 
 -- Special typeclass for pretty printing the code
 class Pretty a where
@@ -21,6 +22,10 @@ concatBlock as = pBlock $ unlines (map pretty as)
 parens :: [String] -> String
 parens x = "(" ++ intercalate ", " x ++ ")"
 
+optionalType :: Pretty a => Maybe a -> String
+optionalType (Just a) = ":" ++ pretty a
+optionalType Nothing = ""
+
 instance Pretty Declaration where
   pretty (Declaration Public decType) = "pub " ++ pretty decType
   pretty (Declaration Private decType) = pretty decType
@@ -28,7 +33,7 @@ instance Pretty Declaration where
 instance Pretty DeclarationType where
   pretty (Use s) = "use " ++ s ++ ";"
   pretty (Module x decs) = "mod " ++ x ++ concatBlock decs
-  pretty (DecLet name expr) = "let " ++ name ++ " = " ++ pretty expr
+  pretty (DecLet name t expr) = "let " ++ name ++ optionalType t ++ " = " ++ pretty expr
   pretty (DecType name constructors) =
     "type " ++ name ++ " " ++ concatBlock constructors
   pretty (DecEffect name operations) =
@@ -46,9 +51,9 @@ instance Pretty Function where
   pretty (Function params ret do') = "fn" ++ parens (map pParam params) ++ maybe "_" pretty ret ++ " " ++ pBlock (pretty do')
 
 instance Pretty Expr where
-  pretty (Let x e1 e2) = "let " ++ x ++ " = " ++ pretty e1 ++ "\n" ++ pretty e2
+  pretty (Let x t e1 e2) = "let " ++ x ++ optionalType t ++ " = " ++ pretty e1 ++ "\n" ++ pretty e2
   pretty (If c e1 e2) = "if " ++ pretty c ++ " then " ++ pBlock (pretty e1) ++ " else " ++ pBlock (pretty e2)
-  pretty (Fn function) = pretty function 
+  pretty (Fn function) = pretty function
   pretty (App name params) = pretty name ++ "(" ++ intercalate ", " (map pretty params) ++ ")"
   -- pretty (Handle handler computation) = "handle " ++ pretty handler ++ " " ++ pretty computation
   pretty (Handle _ computation) = "handle ... " ++ pretty computation
@@ -63,7 +68,7 @@ instance Pretty Value where
   pretty (Int n) = show n
   pretty (String s) = show s
   pretty (Bool b) = if b then "true" else "false"
-  pretty (Lam params body) = "fn" ++ parens params ++ pBlock (pretty body) 
+  pretty (Lam params body) = "fn" ++ parens params ++ pBlock (pretty body)
   pretty (Hdl (Handler ret functions)) =
     "handler "
       ++ pBlock (unlines (pretty ret : map pretty functions))

@@ -4,10 +4,11 @@ module Elaine.Std (stdBindings, stdTypes) where
 
 import Data.Map (Map, fromList)
 import Elaine.AST
-    ( Value(String, Constant, Int, Bool),
-      ValueType(TypeString, TypeInt, TypeArrow, TypeBool),
-      BuiltIn(..),
-      Ident )
+  ( BuiltIn (..),
+    Ident,
+    Value (Bool, Constant, Int, String),
+    ValueType (TypeArrow, TypeBool, TypeInt, TypeString),
+  )
 
 newBuiltIn :: Ident -> ValueType -> ([Value] -> Maybe Value) -> BuiltIn
 newBuiltIn name t f = BuiltIn name t $ \x -> case f x of
@@ -21,7 +22,7 @@ stdBindings =
       (\b@(BuiltIn x _ _) -> (x, Constant b))
       allBuiltIns
 
-stdTypes :: Map Ident ValueType 
+stdTypes :: Map Ident ValueType
 stdTypes = fromList $ map (\(BuiltIn x t _) -> (x, t)) allBuiltIns
 
 allBuiltIns :: [BuiltIn]

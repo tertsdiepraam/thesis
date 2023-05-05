@@ -78,7 +78,7 @@ testParseExpr = describe "parseExpr" $ do
     f "handle[h] { if true { true } else { true } }" `shouldBe` Right (Handle (Var "h") (If tt tt tt))
 
   it "parses let expressions" $ do
-    f "{ let x = if true { true } else { true }; x }" `shouldBe` Right (Let "x" (If tt tt tt) (Var "x"))
+    f "{ let x = if true { true } else { true }; x }" `shouldBe` Right (Let "x" Nothing (If tt tt tt) (Var "x"))
 
   it "treats braces transparently" $ do
     f "{{{{ if {{ true }} {{ true }} else {{ true }} }}}}" `shouldBe` Right (If tt tt tt)
@@ -129,11 +129,11 @@ testEval = describe "eval0" $ do
     f (If ff ff tt) `shouldBe` Bool True
 
   it "binds simple lets" $ do
-    f (Let "x" (iv 5) $ Var "x") `shouldBe` Int 5
-    f (Let "x" (iv 5) $ Var "x") `shouldBe` Int 5
+    f (Let "x" Nothing (iv 5) $ Var "x") `shouldBe` Int 5
+    f (Let "x" Nothing (iv 5) $ Var "x") `shouldBe` Int 5
 
   it "keeps shadowing bindings intact" $ do
-    f (Let "x" (iv 5) $ Let "x" (iv 6) (Var "x")) `shouldBe` Int 6
+    f (Let "x" Nothing (iv 5) $ Let "x" Nothing (iv 6) (Var "x")) `shouldBe` Int 6
 
   it "applies function arguments" $ do
     f (App (Val $ Lam ["x"] $ Var "x") [iv 5]) `shouldBe` Int 5
@@ -149,8 +149,8 @@ testEval = describe "eval0" $ do
   it "handles an abort-like effect" $ do
     -- Returns a boolean to signify whether it ran to completion or aborted
     let h = Val $ Hdl $ Handler (HandleReturn "x" tt) [OperationClause "abort" [] ff]
-    f (Handle h (Let "x" (iv 5) (Var "x"))) `shouldBe` Bool True
-    f (Handle h (Let "x" (App (Var "abort") []) (Var "x"))) `shouldBe` Bool False
+    f (Handle h (Let "x" Nothing (iv 5) (Var "x"))) `shouldBe` Bool True
+    f (Handle h (Let "x" Nothing (App (Var "abort") []) (Var "x"))) `shouldBe` Bool False
 
 testRun :: SpecWith ()
 testRun = describe "run" $ do

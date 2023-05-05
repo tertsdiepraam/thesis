@@ -5,29 +5,30 @@
 
 module Elaine.Parse (parseProgram, parseExpr, ParseResult) where
 
+import Data.Bifunctor (first)
 import Data.Either (partitionEithers)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text, pack, unpack)
 import Data.Void
 import Elaine.AST
 import Text.Megaparsec
-    ( (<|>),
-      empty,
-      optional,
-      oneOf,
-      parse,
-      errorBundlePretty,
-      between,
-      option,
-      many,
-      manyTill,
-      sepBy,
-      Parsec,
-      MonadParsec(try, notFollowedBy, eof),
-      ParseErrorBundle )
+  ( MonadParsec (eof, notFollowedBy, try),
+    ParseErrorBundle,
+    Parsec,
+    between,
+    empty,
+    errorBundlePretty,
+    many,
+    manyTill,
+    oneOf,
+    option,
+    optional,
+    parse,
+    sepBy,
+    (<|>),
+  )
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
-import Data.Maybe (fromMaybe)
-import Data.Bifunctor (first)
 
 type Parser = Parsec Void Text
 
@@ -142,7 +143,8 @@ elaboration = do
 decVal :: Parser DeclarationType
 decVal = do
   name <- try (keyword "let") >> ident
-  DecLet name <$> (equals >> expr <* semicolon)
+  t <- optional (symbol ":" >> valueType)
+  DecLet name t <$> (equals >> expr <* semicolon)
 
 function :: Parser Function
 function = Function <$> functionParams <*> optional computationType <*> exprBlock
@@ -207,11 +209,12 @@ valueType =
     <|> (TypeInt <$ keyword "Int")
     <|> (TypeString <$ keyword "String")
     <|> (TypeBool <$ keyword "Bool")
+    <|> functionType
     <|> (TypeName <$> ident)
     <|> try (parens valueType)
 
--- functionType :: Parser FunctionType
--- functionType = try (keyword "fn") >> FunctionType <$> parens (computationType `sepBy` comma) <*> (colon >> computationType)
+functionType :: Parser ValueType
+functionType = try (keyword "fn") >> TypeArrow <$> parens (valueType `sepBy` comma) <*> valueType
 
 effectRow :: Parser EffectRow
 effectRow =
@@ -221,7 +224,7 @@ effectRow =
     return $ foldr Cons extend effects
 
 -- EXPRESSIONS
-data LetOrExpr = Let' String Expr | Expr' Expr
+data LetOrExpr = Let' String (Maybe ValueType) Expr | Expr' Expr
 
 exprBlock :: Parser Expr
 exprBlock = do
@@ -231,25 +234,26 @@ exprBlock = do
     Nothing -> return $ Val Unit
   where
     f (Expr' e1) Nothing = Just e1
-    f (Let' _ _) Nothing = error "last expression in a block cannot be let"
-    f (Expr' e1) (Just e2) = Just $ Let "_" e1 e2
-    f (Let' x e1) (Just e2) = Just $ Let x e1 e2
+    f (Let' {}) Nothing = error "last expression in a block cannot be let"
+    f (Expr' e1) (Just e2) = Just $ Let "_" Nothing e1 e2
+    f (Let' x t e1) (Just e2) = Just $ Let x t e1 e2
 
 letOrExpr :: Parser LetOrExpr
 letOrExpr = let' <|> Expr' <$> expr
 
 expr :: Parser Expr
 expr = do
-  root <- exprBlock
-    <|> if'
-    <|> (Fn <$> functionLiteral)
-    <|> Val <$> value
-    <|> match'
-    <|> handle
-    <|> elab
-    <|> handler
-    <|> elaboration
-    <|> (Var <$> ident)
+  root <-
+    exprBlock
+      <|> if'
+      <|> (Fn <$> functionLiteral)
+      <|> Val <$> value
+      <|> match'
+      <|> handle
+      <|> elab
+      <|> handler
+      <|> elaboration
+      <|> (Var <$> ident)
   applications <- many (parens (expr `sepBy` comma))
   return $ foldl App root applications
 
@@ -263,7 +267,8 @@ value =
 let' :: Parser LetOrExpr
 let' = do
   x <- try (keyword "let") >> ident
-  Let' x <$> (equals >> expr)
+  t <- optional (symbol ":" >> valueType)
+  Let' x t <$> (equals >> expr)
 
 if' :: Parser Expr
 if' = do
@@ -299,10 +304,9 @@ matchArm = do
 intLiteral :: Parser Int
 intLiteral = do
   negative <- optional (symbol "-")
-  let
-    mul = case negative of
-      Just _ -> negate
-      Nothing -> id
+  let mul = case negative of
+        Just _ -> negate
+        Nothing -> id
   mul <$> lexeme L.decimal
 
 stringLiteral :: Parser String

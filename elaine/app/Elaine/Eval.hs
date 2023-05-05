@@ -52,7 +52,7 @@ reduce = \case
       Lam params body -> subst (zip params args) body
       Constant (BuiltIn _ _ body) -> Val $ body (map (fromJust . toVal) args)
       _ -> error ("Tried to call a non-function: " ++ pretty v)
-  Let x (Val v) e -> Just $ subst [(x, Val v)] e
+  Let x _ (Val v) e -> Just $ subst [(x, Val v)] e
   Handle (Val v) e ->
     let h = case v of
           Hdl h' -> h'
@@ -104,7 +104,7 @@ ctxCommon (App (Val v) args) = case span isVal args of
   (vals, e : es) -> Just (e, \x -> App (Val v) (vals ++ [x] ++ es))
   (_, []) -> Nothing
 ctxCommon (App e args) = Just (e, \x -> App x args)
-ctxCommon (Let var e1 e2) = Just (e1, \x -> Let var x e2)
+ctxCommon (Let var t e1 e2) = Just (e1, \x -> Let var t x e2)
 ctxCommon (Match e arms) = case e of
   Val _ -> Nothing
   _ -> Just (e, \x -> Match x arms)
@@ -200,7 +200,7 @@ subst1 (x, new) = \case
   If e1 e2 e3 -> If (f e1) (f e2) (f e3)
   Handle e1 e2 -> Handle (f e1) (f e2)
   Elab e1 e2 -> Elab (f e1) (f e2)
-  Let y e1 e2 -> if x == y then Let y (f e1) e2 else Let y (f e1) (f e2)
+  Let y t e1 e2 -> if x == y then Let y t (f e1) e2 else Let y t (f e1) (f e2)
   -- TODO prevent name shadowing in match arms
   Match e arms -> Match (f e) (map mapArms arms)
     where
@@ -317,7 +317,7 @@ updateEnv _ (DecType typeIdent decs) =
       decBindings = fromList $ map f decs
    in newEnv {envBindings = decBindings}
 -- Let adds a single binding
-updateEnv env (DecLet x expr) =
+updateEnv env (DecLet x _ expr) =
   let bindings = assocs $ envBindings env
       exprBindings = map (second Val) bindings
       substituted = subst exprBindings expr

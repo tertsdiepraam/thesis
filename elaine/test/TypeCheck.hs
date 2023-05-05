@@ -101,3 +101,79 @@ testTypeCheck = describe "typeCheck" $ do
       use std;
       let main = add("hello", 4);
     |] `shouldSatisfy` isTypeError
+  
+  it "respects let type annotations" $ do
+    check [r|
+      let main: Int = "hello";
+    |] `shouldSatisfy` isTypeError
+    
+    check [r|
+      let main: String = "hello";
+    |] `shouldBe` Right TypeString
+
+  it "respects function type annotations" $ do
+    check [r|
+      let f = fn(x: Int) Int {
+        x
+      };
+
+      let main = f(5);
+    |] `shouldBe` Right TypeInt
+    
+    check [r|
+      let f = fn(x: Int) Int {
+        x
+      };
+
+      let main = f("hello");
+    |] `shouldSatisfy` isTypeError
+
+    check [r|
+      let f = fn(x) Int {
+        x
+      };
+
+      let main = f("hello");
+    |] `shouldSatisfy` isTypeError
+  
+  it "checks function types" $ do
+    check [r|
+      let f: fn(Int) Int = fn(x) { x };
+      let main = f(5);
+    |] `shouldBe` Right TypeInt
+    
+    check [r|
+      let f: fn(Int) Int = fn(x) { x };
+      let main = f("hello");
+    |] `shouldSatisfy` isTypeError 
+
+  it "checks first class functions" $ do
+    check [r|
+      use std;
+      let f = fn(x) fn(Int) Int {
+        fn(y) {
+          add(x, y)
+        }
+      };
+      let main = f(1)(2);
+    |] `shouldBe` Right TypeInt
+    
+    check [r|
+      use std;
+      let f = fn(x) fn(Int) Int {
+        fn(y) {
+          add(x, y)
+        }
+      };
+      let main = f("hello")(2);
+    |] `shouldSatisfy` isTypeError
+    
+    check [r|
+      use std;
+      let f = fn(x) fn(Int) Int {
+        fn(y) {
+          add(x, y)
+        }
+      };
+      let main = f(2)("hello");
+    |] `shouldSatisfy` isTypeError

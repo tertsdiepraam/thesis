@@ -20,6 +20,7 @@ import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Elaine.AST
 import Elaine.Std (stdTypes)
+import Control.Monad (forM_)
 
 -- Variable names to type
 data TypeEnv = TypeEnv
@@ -118,8 +119,9 @@ typeCheckDec' env = \case
     return $ singletonMod x (snd modEnv)
   DecType _ _ -> throwError "Not implemented"
   DecEffect _ _ -> throwError "Not implemented"
-  DecLet x expr -> do
+  DecLet x mt expr -> do
     tExpr <- infer env expr
+    () <- forM_ mt (unify tExpr)
     return $ singletonVar x tExpr
 
 -- TypeVar to Type
@@ -172,16 +174,26 @@ instance Inferable Expr where
         tRet <- fresh
         () <- unify tf (TypeArrow tArgs tRet)
         return tRet
-      Let x e1 e2 -> do
+      Let x mt e1 e2 -> do
         t1 <- infer env e1
+        () <- forM_ mt (unify t1)
         infer (insertVar x t1 env) e2
-      Fn (Function args _ body) -> do
+      Fn (Function args tRet body) -> do
         let args' = map fst args
-        tArgs <- mapM (const fresh) args
-        tRet <- infer (extendVars env $ zip args' tArgs) body
+        tArgs <- mapM (typeOrFresh . fmap extractVal . snd ) args
+        tRetInferred <- infer (extendVars env $ zip args' tArgs) body
+        () <- forM_ (fmap extractVal tRet) (unify tRetInferred)
         tArgs' <- mapM subM tArgs
-        return $ TypeArrow tArgs' tRet
+        tRet' <- subM tRetInferred
+        return $ TypeArrow tArgs' tRet'
       x -> error $ "Not implemented: " ++ show x
+
+extractVal :: ComputationType -> ValueType
+extractVal (ComputationType v _) = v
+
+typeOrFresh :: Maybe ValueType -> Infer ValueType
+typeOrFresh Nothing = fresh
+typeOrFresh (Just t) = return t
 
 -- inferExpr env (Fn (Function args _ body)) = do
 --   tArgs <- map (const fresh) args
