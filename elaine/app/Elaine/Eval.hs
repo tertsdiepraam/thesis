@@ -3,15 +3,16 @@
 
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
 
-module Elaine.Eval (evalExpr, privateEnv, evalModule, envBindings, envModules, newEnv, Env, subst) where
+module Elaine.Eval (eval, subst, evalExpr, newEnv) where
 
 import Control.Applicative ((<|>))
 import Data.Bifunctor (second)
 import Data.List (find)
-import Data.Map (Map, assocs, empty, fromList, lookup, union, singleton)
+import Data.Map (Map, assocs, empty, fromList, lookup, singleton, union)
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Elaine.AST
 import Elaine.Pretty (pretty)
+import Elaine.Std (stdBindings)
 import Prelude hiding (exp, lookup)
 
 -- The decomposition is a list of functions that plug an expression into
@@ -49,7 +50,7 @@ reduce = \case
   App (Val v) args | all isVal args ->
     Just $ case v of
       Lam params body -> subst (zip params args) body
-      Constant (BuiltIn _ body) -> Val $ body (map (fromJust . toVal) args)
+      Constant (BuiltIn _ _ body) -> Val $ body (map (fromJust . toVal) args)
       _ -> error ("Tried to call a non-function: " ++ pretty v)
   Let x (Val v) e -> Just $ subst [(x, Val v)] e
   Handle (Val v) e ->
@@ -339,6 +340,14 @@ mergeEnv a b =
     { envBindings = envBindings a `union` envBindings b,
       envModules = envModules a `union` envModules b
     }
+
+eval :: Program -> Either String Value
+eval decs = case lookup "main" $ envBindings $ privateEnv $ evalModule initialEnv decs of
+  Just a -> Right a
+  Nothing -> Left "No main binding found"
+  where
+    stdEnv = newEnv {envBindings = stdBindings}
+    initialEnv = newEnv {envModules = singleton "std" stdEnv}
 
 evalModule :: Env -> [Declaration] -> EvalResult
 evalModule env = foldl updateResult initialResult

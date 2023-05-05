@@ -74,7 +74,7 @@ instance Pretty Value where
   pretty Unit = "()"
 
 instance Pretty BuiltIn where
-  pretty (BuiltIn name _) = "<|" ++ name ++ "|>"
+  pretty (BuiltIn name _ _) = "<|" ++ name ++ "|>"
 
 instance Pretty MatchArm where
   pretty (MatchArm pat e) = pretty pat ++ " => " ++ pretty e
@@ -105,15 +105,16 @@ instance Pretty EffectRow where
       prettyRow (Cons x xs) = x ++ prettyRow xs
 
 instance Pretty ValueType where
-  pretty (TypeName name) = name
-  pretty (ValueFunctionType sig) = pretty sig
-  pretty UnitType = "()"
+  pretty TypeInt = "Int"
+  pretty TypeString = "String"
+  pretty TypeBool = "Bool"
+  pretty TypeUnit = "()"
+  pretty (TypeName a) = a
+  pretty (TypeVar i) = "<var " ++ show i ++ ">"
+  pretty (TypeArrow args ret) = "(" ++ intercalate ", " (map show args) ++ ") -> " ++ show ret
 
 instance Pretty HandlerType where
   pretty (HandlerType from to) = pretty from ++ " -> " ++ pretty to
-
-instance Pretty FunctionType where
-  pretty (FunctionType params ret) = "(" ++ intercalate ", " (map pretty params) ++ ") -> " ++ pretty ret
 
 indent :: String -> String
 indent s = concatMap (\s' -> "  " ++ s' ++ "\n") $ lines s

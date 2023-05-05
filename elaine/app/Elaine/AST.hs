@@ -72,13 +72,13 @@ data Value
   | Unit
   deriving (Show, Eq)
 
-data BuiltIn = BuiltIn Ident ([Value] -> Value)
+data BuiltIn = BuiltIn Ident ValueType ([Value] -> Value)
 
 instance Show BuiltIn where
-  show (BuiltIn x _) = "<built-in " ++ x ++ ">"
+  show (BuiltIn x _ _) = "<built-in " ++ x ++ ">"
 
 instance Eq BuiltIn where
-  (BuiltIn x _) == (BuiltIn y _) = x == y
+  (BuiltIn x _ _) == (BuiltIn y _  _) = x == y
 
 -- A match is as simple as possible:
 --  - Only constructors can be matches
@@ -95,13 +95,14 @@ data ComputationType = ComputationType ValueType EffectRow
   deriving (Show, Eq)
 
 data ValueType
-  = TypeName Ident
-  | ValueFunctionType FunctionType
-  | UnitType
-  deriving (Show, Eq)
-
-data FunctionType = FunctionType [ComputationType] ComputationType
-  deriving (Show, Eq)
+  = TypeInt
+  | TypeString
+  | TypeBool
+  | TypeUnit
+  | TypeName String
+  | TypeVar Int
+  | TypeArrow [ValueType] ValueType
+  deriving (Show, Eq, Ord)
 
 data HandlerType = HandlerType ComputationType ComputationType
   deriving (Show, Eq)

@@ -1,127 +1,129 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Elaine.Std (stdEnv) where
+module Elaine.Std (stdBindings, stdTypes) where
 
 import Data.Map (Map, fromList)
-
 import Elaine.AST
-import Elaine.Eval (Env, envBindings, newEnv)
+    ( Value(String, Constant, Int, Bool),
+      ValueType(TypeString, TypeInt, TypeArrow, TypeBool),
+      BuiltIn(..),
+      Ident )
 
-newBuiltIn :: Ident -> ([Value] -> Maybe Value) -> BuiltIn
-newBuiltIn name f = BuiltIn name $ \x -> case f x of
+newBuiltIn :: Ident -> ValueType -> ([Value] -> Maybe Value) -> BuiltIn
+newBuiltIn name t f = BuiltIn name t $ \x -> case f x of
   Just a -> a
   Nothing -> error ("incorrect arguments for <" ++ name ++ ">")
 
-stdEnv :: Env
-stdEnv = newEnv { envBindings = bindings }
-
-bindings :: Map Ident Value
-bindings =
+stdBindings :: Map Ident Value
+stdBindings =
   fromList $
     map
-      (\b@(BuiltIn x _) -> (x, Constant b))
-      [ bAdd,
-        bSub,
-        bNeg,
-        bMul,
-        bDiv,
-        bMod,
-        bPow,
-        bEq,
-        bNeq,
-        bGt,
-        bLt,
-        bGeq,
-        bLeq,
-        bNot,
-        bAnd,
-        bOr,
-        bConcat,
-        bShow
-      ]
+      (\b@(BuiltIn x _ _) -> (x, Constant b))
+      allBuiltIns
 
-intBinOp :: (Int -> Int -> Int) -> [Value] -> Maybe Value
-intBinOp op = \case
+stdTypes :: Map Ident ValueType 
+stdTypes = fromList $ map (\(BuiltIn x t _) -> (x, t)) allBuiltIns
+
+allBuiltIns :: [BuiltIn]
+allBuiltIns =
+  [ bAdd,
+    bSub,
+    bNeg,
+    bMul,
+    bDiv,
+    bMod,
+    bPow,
+    bEq,
+    bNeq,
+    bGt,
+    bLt,
+    bGeq,
+    bLeq,
+    bNot,
+    bAnd,
+    bOr,
+    bConcat,
+    bShowInt,
+    bShowBool
+  ]
+
+intBinOp :: String -> (Int -> Int -> Int) -> BuiltIn
+intBinOp name op = newBuiltIn name (TypeArrow [TypeInt, TypeInt] TypeInt) $ \case
   [Int x, Int y] -> Just $ Int $ op x y
   _ -> Nothing
 
-intCmp :: (Int -> Int -> Bool) -> [Value] -> Maybe Value
-intCmp op = \case
+intCmp :: String -> (Int -> Int -> Bool) -> BuiltIn
+intCmp name op = newBuiltIn name (TypeArrow [TypeInt, TypeInt] TypeBool) $ \case
   [Int x, Int y] -> Just $ Bool $ op x y
   _ -> Nothing
 
 bAdd :: BuiltIn
-bAdd = newBuiltIn "add" $ intBinOp (+)
+bAdd = intBinOp "add" (+)
 
 bSub :: BuiltIn
-bSub = newBuiltIn "sub" $ intBinOp (-)
+bSub = intBinOp "sub" (-)
 
 bNeg :: BuiltIn
-bNeg = newBuiltIn "neg" $ \case
-  [Int x] -> Just $ Int $ - x
+bNeg = newBuiltIn "neg" (TypeArrow [TypeInt] TypeInt) $ \case
+  [Int x] -> Just $ Int $ -x
   _ -> Nothing
 
 bMul :: BuiltIn
-bMul = newBuiltIn "mul" $ intBinOp (*)
+bMul = intBinOp "mul" (*)
 
 bDiv :: BuiltIn
-bDiv = newBuiltIn "div" $ intBinOp div
+bDiv = intBinOp "div" div
 
 bMod :: BuiltIn
-bMod = newBuiltIn "mod" $ intBinOp mod
+bMod = intBinOp "mod" mod
 
 bPow :: BuiltIn
-bPow = newBuiltIn "pow" $ intBinOp (^)
+bPow = intBinOp "pow" (^)
 
 bEq :: BuiltIn
-bEq = newBuiltIn "eq" $ \case
-  [Int x, Int y] -> Just $ Bool $ x == y
-  [Bool x, Bool y] -> Just $ Bool $ x == y
-  [String x, String y] -> Just $ Bool $ x == y
-  _ -> Nothing
+bEq = intCmp "eq" (==)
 
 bNeq :: BuiltIn
-bNeq = newBuiltIn "neq" $ \case
-  [Int x, Int y] -> Just $ Bool $ x /= y
-  [Bool x, Bool y] -> Just $ Bool $ x /= y
-  [String x, String y] -> Just $ Bool $ x /= y
-  _ -> Nothing
+bNeq = intCmp "neq" (/=)
 
 bGt :: BuiltIn
-bGt = newBuiltIn "gt" $ intCmp (>)
+bGt = intCmp "gt" (>)
 
 bLt :: BuiltIn
-bLt = newBuiltIn "lt" $ intCmp (<)
+bLt = intCmp "lt" (<)
 
 bGeq :: BuiltIn
-bGeq = newBuiltIn "geq" $ intCmp (>=)
+bGeq = intCmp "geq" (>=)
 
 bLeq :: BuiltIn
-bLeq = newBuiltIn "leq" $ intCmp (<=)
+bLeq = intCmp "leq" (<=)
 
 bNot :: BuiltIn
-bNot = newBuiltIn "not" $ \case
+bNot = newBuiltIn "not" (TypeArrow [TypeBool] TypeBool) $ \case
   [Bool x] -> Just $ Bool $ not x
   _ -> Nothing
 
 bAnd :: BuiltIn
-bAnd = newBuiltIn "and" $ \case
+bAnd = newBuiltIn "and" (TypeArrow [TypeBool, TypeBool] TypeBool) $ \case
   [Bool x, Bool y] -> Just $ Bool $ x && y
   _ -> Nothing
 
 bOr :: BuiltIn
-bOr = newBuiltIn "or" $ \case
+bOr = newBuiltIn "or" (TypeArrow [TypeBool, TypeBool] TypeBool) $ \case
   [Bool x, Bool y] -> Just $ Bool $ x || y
   _ -> Nothing
 
 bConcat :: BuiltIn
-bConcat = newBuiltIn "concat" $ \case
+bConcat = newBuiltIn "concat" (TypeArrow [TypeString, TypeString] TypeString) $ \case
   [String x, String y] -> Just $ String $ x ++ y
   _ -> Nothing
 
-bShow :: BuiltIn
-bShow = newBuiltIn "show" $ \case
+bShowInt :: BuiltIn
+bShowInt = newBuiltIn "show_int" (TypeArrow [TypeInt] TypeString) $ \case
   [Int x] -> Just $ String $ show x
+  _ -> Nothing
+
+bShowBool :: BuiltIn
+bShowBool = newBuiltIn "show_bool" (TypeArrow [TypeBool] TypeString) $ \case
   [Bool x] -> Just $ String $ show x
-  [String x] -> Just $ String $ show x
   _ -> Nothing

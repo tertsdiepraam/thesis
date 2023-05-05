@@ -3,44 +3,42 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Elaine.Parse (parseFile, parseString, parseProgram, parseExpr, prettyError, ParseResult) where
+module Elaine.Parse (parseProgram, parseExpr, ParseResult) where
 
 import Data.Either (partitionEithers)
 import Data.Text (Text, pack, unpack)
 import Data.Void
 import Elaine.AST
 import Text.Megaparsec
+    ( (<|>),
+      empty,
+      optional,
+      oneOf,
+      parse,
+      errorBundlePretty,
+      between,
+      option,
+      many,
+      manyTill,
+      sepBy,
+      Parsec,
+      MonadParsec(try, notFollowedBy, eof),
+      ParseErrorBundle )
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import Data.Maybe (fromMaybe)
+import Data.Bifunctor (first)
 
 type Parser = Parsec Void Text
 
 type ParseResult a = Either (ParseErrorBundle Text Void) a
 
-parseFile :: FilePath -> IO (Maybe Program)
-parseFile filename = do
-  contents <- readFile filename
-  parseString filename (pack contents)
-
-parseString :: String -> Text -> IO (Maybe Program)
-parseString name s = do
-  let result = parse program name s
-  case result of
-    Left bundle -> putStr (errorBundlePretty bundle) >> return Nothing
-    Right decs -> return $ Just decs
+parseProgram :: (Text, Text) -> Either String [Declaration]
+parseProgram (name, s) = first errorBundlePretty $ parse program (unpack name) s
 
 -- This mostly exists for testing
 parseExpr :: String -> ParseResult Expr
 parseExpr s = parse expr s (pack s)
-
--- For testing purposes
-parseProgram :: String -> ParseResult [Declaration]
-parseProgram s = parse program s (pack s)
-
-prettyError :: ParseResult a -> Either String a
-prettyError (Left a) = Left $ errorBundlePretty a
-prettyError (Right x) = Right x
 
 -- WHITESPACE & BASIC SYMBOLS
 space' :: Parser ()
@@ -205,13 +203,15 @@ computationType = do
 
 valueType :: Parser ValueType
 valueType =
-  try (parens $ pure UnitType)
+  try (parens $ pure TypeUnit)
+    <|> (TypeInt <$ keyword "Int")
+    <|> (TypeString <$ keyword "String")
+    <|> (TypeBool <$ keyword "Bool")
+    <|> (TypeName <$> ident)
     <|> try (parens valueType)
-    <|> (ValueFunctionType <$> functionType)
-    <|> TypeName <$> ident
 
-functionType :: Parser FunctionType
-functionType = try (keyword "fn") >> FunctionType <$> parens (computationType `sepBy` comma) <*> (colon >> computationType)
+-- functionType :: Parser FunctionType
+-- functionType = try (keyword "fn") >> FunctionType <$> parens (computationType `sepBy` comma) <*> (colon >> computationType)
 
 effectRow :: Parser EffectRow
 effectRow =

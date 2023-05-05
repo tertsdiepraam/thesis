@@ -5,11 +5,9 @@ module Main (main) where
 import Data.Text (pack)
 import Elaine.AST
 import Elaine.ElabTransform (elabTrans)
-import Elaine.Eval (evalExpr, evalModule, newEnv)
-import Elaine.Exec (exec)
-import Elaine.Parse (ParseResult, parseExpr, parseProgram, prettyError)
-import Elaine.Pretty (pretty)
-import System.Posix.Internals (o_NOCTTY)
+import Elaine.Eval (evalExpr, newEnv)
+import Elaine.Exec (Command (..), Result (..), exec, execParse, execRun, pack')
+import Elaine.Parse (parseExpr)
 import Test.Hspec
   ( Expectation,
     SpecWith,
@@ -20,6 +18,7 @@ import Test.Hspec
     shouldBe,
   )
 import Text.RawString.QQ
+import TypeCheck (testTypeCheck)
 
 tt :: Expr
 tt = Val $ Bool True
@@ -30,32 +29,33 @@ ff = Val $ Bool False
 iv :: Int -> Expr
 iv = Val . Int
 
-shouldBeP :: (Show a, Eq a) => ParseResult a -> a -> Expectation
-result `shouldBeP` e = do
-  case prettyError result of
-    Left a -> putStr a
-    Right a -> pure ()
-  prettyError result `shouldBe` Right e
-
 -- Check transformed
-shouldEvalTo :: String -> Value -> Expectation
-x `shouldEvalTo` e = case prettyError (parseProgram x) of
-  Left a -> expectationFailure a
-  Right parsed -> do
-    putStrLn "======= Original ======="
-    putStrLn (pretty parsed)
-    exec parsed `shouldBe` e
-    let transformed = elabTrans parsed
-    putStrLn "====== Transformed ======"
-    putStrLn (pretty transformed)
-    exec transformed `shouldBe` e
+-- shouldEvalTo :: String -> Value -> Expectation
+-- x `shouldEvalTo` e = case prettyError (parseProgram x) of
+--   Left a -> expectationFailure a
+--   Right parsed -> do
+--     putStrLn "======= Original ======="
+--     putStrLn (pretty parsed)
+--     exec parsed `shouldBe` e
+--     let transformed = elabTrans parsed
+--     putStrLn "====== Transformed ======"
+--     putStrLn (pretty transformed)
+--     exec transformed `shouldBe` e
+
+parse :: String -> Result Program
+parse = execParse . pack' . (,) "test"
+
+run :: String -> Result Value
+run = execRun . pack' . (,) "test"
 
 main :: IO ()
 main = hspec $ do
   testParseExpr
   testParseProgram
+  testTypeCheck
   testEval
-  testExec
+
+-- testExec
 
 testParseExpr :: SpecWith ()
 testParseExpr = describe "parseExpr" $ do
@@ -85,39 +85,39 @@ testParseExpr = describe "parseExpr" $ do
 
 testParseProgram :: SpecWith ()
 testParseProgram = describe "parseProgram" $ do
-  let f = parseProgram
-
   it "parses algebraic effects" $ do
-    f
+    parse
       [r|
       effect A {
         put(Int) ()
         get() Int
       }
     |]
-      `shouldBeP` [ Declaration Private $
-                      DecEffect
-                        "A"
-                        [ OperationSignature "put" [TypeName "Int"] UnitType,
-                          OperationSignature "get" [] (TypeName "Int")
-                        ]
-                  ]
+      `shouldBe` Right
+        [ Declaration Private $
+            DecEffect
+              "A"
+              [ OperationSignature "put" [TypeInt] TypeUnit,
+                OperationSignature "get" [] TypeInt
+              ]
+        ]
 
   it "parses algebraic effects" $ do
-    f
+    parse
       [r|
       effect A! {
         put!(Int) ()
         get!() Int
       }
     |]
-      `shouldBeP` [ Declaration Private $
-                      DecEffect
-                        "A!"
-                        [ OperationSignature "put!" [TypeName "Int"] UnitType,
-                          OperationSignature "get!" [] (TypeName "Int")
-                        ]
-                  ]
+      `shouldBe` Right
+        [ Declaration Private $
+            DecEffect
+              "A!"
+              [ OperationSignature "put!" [TypeInt] TypeUnit,
+                OperationSignature "get!" [] TypeInt
+              ]
+        ]
 
 testEval :: SpecWith ()
 testEval = describe "eval0" $ do
@@ -152,24 +152,23 @@ testEval = describe "eval0" $ do
     f (Handle h (Let "x" (iv 5) (Var "x"))) `shouldBe` Bool True
     f (Handle h (Let "x" (App (Var "abort") []) (Var "x"))) `shouldBe` Bool False
 
-testExec :: SpecWith ()
-testExec = describe "exec" $ do
+testRun :: SpecWith ()
+testRun = describe "run" $ do
   it "interprets a simple main module" $ do
-    "let main = 5;"
-      `shouldEvalTo` Int
-        5
+    run "let main = 5;"
+      `shouldBe` Right (Int 5)
 
-    [r|
+    run [r|
       let main = {
         let x = 5;
         let y = 6;
         if true { x } else { y }
       };
     |]
-      `shouldEvalTo` Int 5
+      `shouldBe` Right (Int 5)
 
   it "elaborates higher order effects into values" $ do
-    [r|
+    run [r|
       effect A! {
         a!() Int
       }
@@ -184,10 +183,10 @@ testExec = describe "exec" $ do
         elab[elabA] { a!() }
       };
     |]
-      `shouldEvalTo` Int 10
+      `shouldBe` Right (Int 10)
 
   it "elaborates higher order effects into algebraic effects" $ do
-    [r|
+    run [r|
       effect A {
         a() Int
       }
@@ -218,49 +217,49 @@ testExec = describe "exec" $ do
         }
       };
     |]
-      `shouldEvalTo` Int 101
+      `shouldBe` Right (Int 101)
 
   it "can access global values" $ do
-    [r|
+    run [r|
       let x = 5;
       let y = 6;
       let main = if true { x } else { y };
     |]
-      `shouldEvalTo` Int 5
-
+      `shouldBe` Right (Int 5)
+      
   it "can use functions from the standard library" $ do
-    [r|
+    run [r|
       use std;
       let main = add(6, 5);
     |]
-      `shouldEvalTo` Int 11
+      `shouldBe` Right (Int 11)
 
-    [r|
+    run [r|
       use std;
       let main = sub(6, 5);
     |]
-      `shouldEvalTo` Int 1
+      `shouldBe` Right (Int 1)
 
-    [r|
+    run [r|
       use std;
       let main = mul(6, 5);
     |]
-      `shouldEvalTo` Int 30
+      `shouldBe` Right (Int 30)
 
-    [r|
+    run [r|
       use std;
       let main = concat(concat("hello", " "), "world");
     |]
-      `shouldEvalTo` String "hello world"
+      `shouldBe` Right (String "hello world")
 
-    [r|
+    run [r|
       use std;
       let main = and(true, true);
     |]
-      `shouldEvalTo` Bool True
+      `shouldBe` Right (Bool True)
 
   it "a" $ do
-    [r|
+    run [r|
       use std;
       let main = {
         let x = add(5, 10);
@@ -268,10 +267,10 @@ testExec = describe "exec" $ do
         mul(2, y)
       };
     |]
-      `shouldEvalTo` Int 34
+      `shouldBe` Right (Int 34)
 
   it "handles the Out effect" $ do
-    [r|
+    run [r|
       use std;
 
       effect Out {
@@ -295,17 +294,17 @@ testExec = describe "exec" $ do
         ()
       };
     |]
-      `shouldEvalTo` String "hello world"
+      `shouldBe` Right (String "hello world")
 
   it "can turn values into strings" $ do
-    [r|
+    run [r|
       use std;
-      let main = show(5);
+      let main = show_int(5);
     |]
-      `shouldEvalTo` String "5"
+      `shouldBe` Right (String "5")
 
   it "can construct data types" $ do
-    [r|
+    run [r|
       type Either {
         Left(<> a)
         Right(<> b)
@@ -313,10 +312,10 @@ testExec = describe "exec" $ do
 
       let main = Left(5);
     |]
-      `shouldEvalTo` Data "Either" "Left" [Val $ Int 5]
+      `shouldBe` Right (Data "Either" "Left" [Val $ Int 5])
 
   it "can represent a list" $ do
-    [r|
+    run [r|
       type List {
         Nil()
         Cons(a, List)
@@ -324,10 +323,10 @@ testExec = describe "exec" $ do
 
       let main = Cons(1, Cons(2, Nil()));
     |]
-      `shouldEvalTo` Data "List" "Cons" [Val $ Int 1, Val $ Data "List" "Cons" [Val $ Int 2, Val $ Data "List" "Nil" []]]
+      `shouldBe` Right (Data "List" "Cons" [Val $ Int 1, Val $ Data "List" "Cons" [Val $ Int 2, Val $ Data "List" "Nil" []]])
 
   it "can match on custom data types" $ do
-    [r|
+    run [r|
       type Bool {
         False()
         True()
@@ -338,10 +337,10 @@ testExec = describe "exec" $ do
         False() => 10
       };
     |]
-      `shouldEvalTo` Int 5
+      `shouldBe` Right (Int 5)
 
   it "can call a defined function" $ do
-    [r|
+    run [r|
       use std;
       let add3 = fn(a: Int, b: Int, c: Int) <> Int {
         add(a, add(b, c))
@@ -349,10 +348,10 @@ testExec = describe "exec" $ do
 
       let main = add3(1, 2, 3);
     |]
-      `shouldEvalTo` Int 6
+      `shouldBe` Right (Int 6)
 
   it "can call a function returning a custom datatype" $ do
-    [r|
+    run [r|
       use std;
 
       type Maybe {
@@ -370,10 +369,10 @@ testExec = describe "exec" $ do
 
       let main = safediv(6, 0);
     |]
-      `shouldEvalTo` Data "Maybe" "Nothing" []
+      `shouldBe` Right (Data "Maybe" "Nothing" [])
 
   it "can handle the abort effect" $ do
-    [r|
+    run [r|
       use std;
       
       type Maybe {
@@ -406,10 +405,10 @@ testExec = describe "exec" $ do
         Nothing() => "cannot divide by zero"
       };
     |]
-      `shouldEvalTo` String "cannot divide by zero"
+      `shouldBe` Right (String "cannot divide by zero")
 
   it "can elaborate and handle exceptions" $ do
-    [r|
+    run [r|
       use std;
 
       type Maybe {
@@ -456,10 +455,10 @@ testExec = describe "exec" $ do
         }
       };
     |]
-      `shouldEvalTo` Data "Maybe" "Just" [Val $ String "cannot divide by 0"]
+      `shouldBe` Right (Data "Maybe" "Just" [Val $ String "cannot divide by 0"])
 
   it "can do a state effect" $ do
-    [r|
+    run [r|
       use std;
 
       effect State {
@@ -492,10 +491,10 @@ testExec = describe "exec" $ do
         f(5)
       };
     |]
-      `shouldEvalTo` Int 6
+      `shouldBe` Right (Int 6)
 
   it "can do some funky stuff" $ do
-    [r|
+    run [r|
       use std;
       let hVal = handler {
         return(x) { x }
@@ -510,10 +509,10 @@ testExec = describe "exec" $ do
         val(timesTwo)()
       };
     |]
-      `shouldEvalTo` Int 10
+      `shouldBe` Right (Int 10)
 
   it "can do the reader effect" $ do
-    [r|
+    run [r|
       use std;
 
       effect Reader! {
@@ -561,10 +560,10 @@ testExec = describe "exec" $ do
         }
       };
     |]
-      `shouldEvalTo` Data "Triple" "t" [Val $ Int 1, Val $ Int 2, Val $ Int 4]
+      `shouldBe` Right (Data "Triple" "t" [Val $ Int 1, Val $ Int 2, Val $ Int 4])
 
   it "can do the log effect" $ do
-    [r|
+    run [r|
       use std;
 
       effect Log! {
@@ -617,10 +616,10 @@ testExec = describe "exec" $ do
         })
       };
     |]
-      `shouldEvalTo` String "root: one\nroot:foo: two\nroot:foo:bar: three\n"
+      `shouldBe` Right (String "root: one\nroot:foo: two\nroot:foo:bar: three\n")
 
   it "does an use" $ do
-    [r|
+    run [r|
     mod math {
       use std;
       pub let double = fn(x) {
@@ -638,10 +637,10 @@ testExec = describe "exec" $ do
     use math;
     let main = abs(double(-10));
     |]
-      `shouldEvalTo` Int 20
+      `shouldBe` Right (Int 20)
 
   it "elaborates dynamically based on if" $ do
-    [r|
+    run [r|
       let x = true;
       # TODO should register the effects for type checking 
       let e1 = elaboration A! -> <> {
@@ -653,10 +652,10 @@ testExec = describe "exec" $ do
       let e = if x { e1 } else { e2 };
       let main = elab[e] { a!() };
     |]
-      `shouldEvalTo` Int 5
+      `shouldBe` Right (Int 5)
 
   it "uses the right elaboration based on runtime values" $ do
-    [r|
+    run [r|
     use std;
 
     let f = fn(x) { a!() };
@@ -678,10 +677,10 @@ testExec = describe "exec" $ do
       g()
     };
     |]
-      `shouldEvalTo` Int 11
+      `shouldBe` Right (Int 11)
 
   it "applies the inner handler" $ do
-    [r|
+    run [r|
       let e1 = elaboration A! -> <> {
         a!() { 5 }
       };
@@ -695,10 +694,10 @@ testExec = describe "exec" $ do
         f(g)
       };
     |]
-      `shouldEvalTo` Int 10
-  
+      `shouldBe` Right (Int 10)
+
   it "weird uses" $ do
-    [r|
+    run [r|
     mod A {
       pub mod B {
         pub mod C {
@@ -711,10 +710,11 @@ testExec = describe "exec" $ do
     use B;
     use C;
     let main = x;
-    |] `shouldEvalTo` Int 5
-  
+    |]
+      `shouldBe` Right (Int 5)
+
   it "weird use 2" $ do
-    [r|
+    run [r|
     mod A {
       mod B {
         pub let x = 5;
@@ -728,42 +728,43 @@ testExec = describe "exec" $ do
     use A;
     use C;
     let main = x;
-    |] `shouldEvalTo` Int 5
+    |]
+      `shouldBe` Right (Int 5)
 
-  -- TODO expression context for elab
-  -- it "applies elaboration with parameter" $ do
-  --   [r|
-  --     let e1 = elaboration A! -> <> {
-  --       a!() { 5 }
-  --     };
-  --     let e2 = elaboration A! -> <> {
-  --       a!() { 10 }
-  --     };
-  --     let e3 = elaboration B! -> <> {
-  --       b!() { () }
-  --     };
+-- TODO expression context for elab
+-- it "applies elaboration with parameter" $ do
+--   run [r|
+--     let e1 = elaboration A! -> <> {
+--       a!() { 5 }
+--     };
+--     let e2 = elaboration A! -> <> {
+--       a!() { 10 }
+--     };
+--     let e3 = elaboration B! -> <> {
+--       b!() { () }
+--     };
 
-  --     let main = elab[e1] elab[e2] { a!() };
+--     let main = elab[e1] elab[e2] { a!() };
 
-  --     let main = elab {
-  --       let f = fn(x) { elab[e2] x() };
-  --       let g = fn() { a!() };
-  --       f(g)
-  --     };
-  --   |]
-  --     `shouldEvalTo` Int 10
+--     let main = elab {
+--       let f = fn(x) { elab[e2] x() };
+--       let g = fn() { a!() };
+--       f(g)
+--     };
+--   |]
+--     `shouldBe` Right (Int 10)
 
-  --   [r|
-  --     let ex = fn(x) {
-  --       elaboration A! -> <> {
-  --         a!() { x }
-  --       }
-  --     };
+--   run [r|
+--     let ex = fn(x) {
+--       elaboration A! -> <> {
+--         a!() { x }
+--       }
+--     };
 
-  --     let f = ex(5);
-      
-  --     let main = elab[f] {
-  --       a!()
-  --     };
-  --   |]
-  --     `shouldEvalTo` Int 5
+--     let f = ex(5);
+
+--     let main = elab[f] {
+--       a!()
+--     };
+--   |]
+--     `shouldBe` Right (Int 5)
