@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 module Elaine.AST where
-import Data.Functor.Compose (Compose(Compose))
 
 type Program = [Declaration]
 

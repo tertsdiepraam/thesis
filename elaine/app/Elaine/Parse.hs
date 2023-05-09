@@ -98,11 +98,11 @@ otherIdentChars = firstIdentChars ++ ['0' .. '9']
 
 ident :: Parser String
 ident = lexeme $ do
-  first <- oneOf firstIdentChars
+  firstChar <- oneOf firstIdentChars
   rest <- many (oneOf otherIdentChars)
   ticks <- many (char '\'')
   exc <- option "" (symbol "!")
-  return $ [first] ++ rest ++ ticks ++ unpack exc
+  return $ [firstChar] ++ rest ++ ticks ++ unpack exc
 
 -- PROGRAM
 -- A program is simply a sequence of modules, but the parser requires parsing

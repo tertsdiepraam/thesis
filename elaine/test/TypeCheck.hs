@@ -177,3 +177,13 @@ testTypeCheck = describe "typeCheck" $ do
       };
       let main = f(2)("hello");
     |] `shouldSatisfy` isTypeError
+    
+    check [r|
+      let f = fn(x) {
+        x
+      };
+      let main = {
+        let a = f(2);
+        f("hello")
+      };
+    |] `shouldSatisfy` isTypeError
