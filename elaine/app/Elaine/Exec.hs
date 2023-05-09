@@ -3,7 +3,6 @@ module Elaine.Exec where
 import Data.Bifunctor (first)
 import Data.Text (Text, pack, unpack)
 import Elaine.AST (Program, Value, ValueType)
-import Elaine.Desugar (desugar)
 import Elaine.ElabTransform (elabTrans)
 import Elaine.Eval (eval)
 import Elaine.Parse (parseProgram)
@@ -44,9 +43,6 @@ isEvalError (Left (ParseError _)) = True
 isEvalError _ = False
 
 type Result a = Either Error a
-
-desugar' :: Program -> Result Program
-desugar' = Right . desugar
 
 eval' :: Program -> Result Value
 eval' = first EvalError . eval

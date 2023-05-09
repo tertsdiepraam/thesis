@@ -136,12 +136,12 @@ testEval = describe "eval0" $ do
     f (Let "x" Nothing (iv 5) $ Let "x" Nothing (iv 6) (Var "x")) `shouldBe` Int 6
 
   it "applies function arguments" $ do
-    f (App (Val $ Lam ["x"] $ Var "x") [iv 5]) `shouldBe` Int 5
-    f (App (Val $ Lam ["y"] $ Var "y") [If tt (iv 5) (iv 6)]) `shouldBe` Int 5
-    f (App (Val $ Lam ["x", "y"] (Var "y")) [iv 5, iv 10]) `shouldBe` Int 10
+    f (App (Val $ lam ["x"] $ Var "x") [iv 5]) `shouldBe` Int 5
+    f (App (Val $ lam ["y"] $ Var "y") [If tt (iv 5) (iv 6)]) `shouldBe` Int 5
+    f (App (Val $ lam ["x", "y"] (Var "y")) [iv 5, iv 10]) `shouldBe` Int 10
 
   it "applies multiple function arguments" $ do
-    let g = Val $ Lam ["x", "y", "z"] (If (Var "x") (Var "y") (Var "z"))
+    let g = Val $ lam ["x", "y", "z"] (If (Var "x") (Var "y") (Var "z"))
     f (App g [tt, iv 100, iv 200]) `shouldBe` Int 100
     f (App g [ff, iv 100, iv 200]) `shouldBe` Int 200
     f (App g [App g [tt, tt, ff], iv (-10), iv 10]) `shouldBe` Int (-10)

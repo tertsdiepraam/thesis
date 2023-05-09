@@ -178,14 +178,6 @@ instance Inferable Expr where
         t1 <- infer env e1
         () <- forM_ mt (unify t1)
         infer (insertVar x t1 env) e2
-      Fn (Function args tRet body) -> do
-        let args' = map fst args
-        tArgs <- mapM (typeOrFresh . fmap extractVal . snd ) args
-        tRetInferred <- infer (extendVars env $ zip args' tArgs) body
-        () <- forM_ (fmap extractVal tRet) (unify tRetInferred)
-        tArgs' <- mapM subM tArgs
-        tRet' <- subM tRetInferred
-        return $ TypeArrow tArgs' tRet'
       x -> error $ "Not implemented: " ++ show x
 
 extractVal :: ComputationType -> ValueType
@@ -209,4 +201,12 @@ instance Inferable Value where
   infer _ (String _) = return TypeString
   infer _ (Bool _) = return TypeBool
   infer _ Unit = return TypeUnit
+  infer env (Fn (Function args tRet body)) = do
+    let args' = map fst args
+    tArgs <- mapM (typeOrFresh . fmap extractVal . snd ) args
+    tRetInferred <- infer (extendVars env $ zip args' tArgs) body
+    () <- forM_ (fmap extractVal tRet) (unify tRetInferred)
+    tArgs' <- mapM subM tArgs
+    tRet' <- subM tRetInferred
+    return $ TypeArrow tArgs' tRet'
   infer _ _ = error "Not implemented yet"

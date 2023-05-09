@@ -22,10 +22,10 @@ elabTransExpr = \case
   Elab e1 e2 -> Handle (f e1) (f e2)
   App (Var x) args
     | isHigherOrder x ->
-        App (App (Var x) (map (Val . Lam [] . f) args)) []
+        App (App (Var x) (map (Val . lam [] . f) args)) []
   Val (Elb (Elaboration _ _ clauses)) ->
     let mapping params = zip params (map (\p -> App (Var p) []) params)
-        f' (OperationClause x params e) = OperationClause x params (App (Var "resume") [Val $ Lam [] (subst (mapping params) e)])
+        f' (OperationClause x params e) = OperationClause x params (App (Var "resume") [Val $ lam [] (subst (mapping params) e)])
         clauses' = map f' clauses
      in Val $
           Hdl $
@@ -35,7 +35,6 @@ elabTransExpr = \case
   -- This is just the rest of the fold
   App e1 e2 -> App (f e1) (map f e2)
   If e1 e2 e3 -> If (f e1) (f e2) (f e3)
-  Fn (Function params _ e) -> Val $ Lam (map fst params) (f e)
   Handle e1 e2 -> Handle (f e1) (f e2)
   Match e1 arms -> Match (f e1) (map (\(MatchArm p e) -> MatchArm p (f e)) arms)
   Var x -> Var x
@@ -47,7 +46,8 @@ elabTransExpr = \case
 
 elabTransVal :: Value -> Value
 elabTransVal = \case
-  Lam xs e -> Lam xs (elabTransExpr e)
+  Fn (Function params ret body) ->
+    Fn $ Function params ret (elabTransExpr body)
   Hdl (Handler (HandleReturn xRet eRet) clauses) ->
     Hdl $
       Handler

@@ -49,7 +49,7 @@ reduce = \case
     _ -> error "Invalid condition for if expression"
   App (Val v) args | all isVal args ->
     Just $ case v of
-      Lam params body -> subst (zip params args) body
+      Fn (Function params _ body) -> subst (zip (map fst params) args) body
       Constant (BuiltIn _ _ body) -> Val $ body (map (fromJust . toVal) args)
       _ -> error ("Tried to call a non-function: " ++ pretty v)
   Let x _ (Val v) e -> Just $ subst [(x, Val v)] e
@@ -205,14 +205,12 @@ subst1 (x, new) = \case
   Match e arms -> Match (f e) (map mapArms arms)
     where
       mapArms (MatchArm (Pattern y params) exp) = MatchArm (Pattern y params) (if x `elem` params then exp else f exp)
-  fun@(Fn (Function params ret body)) ->
-    if x `elem` map fst params
-      then fun
-      else Fn $ Function params ret (f body)
-  Val (Lam params body) ->
-    if x `elem` params
-      then Val $ Lam params body
-      else Val $ Lam params $ f body
+  Val (Fn function) ->
+    let Function params ret body = function
+        paramNames = map fst params
+     in if x `elem` paramNames
+          then Val $ Fn $ Function params ret body
+          else Val $ Fn $ Function params ret (f body)
   Val (Hdl (Handler (HandleReturn retVar retExpr) hClauses)) ->
     let ret' =
           if x == retVar
@@ -279,7 +277,7 @@ reduceHandler h e = case e of
           -- Because we don't want the handler body to affect it anyway, so if they
           -- use y it works and the function will have to be applied before we can
           -- do anything with it.
-          k = Val $ Lam ["y"] $ Handle (Val $ Hdl h) $ compose (Var "y", cs)
+          k = Val $ lam ["y"] $ Handle (Val $ Hdl h) $ compose (Var "y", cs)
           cont = [("resume", k)]
       _ -> Nothing
 
@@ -313,7 +311,10 @@ updateEnv _ (DecType typeIdent decs) =
   let -- We create a function for every constructor returning a Data value
       -- The parameters are called param0, param1, param2, etc.
       lamParams params = map (\i -> "param" ++ show i) (take (length params) [0 ..] :: [Int])
-      f (Constructor x params) = (x, Lam (lamParams params) (Val $ Data typeIdent x (map Var (lamParams params))))
+      f (Constructor x params) =
+        ( x,
+          lam (lamParams params) (Val $ Data typeIdent x (map Var (lamParams params)))
+        )
       decBindings = fromList $ map f decs
    in newEnv {envBindings = decBindings}
 -- Let adds a single binding

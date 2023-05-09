@@ -35,6 +35,9 @@ data HandleReturn = HandleReturn Ident Expr
 data Function = Function [(Ident, Maybe ComputationType)] (Maybe ComputationType) Expr
   deriving (Show, Eq)
 
+lam :: [Ident] -> Expr -> Value
+lam a = Fn . Function (zip a (repeat Nothing)) Nothing
+
 data EffectRow = Cons Effect EffectRow | Empty | Extend Ident
   deriving (Show, Eq, Ord)
 
@@ -50,7 +53,6 @@ clauseName (OperationClause name _ _) = name
 data Expr
   = App Expr [Expr]
   | If Expr Expr Expr
-  | Fn Function
   | Handle Expr Expr
   | Match Expr [MatchArm]
   | ImplicitElab Expr
@@ -64,7 +66,7 @@ data Value
   = Int Int
   | String String
   | Bool Bool
-  | Lam [Ident] Expr
+  | Fn Function
   | Hdl Handler
   | Elb Elaboration
   | Constant BuiltIn

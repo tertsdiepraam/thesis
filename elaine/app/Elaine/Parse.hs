@@ -246,7 +246,6 @@ expr = do
   root <-
     exprBlock
       <|> if'
-      <|> (Fn <$> functionLiteral)
       <|> Val <$> value
       <|> match'
       <|> handle
@@ -263,6 +262,7 @@ value =
     <|> (String <$> stringLiteral)
     <|> (Bool <$> boolLiteral)
     <|> (Unit <$ unitLiteral)
+    <|> (Fn <$> functionLiteral)
 
 let' :: Parser LetOrExpr
 let' = do

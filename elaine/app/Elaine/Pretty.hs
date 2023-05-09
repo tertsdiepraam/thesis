@@ -53,7 +53,6 @@ instance Pretty Function where
 instance Pretty Expr where
   pretty (Let x t e1 e2) = "let " ++ x ++ optionalType t ++ " = " ++ pretty e1 ++ "\n" ++ pretty e2
   pretty (If c e1 e2) = "if " ++ pretty c ++ " then " ++ pBlock (pretty e1) ++ " else " ++ pBlock (pretty e2)
-  pretty (Fn function) = pretty function
   pretty (App name params) = pretty name ++ "(" ++ intercalate ", " (map pretty params) ++ ")"
   -- pretty (Handle handler computation) = "handle " ++ pretty handler ++ " " ++ pretty computation
   pretty (Handle _ computation) = "handle ... " ++ pretty computation
@@ -68,7 +67,7 @@ instance Pretty Value where
   pretty (Int n) = show n
   pretty (String s) = show s
   pretty (Bool b) = if b then "true" else "false"
-  pretty (Lam params body) = "fn" ++ parens params ++ pBlock (pretty body)
+  pretty (Fn function) = "fn" ++ pretty function
   pretty (Hdl (Handler ret functions)) =
     "handler "
       ++ pBlock (unlines (pretty ret : map pretty functions))
