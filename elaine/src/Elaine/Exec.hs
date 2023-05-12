@@ -2,14 +2,16 @@ module Elaine.Exec where
 
 import Data.Bifunctor (first)
 import Data.Text (Text, pack, unpack)
+import qualified Data.Text.Lazy as L
 import Elaine.AST (Program, Value, ValueType, TypeScheme (TypeScheme))
 import Elaine.ElabTransform (elabTrans)
 import Elaine.Eval (eval)
-import Elaine.Parse (parseProgram)
+import Elaine.Parse (parseProgram, Spans)
 import Elaine.TypeCheck (typeCheck, getMain)
 import Prelude hiding (last, lookup)
 import Elaine.Pretty (pretty)
 import Control.Monad ((>=>))
+import Text.Pretty.Simple (pShow)
 
 last :: [a] -> Maybe a
 last = foldl (\_ x -> Just x) Nothing
@@ -52,8 +54,18 @@ read' filename = do
   contents <- readFile (unpack filename)
   return (filename, pack contents)
 
-parse' :: (Text, Text) -> Result Program
-parse' = first ParseError . parseProgram
+parse' :: (Text, Text) -> Result (Program, Spans)
+parse' a = first ParseError $ parseProgram a
+
+parseNoSpans :: (Text, Text) -> Result Program
+parseNoSpans a = case parse' a of
+  Left b -> Left b
+  Right b -> Right $ fst b
+
+parseSpans :: (Text, Text) -> Result Spans
+parseSpans a = case parse' a of
+  Left b -> Left b
+  Right b -> Right $ snd b
 
 typeCheck' :: Program -> Result Program
 typeCheck' x = case typeCheck x of
@@ -69,21 +81,28 @@ pretty' = Right . pack . pretty
 show' :: Show a => a -> Result String
 show' = Right . show
 
+pShow' :: Show a => a -> Result String
+pShow' = Right . L.unpack . pShow
+
 execParse :: (Text, Text) -> Either Error Program
-execParse = parse'
+execParse = parseNoSpans
+
+execSpans :: (Text, Text) -> Either Error Spans
+execSpans = parseSpans
 
 execCheck :: (Text, Text) -> Either Error ValueType
-execCheck = parse' >=> \x -> case typeCheck x of
+execCheck = parseNoSpans >=> \x -> case typeCheck x of
   Left a -> Left $ TypeError a
   Right env -> case getMain env of
     TypeScheme [] t -> Right t
     TypeScheme xs t -> Left $ TypeError $ "main cannot have type variables but has variables " ++ show xs ++ " and type " ++ show t
 
 execRun :: (Text, Text) -> Either Error Value
-execRun = parse' >=> typeCheck' >=> eval'
+execRun = parseNoSpans >=> typeCheck' >=> eval'
 
 cmd :: String -> (Text, Text) -> Either Error String
 cmd "parse" = execParse >=> show'
+cmd "spans" = execSpans >=> pShow'
 cmd "check" = execCheck >=> show'
 cmd "run" = execRun >=> show'
 cmd _ = error "unrecognized command"
@@ -96,5 +115,5 @@ exec command filename = do
   x <- read' (pack filename)
   case cmd command x of
     Left a -> print a
-    Right a -> print a
+    Right a -> putStrLn a
     

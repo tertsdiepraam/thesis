@@ -3,9 +3,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Elaine.Parse (parseProgram, parseExpr, ParseResult) where
+module Elaine.Parse (parseProgram, parseExpr, ParseResult, Spans, Span) where
 
-import Data.Bifunctor (first)
 import Data.Either (partitionEithers)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text, pack, unpack)
@@ -14,7 +13,7 @@ import Elaine.AST
 import Text.Megaparsec
   ( MonadParsec (eof, notFollowedBy, try),
     ParseErrorBundle,
-    Parsec,
+    ParsecT,
     between,
     empty,
     errorBundlePretty,
@@ -23,24 +22,49 @@ import Text.Megaparsec
     oneOf,
     option,
     optional,
-    parse,
     sepBy,
-    (<|>),
+    (<|>), runParserT, getOffset, getInput,
   )
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import Data.Char (isLower)
+import Control.Monad.State (State, runState, put, get, evalState)
+import Prelude hiding (span)
 
-type Parser = Parsec Void Text
+data Span = Span Int Int String
+  deriving (Show)
+type Spans = [(Span, String)]
+
+type Parser = ParsecT Void Text (State Spans)
 
 type ParseResult a = Either (ParseErrorBundle Text Void) a
 
-parseProgram :: (Text, Text) -> Either String [Declaration]
-parseProgram (name, s) = first errorBundlePretty $ parse program (unpack name) s
+span :: String -> Parser a -> Parser a
+span c p = do
+  start <- getOffset
+  input <- fmap unpack getInput
+  x <- p
+  end <- getOffset
+  let length' = end - start
+  currentList <- get
+  () <- put (currentList ++ [(Span start end (take length' input), c)])
+  return x
+
+parseProgram :: (Text, Text) -> Either String ([Declaration], Spans)
+parseProgram (name, s) = 
+  let parsed = runParserT program (unpack name) s
+      afterState = runState parsed []
+  in case afterState of
+    (Left a, _) -> Left (errorBundlePretty a)
+    (Right p, s') -> Right (p, s')
 
 -- This mostly exists for testing
 parseExpr :: String -> ParseResult Expr
-parseExpr s = parse expr s (pack s)
+parseExpr s = 
+  let
+    parsed = runParserT expr s (pack s)
+  in
+    evalState parsed empty
 
 -- WHITESPACE & BASIC SYMBOLS
 space' :: Parser ()
@@ -57,7 +81,7 @@ symbol :: Text -> Parser Text
 symbol = L.symbol space'
 
 keyword :: Text -> Parser Text
-keyword kw = lexeme (string kw <* notFollowedBy (oneOf otherIdentChars))
+keyword kw = span "keyword" $ lexeme (string kw <* notFollowedBy (oneOf otherIdentChars))
 
 delimiters :: Text -> Text -> Parser a -> Parser a
 delimiters left right = between (symbol left) (symbol right)
@@ -98,7 +122,7 @@ otherIdentChars :: [Char]
 otherIdentChars = firstIdentChars ++ ['0' .. '9']
 
 ident :: Parser String
-ident = lexeme $ do
+ident = span "identifier" $ lexeme $ do
   firstChar <- oneOf firstIdentChars
   rest <- many (oneOf otherIdentChars)
   ticks <- many (char '\'')

@@ -16,13 +16,6 @@ common warnings
   ghc-options: -Wall
   default-extensions:  FlexibleInstances
 
-executable elaine
-  import:           warnings
-  main-is:          Main.hs
-  build-depends:    base ^>=4.16.3.0, elaine, pretty-simple
-  hs-source-dirs:   app
-  default-language: Haskell2010
-
 library
   import:           warnings
   exposed-modules:  Elaine.AST,
@@ -33,7 +26,7 @@ library
                     Elaine.Exec,
                     Elaine.ElabTransform,
                     Elaine.Std
-  hs-source-dirs:   app
+  hs-source-dirs:   src
   build-depends:    base ^>=4.16.3.0,
                     mtl == 2.2.2,
                     containers == 0.6.5.1,
@@ -42,6 +35,13 @@ library
                     text == 1.2.5.0,
                     lens == 5.2.2,
                     pretty-simple == 4.1.2.0
+  default-language: Haskell2010
+
+executable elaine
+  import:           warnings
+  main-is:          Main.hs
+  build-depends:    base ^>=4.16.3.0, elaine, pretty-simple
+  hs-source-dirs:   app
   default-language: Haskell2010
 
 test-suite test-elaine
@@ -54,4 +54,4 @@ test-suite test-elaine
                       elaine,
                       hspec == 2.10.10,
                       raw-strings-qq == 1.1,
-                      text,
+                      text
