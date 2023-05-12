@@ -74,7 +74,7 @@ data Value
   | Unit
   deriving (Show, Eq)
 
-data BuiltIn = BuiltIn Ident ValueType ([Value] -> Value)
+data BuiltIn = BuiltIn Ident TypeScheme ([Value] -> Value)
 
 instance Show BuiltIn where
   show (BuiltIn x _ _) = "<built-in " ++ x ++ ">"
@@ -96,13 +96,19 @@ data Pattern = Pattern Ident [Ident]
 data ComputationType = ComputationType ValueType EffectRow
   deriving (Show, Eq, Ord)
 
+data TypeScheme = TypeScheme [TypeVar] ValueType
+  deriving (Show, Eq, Ord)
+
+data TypeVar = ImplicitVar Int | ExplicitVar String
+  deriving (Show, Eq, Ord)
+
 data ValueType
   = TypeInt
   | TypeString
   | TypeBool
   | TypeUnit
   | TypeName String
-  | TypeVar Int
+  | TypeVar TypeVar
   | TypeArrow [ValueType] ValueType
   deriving (Show, Eq, Ord)
 

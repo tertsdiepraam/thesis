@@ -24,11 +24,13 @@ import Text.Megaparsec
     option,
     optional,
     parse,
+    satisfy,
     sepBy,
     (<|>),
   )
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
+import Data.Char (isLower)
 
 type Parser = Parsec Void Text
 
@@ -210,7 +212,13 @@ valueType =
     <|> (TypeString <$ keyword "String")
     <|> (TypeBool <$ keyword "Bool")
     <|> functionType
-    <|> (TypeName <$> ident)
+    <|> ( do
+            x <- ident
+            return $
+              if isLower $ head x
+                then TypeVar $ ExplicitVar x
+                else TypeName x
+        )
     <|> try (parens valueType)
 
 functionType :: Parser ValueType

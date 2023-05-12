@@ -4,7 +4,7 @@ module TypeCheck (testTypeCheck) where
 
 import Data.Either (isLeft)
 import Data.Text (pack)
-import Elaine.AST
+import Elaine.AST ( ValueType(TypeInt, TypeBool, TypeString) )
 import Elaine.ElabTransform (elabTrans)
 import Elaine.Exec (exec, Result, pack', execCheck, isTypeError)
 import Elaine.Parse (ParseResult, parseExpr, parseProgram)
@@ -110,6 +110,45 @@ testTypeCheck = describe "typeCheck" $ do
     check [r|
       let main: String = "hello";
     |] `shouldBe` Right TypeString
+  
+  it "cannot assign mono to poly" $ do
+    check [r|
+      let main: a = "hello";
+    |] `shouldSatisfy` isTypeError
+  
+  it "can assign to bound poly" $ do
+    check [r|
+      let f = fn(x: a) {
+        let y = x;
+        y
+      };
+      let main = f(5);
+    |] `shouldBe` Right TypeInt
+  
+  it "can assign to explicit bound poly" $ do
+    check [r|
+      let f = fn(x: a) {
+        let y: a = x;
+        y
+      };
+      let main = f(5);
+    |] `shouldBe` Right TypeInt
+  
+  it "cannot use poly as specific type" $ do
+    check [r|
+      let f = fn(x: a) {
+        add(x, x)
+      };
+      let main = f(2);
+    |] `shouldSatisfy` isTypeError
+  
+  it "uses the function body to infer types" $ do
+    check [r|
+      let f = fn(x) {
+        add(x, x)
+      };
+      let main = f("hello");
+    |] `shouldSatisfy` isTypeError
 
   it "respects function type annotations" $ do
     check [r|
@@ -177,7 +216,8 @@ testTypeCheck = describe "typeCheck" $ do
       };
       let main = f(2)("hello");
     |] `shouldSatisfy` isTypeError
-    
+  
+  it "can do polymorphic functions" $ do
     check [r|
       let f = fn(x) {
         x

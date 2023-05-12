@@ -2,14 +2,15 @@ module Elaine.Exec where
 
 import Data.Bifunctor (first)
 import Data.Text (Text, pack, unpack)
-import Elaine.AST (Program, Value, ValueType)
+import Elaine.AST (Program, Value, ValueType, TypeScheme (TypeScheme))
 import Elaine.ElabTransform (elabTrans)
 import Elaine.Eval (eval)
 import Elaine.Parse (parseProgram)
-import Elaine.TypeCheck (typeCheck, getMain)
+import Elaine.TypeCheck (typeCheck, getMain, inst, gen)
 import Prelude hiding (last, lookup)
 import Elaine.Pretty (pretty)
 import Control.Monad ((>=>))
+import Debug.Trace (trace, traceShowId)
 
 last :: [a] -> Maybe a
 last = foldl (\_ x -> Just x) Nothing
@@ -75,7 +76,9 @@ execParse = parse'
 execCheck :: (Text, Text) -> Either Error ValueType
 execCheck = parse' >=> \x -> case typeCheck x of
   Left a -> Left $ TypeError a
-  Right env -> Right $ getMain env
+  Right env -> case getMain env of
+    TypeScheme [] t -> Right t
+    TypeScheme xs t -> Left $ TypeError $ "main cannot have type variables but has variables " ++ show xs ++ " and type " ++ show t
 
 execRun :: (Text, Text) -> Either Error Value
 execRun = parse' >=> typeCheck' >=> eval'

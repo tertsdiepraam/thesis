@@ -6,12 +6,13 @@ import Data.Map (Map, fromList)
 import Elaine.AST
   ( BuiltIn (..),
     Ident,
+    TypeScheme (TypeScheme),
     Value (Bool, Constant, Int, String),
     ValueType (TypeArrow, TypeBool, TypeInt, TypeString),
   )
 
 newBuiltIn :: Ident -> ValueType -> ([Value] -> Maybe Value) -> BuiltIn
-newBuiltIn name t f = BuiltIn name t $ \x -> case f x of
+newBuiltIn name t f = BuiltIn name (TypeScheme [] t) $ \x -> case f x of
   Just a -> a
   Nothing -> error ("incorrect arguments for <" ++ name ++ ">")
 
@@ -22,7 +23,7 @@ stdBindings =
       (\b@(BuiltIn x _ _) -> (x, Constant b))
       allBuiltIns
 
-stdTypes :: Map Ident ValueType
+stdTypes :: Map Ident TypeScheme
 stdTypes = fromList $ map (\(BuiltIn x t _) -> (x, t)) allBuiltIns
 
 allBuiltIns :: [BuiltIn]
