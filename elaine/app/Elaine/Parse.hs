@@ -24,7 +24,6 @@ import Text.Megaparsec
     option,
     optional,
     parse,
-    satisfy,
     sepBy,
     (<|>),
   )

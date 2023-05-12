@@ -6,11 +6,10 @@ import Elaine.AST (Program, Value, ValueType, TypeScheme (TypeScheme))
 import Elaine.ElabTransform (elabTrans)
 import Elaine.Eval (eval)
 import Elaine.Parse (parseProgram)
-import Elaine.TypeCheck (typeCheck, getMain, inst, gen)
+import Elaine.TypeCheck (typeCheck, getMain)
 import Prelude hiding (last, lookup)
 import Elaine.Pretty (pretty)
 import Control.Monad ((>=>))
-import Debug.Trace (trace, traceShowId)
 
 last :: [a] -> Maybe a
 last = foldl (\_ x -> Just x) Nothing
