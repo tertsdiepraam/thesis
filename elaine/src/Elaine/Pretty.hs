@@ -104,7 +104,7 @@ instance Pretty EffectRow where
   pretty row = "<" ++ prettyRow row ++ ">"
     where
       prettyRow Empty = ""
-      prettyRow (Extend x) = "|" ++ x
+      prettyRow (Extend x) = "|" ++ show x
       prettyRow (Cons x xs@(Cons _ _)) = x ++ ", " ++ prettyRow xs
       prettyRow (Cons x xs) = x ++ prettyRow xs
 

@@ -15,7 +15,7 @@ data Declaration = Declaration Visibility DeclarationType
 data DeclarationType
   = Use Ident
   | Module String [Declaration]
-  | DecLet Ident (Maybe ValueType) Expr
+  | DecLet Ident (Maybe ComputationType) Expr
   | DecType Ident [Constructor]
   | DecEffect Effect [OperationSignature]
   deriving (Show, Eq)
@@ -38,7 +38,7 @@ data Function = Function [(Ident, Maybe ComputationType)] (Maybe ComputationType
 lam :: [Ident] -> Expr -> Value
 lam a = Fn . Function (zip a (repeat Nothing)) Nothing
 
-data EffectRow = Cons Effect EffectRow | Empty | Extend Ident
+data EffectRow = Cons Effect EffectRow | Empty | Extend TypeVar
   deriving (Show, Eq, Ord)
 
 data Constructor = Constructor Ident [ComputationType]
@@ -58,7 +58,7 @@ data Expr
   | ImplicitElab Expr
   | Elab Expr Expr
   | Var Ident
-  | Let Ident (Maybe ValueType) Expr Expr
+  | Let Ident (Maybe ComputationType) Expr Expr
   | Val Value
   deriving (Show, Eq)
 
@@ -93,10 +93,14 @@ data MatchArm = MatchArm Pattern Expr
 data Pattern = Pattern Ident [Ident]
   deriving (Show, Eq)
 
-data ComputationType = ComputationType ValueType EffectRow
+data ComputationType = ComputationType EffectRow ValueType
   deriving (Show, Eq, Ord)
 
-data TypeScheme = TypeScheme [TypeVar] ValueType
+data TypeScheme = TypeScheme {
+  typeVars :: [TypeVar],
+  effectVars :: [TypeVar],
+  typ :: ComputationType
+}
   deriving (Show, Eq, Ord)
 
 data TypeVar = ImplicitVar Int | ExplicitVar String
@@ -109,7 +113,7 @@ data ValueType
   | TypeUnit
   | TypeName String
   | TypeVar TypeVar
-  | TypeArrow [ValueType] ValueType
+  | TypeArrow [ComputationType] ComputationType
   deriving (Show, Eq, Ord)
 
 data HandlerType = HandlerType ComputationType ComputationType

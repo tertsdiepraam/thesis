@@ -4,7 +4,7 @@ module TypeCheck (testTypeCheck) where
 
 import Data.Either (isLeft)
 import Data.Text (pack)
-import Elaine.AST ( ValueType(TypeInt, TypeBool, TypeString) )
+import Elaine.AST ( ValueType(TypeInt, TypeBool, TypeString), ComputationType(ComputationType), EffectRow (Empty) )
 import Elaine.ElabTransform (elabTrans)
 import Elaine.Exec (exec, Result, pack', execCheck, isTypeError)
 import Elaine.Parse (ParseResult, parseExpr, parseProgram)
@@ -23,7 +23,7 @@ import Test.Hspec
 import Test.Hspec.Runner (SpecResult (specResultSuccess))
 import Text.RawString.QQ (r)
 
-check :: String -> Result ValueType
+check :: String -> Result ComputationType
 check = execCheck . pack' . (,) "test"
 
 testTypeCheck :: SpecWith ()
@@ -32,14 +32,14 @@ testTypeCheck = describe "typeCheck" $ do
     check [r|
       let main = if true { 5 } else { 10 };
     |]
-      `shouldBe` Right TypeInt
+      `shouldBe` Right (ComputationType Empty TypeInt)
 
   it "checks bindings" $ do
     check [r|
       let x = "Hello";
       let main = x;
     |]
-      `shouldBe` Right TypeString
+      `shouldBe` Right (ComputationType Empty TypeString)
 
     check [r|
       let main = {
@@ -47,7 +47,7 @@ testTypeCheck = describe "typeCheck" $ do
         x
       };
     |]
-      `shouldBe` Right TypeBool
+      `shouldBe` Right (ComputationType Empty TypeBool)
 
   it "checks function applications" $ do
     check [r|
@@ -56,7 +56,7 @@ testTypeCheck = describe "typeCheck" $ do
       };
       let main = f(true, 5, 10);
     |]
-      `shouldBe` Right TypeInt
+      `shouldBe` Right (ComputationType Empty TypeInt)
 
   it "can type check used items" $ do
     check [r|
@@ -66,7 +66,7 @@ testTypeCheck = describe "typeCheck" $ do
       use A;
       let main = x;
     |]
-      `shouldBe` Right TypeInt
+      `shouldBe` Right (ComputationType Empty TypeInt)
 
   it "errors on undefined variable" $ do
     check
@@ -89,12 +89,12 @@ testTypeCheck = describe "typeCheck" $ do
     check [r|
       use std;
       let main = add(1, 2);
-    |] `shouldBe` Right TypeInt
+    |] `shouldBe` Right (ComputationType Empty TypeInt)
     
     check [r|
       use std;
       let main = concat("hello", concat(" ", " world"));
-    |] `shouldBe` Right TypeString
+    |] `shouldBe` Right (ComputationType Empty TypeString)
   
   it "checks input for built-ins" $ do
     check [r|
@@ -109,7 +109,7 @@ testTypeCheck = describe "typeCheck" $ do
     
     check [r|
       let main: String = "hello";
-    |] `shouldBe` Right TypeString
+    |] `shouldBe` Right (ComputationType Empty TypeString)
   
   it "cannot assign mono to poly" $ do
     check [r|
@@ -123,7 +123,7 @@ testTypeCheck = describe "typeCheck" $ do
         y
       };
       let main = f(5);
-    |] `shouldBe` Right TypeInt
+    |] `shouldBe` Right (ComputationType Empty TypeInt)
   
   it "can assign to explicit bound poly" $ do
     check [r|
@@ -132,7 +132,7 @@ testTypeCheck = describe "typeCheck" $ do
         y
       };
       let main = f(5);
-    |] `shouldBe` Right TypeInt
+    |] `shouldBe` Right (ComputationType Empty TypeInt)
   
   it "cannot use poly as specific type" $ do
     check [r|
@@ -157,7 +157,7 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = f(5);
-    |] `shouldBe` Right TypeInt
+    |] `shouldBe` Right (ComputationType Empty TypeInt)
     
     check [r|
       let f = fn(x: Int) Int {
@@ -179,7 +179,7 @@ testTypeCheck = describe "typeCheck" $ do
     check [r|
       let f: fn(Int) Int = fn(x) { x };
       let main = f(5);
-    |] `shouldBe` Right TypeInt
+    |] `shouldBe` Right (ComputationType Empty TypeInt)
     
     check [r|
       let f: fn(Int) Int = fn(x) { x };
@@ -195,7 +195,7 @@ testTypeCheck = describe "typeCheck" $ do
         }
       };
       let main = f(1)(2);
-    |] `shouldBe` Right TypeInt
+    |] `shouldBe` Right (ComputationType Empty TypeInt)
     
     check [r|
       use std;
@@ -226,4 +226,20 @@ testTypeCheck = describe "typeCheck" $ do
         let a = f(2);
         f("hello")
       };
+    |] `shouldSatisfy` isTypeError
+
+  it "can call effectless functions in main" $ do
+    check [r|
+      let f = fn(x: a) <> a {
+        x
+      };
+      let main = f(5);
+    |] `shouldBe` Right (ComputationType Empty TypeInt)
+
+  it "cannot call effectful functions in main" $ do
+    check [r|
+      let f = fn(x: a) <A> a {
+        x
+      };
+      let main = f(5);
     |] `shouldSatisfy` isTypeError

@@ -168,7 +168,7 @@ elaboration = do
 decVal :: Parser DeclarationType
 decVal = do
   name <- try (keyword "let") >> ident
-  t <- optional (symbol ":" >> valueType)
+  t <- optional (symbol ":" >> computationType)
   DecLet name t <$> (equals >> expr <* semicolon)
 
 function :: Parser Function
@@ -219,14 +219,14 @@ constructor = Constructor <$> ident <*> parens (computationType `sepBy` comma)
 functionParam :: Parser (Ident, Maybe ComputationType)
 functionParam = do
   name <- ident
-  typ <- optional (colon >> computationType)
-  return (name, typ)
+  typ' <- optional (colon >> computationType)
+  return (name, typ')
 
 computationType :: Parser ComputationType
 computationType = do
   effs <- optional effectRow
   v <- valueType
-  return $ ComputationType v (fromMaybe Empty effs)
+  return $ ComputationType (fromMaybe Empty effs) v
 
 valueType :: Parser ValueType
 valueType =
@@ -245,17 +245,17 @@ valueType =
     <|> try (parens valueType)
 
 functionType :: Parser ValueType
-functionType = try (keyword "fn") >> TypeArrow <$> parens (valueType `sepBy` comma) <*> valueType
+functionType = try (keyword "fn") >> TypeArrow <$> parens (computationType `sepBy` comma) <*> computationType
 
 effectRow :: Parser EffectRow
 effectRow =
   angles $ do
     effects <- ident `sepBy` comma
-    extend <- (Extend <$> (symbol "|" >> ident)) <|> return Empty
+    extend <- (Extend . ExplicitVar <$> (symbol "|" >> ident)) <|> return Empty
     return $ foldr Cons extend effects
 
 -- EXPRESSIONS
-data LetOrExpr = Let' String (Maybe ValueType) Expr | Expr' Expr
+data LetOrExpr = Let' String (Maybe ComputationType) Expr | Expr' Expr
 
 exprBlock :: Parser Expr
 exprBlock = do
@@ -298,7 +298,7 @@ value =
 let' :: Parser LetOrExpr
 let' = do
   x <- try (keyword "let") >> ident
-  t <- optional (symbol ":" >> valueType)
+  t <- optional (symbol ":" >> computationType)
   Let' x t <$> (equals >> expr)
 
 if' :: Parser Expr

@@ -3,7 +3,7 @@ module Elaine.Exec where
 import Data.Bifunctor (first)
 import Data.Text (Text, pack, unpack)
 import qualified Data.Text.Lazy as L
-import Elaine.AST (Program, Value, ValueType, TypeScheme (TypeScheme))
+import Elaine.AST (Program, Value, ComputationType, TypeScheme (TypeScheme))
 import Elaine.ElabTransform (elabTrans)
 import Elaine.Eval (eval)
 import Elaine.Parse (parseProgram, Spans)
@@ -12,6 +12,7 @@ import Prelude hiding (last, lookup)
 import Elaine.Pretty (pretty)
 import Control.Monad ((>=>))
 import Text.Pretty.Simple (pShow)
+import Debug.Trace (traceShow)
 
 last :: [a] -> Maybe a
 last = foldl (\_ x -> Just x) Nothing
@@ -90,12 +91,12 @@ execParse = parseNoSpans
 execSpans :: (Text, Text) -> Either Error Spans
 execSpans = parseSpans
 
-execCheck :: (Text, Text) -> Either Error ValueType
+execCheck :: (Text, Text) -> Either Error ComputationType
 execCheck = parseNoSpans >=> \x -> case typeCheck x of
   Left a -> Left $ TypeError a
   Right env -> case getMain env of
-    TypeScheme [] t -> Right t
-    TypeScheme xs t -> Left $ TypeError $ "main cannot have type variables but has variables " ++ show xs ++ " and type " ++ show t
+    TypeScheme [] [] t -> Right t
+    scheme -> traceShow scheme $ Left $ TypeError "main cannot have type variables"
 
 execRun :: (Text, Text) -> Either Error Value
 execRun = parseNoSpans >=> typeCheck' >=> eval'
