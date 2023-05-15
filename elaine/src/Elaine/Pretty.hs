@@ -1,5 +1,3 @@
-{-# LANGUAGE GADTs #-}
-
 module Elaine.Pretty where
 
 import Data.List (intercalate)
@@ -39,10 +37,6 @@ instance Pretty DeclarationType where
   pretty (DecEffect name operations) =
     "effect " ++ name ++ " " ++ concatBlock operations
 
-instance Pretty HandleReturn where
-  pretty (HandleReturn var body) =
-    "return(" ++ var ++ ") " ++ pBlock (pretty body)
-
 instance Pretty OperationSignature where
   pretty (OperationSignature name args ret) =
     name ++ parens (map pretty args) ++ pretty ret
@@ -70,7 +64,7 @@ instance Pretty Value where
   pretty (Fn function) = "fn" ++ pretty function
   pretty (Hdl (Handler ret functions)) =
     "handler "
-      ++ pBlock (unlines (pretty ret : map pretty functions))
+      ++ pBlock (unlines (("return" ++ pretty ret) : map pretty functions))
   pretty (Elb (Elaboration from to clauses)) =
     "elaboration " ++ from ++ " -> " ++ pretty to ++ pBlock (unlines (map pretty clauses))
   pretty (Data type' variant args) = type' ++ "." ++ variant ++ "(" ++ concatMap pretty args ++ ")"
@@ -116,9 +110,6 @@ instance Pretty ValueType where
   pretty (TypeName a) = a
   pretty (TypeVar i) = "<var " ++ show i ++ ">"
   pretty (TypeArrow args ret) = "(" ++ intercalate ", " (map show args) ++ ") -> " ++ show ret
-
-instance Pretty HandlerType where
-  pretty (HandlerType from to) = pretty from ++ " -> " ++ pretty to
 
 indent :: String -> String
 indent s = concatMap (\s' -> "  " ++ s' ++ "\n") $ lines s

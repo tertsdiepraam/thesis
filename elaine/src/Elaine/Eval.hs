@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
@@ -205,17 +204,9 @@ subst1 (x, new) = \case
   Match e arms -> Match (f e) (map mapArms arms)
     where
       mapArms (MatchArm (Pattern y params) exp) = MatchArm (Pattern y params) (if x `elem` params then exp else f exp)
-  Val (Fn function) ->
-    let Function params ret body = function
-        paramNames = map fst params
-     in if x `elem` paramNames
-          then Val $ Fn $ Function params ret body
-          else Val $ Fn $ Function params ret (f body)
-  Val (Hdl (Handler (HandleReturn retVar retExpr) hClauses)) ->
-    let ret' =
-          if x == retVar
-            then retExpr
-            else f retExpr
+  Val (Fn function) -> Val $ Fn $ subFun function
+  Val (Hdl (Handler ret hClauses)) ->
+    let ret' = subFun ret
         clauses' =
           map
             ( \c@(OperationClause name params body) ->
@@ -224,7 +215,7 @@ subst1 (x, new) = \case
                   else OperationClause name params (f body)
             )
             hClauses
-     in Val $ Hdl $ Handler (HandleReturn retVar ret') clauses'
+     in Val $ Hdl $ Handler ret' clauses'
   Val (Elb (Elaboration eff row elabClauses)) ->
     Val $
       Elb $
@@ -245,6 +236,11 @@ subst1 (x, new) = \case
   ImplicitElab _ -> error "Implicit elab should have been made explicit"
   where
     f = subst1 (x, new)
+    subFun (Function params ret body) =
+      let paramNames = map fst params
+       in if x `elem` paramNames
+            then Function params ret body
+            else Function params ret (f body)
 
 ops :: Handler -> [OperationClause]
 ops (Handler _ c) = c
@@ -258,7 +254,9 @@ reduceHandler h e = case e of
   Val v' -> Just $ reduceRet h v'
   _ -> applyOps (ops h)
   where
-    reduceRet (Handler (HandleReturn x body) _) v = subst [(x, Val v)] body
+    reduceRet (Handler (Function params _ body) _) v = case params of
+      [(x, _)] -> subst [(x, Val v)] body
+      _ -> error "A return case of a handler must have exactly one parameter"
 
     applyOps [] = Nothing
     applyOps (o : os) = case applyOp o of

@@ -1,4 +1,3 @@
-{-# LANGUAGE DataKinds #-}
 module Elaine.AST where
 
 type Program = [Declaration]
@@ -26,10 +25,7 @@ data OperationSignature = OperationSignature Ident [ValueType] ValueType
 data Elaboration = Elaboration Ident EffectRow [OperationClause]
   deriving (Show, Eq)
 
-data Handler = Handler HandleReturn [OperationClause]
-  deriving (Show, Eq)
-
-data HandleReturn = HandleReturn Ident Expr
+data Handler = Handler Function [OperationClause]
   deriving (Show, Eq)
 
 data Function = Function [(Ident, Maybe ComputationType)] (Maybe ComputationType) Expr
@@ -114,7 +110,5 @@ data ValueType
   | TypeName String
   | TypeVar TypeVar
   | TypeArrow [ComputationType] ComputationType
+  | TypeHandler Effect TypeVar ValueType
   deriving (Show, Eq, Ord)
-
-data HandlerType = HandlerType ComputationType ComputationType
-  deriving (Show, Eq)

@@ -12,12 +12,18 @@ build-type:         Simple
 extra-doc-files:    CHANGELOG.md
 -- extra-source-files:
 
+common extensions
+  default-extensions: FlexibleInstances,
+                      LambdaCase,
+                      DataKinds,
+                      GADTs,
+                      OverloadedStrings
+
 common warnings
   ghc-options: -Wall
-  default-extensions:  FlexibleInstances
 
 library
-  import:           warnings
+  import:           warnings, extensions
   exposed-modules:  Elaine.AST,
                     Elaine.Parse,
                     Elaine.TypeCheck,
@@ -45,6 +51,7 @@ executable elaine
   default-language: Haskell2010
 
 test-suite test-elaine
+  import:             extensions
   type:               exitcode-stdio-1.0
   main-is:            Main.hs
   other-modules:      TypeCheck

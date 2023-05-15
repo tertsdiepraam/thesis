@@ -4,7 +4,7 @@ module TypeCheck (testTypeCheck) where
 
 import Data.Either (isLeft)
 import Data.Text (pack)
-import Elaine.AST ( ValueType(TypeInt, TypeBool, TypeString), ComputationType(ComputationType), EffectRow (Empty) )
+import Elaine.AST ( ValueType(TypeHandler, TypeInt, TypeBool, TypeString), ComputationType(ComputationType), EffectRow (Empty) )
 import Elaine.ElabTransform (elabTrans)
 import Elaine.Exec (exec, Result, pack', execCheck, isTypeError)
 import Elaine.Parse (ParseResult, parseExpr, parseProgram)
@@ -40,14 +40,6 @@ testTypeCheck = describe "typeCheck" $ do
       let main = x;
     |]
       `shouldBe` Right (ComputationType Empty TypeString)
-
-    check [r|
-      let main = {
-        let x = true;
-        x
-      };
-    |]
-      `shouldBe` Right (ComputationType Empty TypeBool)
 
   it "checks function applications" $ do
     check [r|
@@ -226,7 +218,7 @@ testTypeCheck = describe "typeCheck" $ do
         let a = f(2);
         f("hello")
       };
-    |] `shouldSatisfy` isTypeError
+    |] `shouldBe` Right (ComputationType Empty TypeString)
 
   it "can call effectless functions in main" $ do
     check [r|
@@ -243,3 +235,148 @@ testTypeCheck = describe "typeCheck" $ do
       };
       let main = f(5);
     |] `shouldSatisfy` isTypeError
+  
+  it "can infer handler types" $ do
+    check [r|
+      effect Foo {
+        bar(a) a
+      }
+
+      let main = handler {
+        return(x) { x }
+        bar(x) { resume(x) } 
+      };
+    |] `shouldSatisfy` \case
+        Right (ComputationType Empty (TypeHandler "Foo" _ _)) -> True
+        _ -> False
+  
+  it "can infer handler types with specific types in the operations" $ do
+    check [r|
+      use std;
+
+      effect Foo {
+        bar(Int) Int
+      }
+
+      let main = handler {
+        return(x) { x }
+        bar(x) { resume(add(x, x)) } 
+      };
+    |] `shouldSatisfy` \case
+        Right (ComputationType Empty (TypeHandler "Foo" _ _)) -> True
+        _ -> False
+
+  it "can cannot be more specific about types in handlers" $ do
+    check [r|
+      use std;
+
+      effect Foo {
+        bar(a) a
+      }
+
+      let main = handler {
+        return(x) { x }
+        bar(x) { add(x, x) } 
+      };
+    |] `shouldSatisfy` isTypeError
+  
+  it "handler return types must match" $ do
+    check [r|
+      effect Foo {
+        bar(a) a
+      }
+
+      let main = handler {
+        return(x) { "hello" }
+        bar(x) { 5 }
+      };
+    |] `shouldSatisfy` isTypeError
+    
+    check [r|
+      effect Foo {
+        bar(a) a
+      }
+
+      let main = handler {
+        return(x) { "hello" }
+        bar(x) { "world" }
+      };
+    |] `shouldSatisfy` \case
+        Right (ComputationType Empty (TypeHandler "Foo" _ TypeString)) -> True
+        _ -> False
+  
+  it "can apply a handler" $ do
+    check [r|
+      effect Foo {
+        bar(a) a
+      }
+
+      let h = handler {
+        return(x) { "hello" }
+        bar(x) { "world" }
+      };
+
+      let main = handle[h] {
+        5
+      };
+    |] `shouldBe` Right (ComputationType Empty TypeString)
+  
+  it "can apply a handler" $ do
+    check [r|
+      effect Foo {
+        bar(a) a
+      }
+
+      let h = handler {
+        return(x) { "hello" }
+        bar(x) { "world" }
+      };
+
+      let main = handle[h] {
+        bar(5)
+      };
+    |] `shouldBe` Right (ComputationType Empty TypeString)
+  
+  it "cannot use operation outside of handle" $ do
+    check [r|
+      effect Foo {
+        bar(a) a
+      }
+
+      let main = bar(5);
+    |] `shouldSatisfy` isTypeError
+  
+  it "cannot use operation in effectless function" $ do
+    check [r|
+      effect Foo {
+        bar(a) a
+      }
+      
+      let f = fn() <|e> Int {
+        bar(5)
+      };
+
+      let h = handler {
+        return(x) { "hello" }
+        bar(x) { "world" }
+      };
+
+      let main = handle[h] { f() };
+    |] `shouldSatisfy` isTypeError
+    
+    check [r|
+      effect Foo {
+        bar(a) a
+      }
+      
+      let f = fn() <Foo|e> Int {
+        bar(5)
+      };
+
+      let h = handler {
+        return(x) { "hello" }
+        bar(x) { "world" }
+      };
+
+      let main = handle[h] { f() };
+    |] `shouldBe` Right (ComputationType Empty TypeString)

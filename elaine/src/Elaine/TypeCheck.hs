@@ -16,13 +16,16 @@ import Control.Monad.State
     (<=<),
   )
 import Data.Foldable (foldlM)
+import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Text.Lazy (unpack)
 import Elaine.AST
 import Elaine.Std (stdTypes)
+import Text.Pretty.Simple (pShow)
+import Control.Monad (when)
 
 type Infer = ExceptT String (State (Int, Substitutions))
 
@@ -31,10 +34,12 @@ data Substitutions = Substitutions
   { subTypeVars :: Map ValueType ValueType,
     subEffectVars :: Map EffectRow EffectRow
   }
+  deriving (Show)
 
 -- Variable names to type
 data TypeEnv = TypeEnv
   { _vars :: Map String TypeScheme,
+    _effects :: Map String [OperationSignature],
     _mods :: Map String TypeEnv,
     _bound :: Set TypeVar
   }
@@ -49,7 +54,7 @@ get' m a = case Map.lookup a m of
   Nothing -> throwError $ "undefined identifier: " ++ a
 
 union :: TypeEnv -> TypeEnv -> TypeEnv
-union a = unionLens vars a . unionLens mods a
+union a = unionLens vars a . unionLens mods a . unionLens effects a
   where
     unionLens :: Lens' TypeEnv (Map String b) -> TypeEnv -> TypeEnv -> TypeEnv
     unionLens l a' = over l (Map.union $ a' ^. l)
@@ -72,16 +77,23 @@ insertVar k v = over vars $ Map.insert k v
 insertMod :: String -> TypeEnv -> TypeEnv -> TypeEnv
 insertMod k v = over mods $ Map.insert k v
 
+insertEffect :: String -> [OperationSignature] -> TypeEnv -> TypeEnv
+insertEffect k v = over effects $ Map.insert k v
+
 singletonVar :: String -> TypeScheme -> TypeEnv
 singletonVar k v = insertVar k v empty
 
 singletonMod :: String -> TypeEnv -> TypeEnv
 singletonMod k v = insertMod k v empty
 
+singletonEffect :: String -> [OperationSignature] -> TypeEnv
+singletonEffect k v = insertEffect k v empty
+
 empty :: TypeEnv
 empty =
   TypeEnv
     { _vars = Map.empty,
+      _effects = Map.empty,
       _mods = Map.empty,
       _bound = Set.empty
     }
@@ -100,12 +112,13 @@ inst (TypeScheme {typeVars, effectVars, typ}) = do
       typ
 
 gen :: TypeEnv -> ComputationType -> Infer TypeScheme
-gen env type' = do
-  let typeVars = Set.toList $ freeTypeVars env type'
+gen env typ = do
+  typ' <- subM typ
+  let typeVars = Set.toList $ freeTypeVars env typ'
   freshTypeVars <- freshes typeVars
   let typeVarMap = zip (map TypeVar typeVars) (map TypeVar freshTypeVars)
 
-  let effectVars = Set.toList $ freeEffectVars env type'
+  let effectVars = Set.toList $ freeEffectVars env typ'
   freshEffectVars <- freshes effectVars
   let effectVarMap = zip (map Extend effectVars) (map Extend freshEffectVars)
 
@@ -115,12 +128,13 @@ gen env type' = do
             subEffectVars = Map.fromList effectVarMap
           }
 
-  let typ = sub subs type'
+  let typ'' = sub subs typ'
+
   return $
     TypeScheme
       { typeVars = freshTypeVars,
         effectVars = freshEffectVars,
-        typ
+        typ = typ''
       }
 
 freshes :: [a] -> Infer [TypeVar]
@@ -133,6 +147,7 @@ freeTypeVars env t = allTypeVars t Set.\\ view bound env
 
     allTypeVarsV (TypeVar v) = Set.singleton v
     allTypeVarsV (TypeArrow args ret) = Set.unions (map allTypeVars (args ++ [ret]))
+    allTypeVarsV (TypeHandler _ from to) = Set.insert from (allTypeVarsV to)
     allTypeVarsV _ = Set.empty
 
 freeEffectVars :: TypeEnv -> ComputationType -> Set TypeVar
@@ -144,6 +159,7 @@ freeEffectVars env t = allEffectVars t Set.\\ view bound env
         (allEffectVarsV typ)
 
     allEffectVarsV (TypeArrow args ret) = Set.unions (map allEffectVars (args ++ [ret]))
+    allEffectVarsV (TypeHandler _ _ to) = allEffectVarsV to
     allEffectVarsV _ = Set.empty
 
     allEffectVarsR (Extend v) = Set.singleton v
@@ -178,12 +194,19 @@ emptySubs = Substitutions Map.empty Map.empty
 addTypeSub :: ValueType -> ValueType -> Infer ()
 addTypeSub k v = do
   (i, subs) <- get
-  put (i, subs {subTypeVars = Map.insert k v (subTypeVars subs)})
+  put (i, updateSubs $ subs {subTypeVars = Map.insert k v (subTypeVars subs)})
 
 addEffectSub :: EffectRow -> EffectRow -> Infer ()
 addEffectSub k v = do
   (i, subs) <- get
-  put (i, subs {subEffectVars = Map.insert k v (subEffectVars subs)})
+  put (i, updateSubs $ subs {subEffectVars = Map.insert k v (subEffectVars subs)})
+
+updateSubs :: Substitutions -> Substitutions
+updateSubs subs =
+  Substitutions
+    { subTypeVars = Map.map (sub subs) (subTypeVars subs),
+      subEffectVars = Map.map (sub subs) (subEffectVars subs)
+    }
 
 runInfer :: Infer a -> Either String a
 runInfer a = evalState (runExceptT a) (0, emptySubs)
@@ -229,19 +252,40 @@ typeCheckDec' env = \case
     modEnv <- typeCheckMod env decs
     return $ singletonMod x (snd modEnv)
   DecType _ _ -> throwError "Not implemented"
-  DecEffect _ _ -> throwError "Not implemented"
+  DecEffect name signatures ->
+    let sigsAsFunctions =
+          map
+            ( \(OperationSignature f args ret) ->
+                ( f,
+                  TypeScheme [] [ExplicitVar "a", ExplicitVar "b"] $
+                    ComputationType (Extend $ ExplicitVar "a") $
+                      TypeArrow
+                        (map (ComputationType Empty) args)
+                        (ComputationType (Cons name $ Extend $ ExplicitVar "b") ret)
+                )
+            )
+            signatures
+        newEnv =
+          empty
+            { _vars = Map.fromList sigsAsFunctions,
+              _effects = Map.singleton name signatures
+            }
+     in return newEnv
   DecLet x mt expr -> do
     tExpr <- infer env expr
     tExpr' <- subM tExpr
-    tExpr'' <- gen env tExpr'
     () <- forM_ mt (isInstanceOf tExpr')
+    tExpr'' <- gen env tExpr'
     return $ singletonVar x tExpr''
 
 class Substitutable a where
   sub :: Substitutions -> a -> a
 
 instance Substitutable ValueType where
-  sub subs vt = fromMaybe vt $ Map.lookup vt (subTypeVars subs)
+  sub subs vt | Just vt' <- Map.lookup vt (subTypeVars subs) = vt'
+  sub subs (TypeArrow args ret) = TypeArrow (map (sub subs) args) (sub subs ret)
+  sub subs (TypeHandler name from to) = TypeHandler name from (sub subs to)
+  sub _ vt = vt
 
 instance Substitutable TypeEnv where
   sub subs = over vars (Map.map $ sub subs) . over mods (Map.map $ sub subs)
@@ -275,8 +319,14 @@ unify a b = do
     unifyR aRow@(Cons aEff aRest) bRow@(Cons bEff bRest)
       | Just b' <- removeEffect aEff bRow = unifyR aRest b'
       | Just a' <- removeEffect bEff aRow = unifyR a' bRest
-    unifyR _ _ = throwError "failed to unify effect rows"
-    
+    unifyR a' b' =
+      throwError
+        ( "failed to unify effect rows "
+            ++ show a'
+            ++ " -- "
+            ++ show b'
+        )
+
     removeEffect a' (Cons b' rest) | a' == b' = Just rest
     removeEffect a' (Cons b' rest) = do
       rest' <- removeEffect a' rest
@@ -289,6 +339,11 @@ unify a b = do
     unifyV (TypeArrow args1 ret1) (TypeArrow args2 ret2) = do
       () <- mapM_ (uncurry unify) (zip args1 args2)
       unify ret1 ret2
+    unifyV (TypeHandler name1 from1 to1) (TypeHandler name2 from2 to2) = do
+      () <- when (name1 /= name2) $ throwError "failed to unify handlers for different effects"
+      () <- unify (ComputationType Empty (TypeVar from1)) (ComputationType Empty (TypeVar from2))
+      () <- unify (ComputationType Empty to1) (ComputationType Empty to2)
+      return ()
     unifyV _ _ = throwError "Failed to unify: type error"
 
 class Inferable a where
@@ -322,6 +377,23 @@ instance Inferable Expr where
         t1' <- gen env t1
         () <- forM_ mt (isInstanceOf t1)
         infer (insertVar x t1' env) e2
+      Handle e1 e2 -> do
+        t1 <- infer env e1
+        restRow <- freshR
+        vt <- freshV
+        () <- unify (ComputationType restRow vt) t1
+
+        vt' <- subM vt
+        (name, from, to) <- case vt' of
+          TypeHandler name from to -> return (name, from, to)
+          _ -> throwError "handle did not get a handler"
+
+        t2 <- infer env e2
+        () <- unify (ComputationType (Cons name restRow) (TypeVar from)) t2
+
+        to' <- subM to
+        restRow' <- subM restRow
+        return $ ComputationType restRow' to'
       x -> error $ "Not implemented: " ++ show x
 
 extractVal :: ComputationType -> ValueType
@@ -333,9 +405,15 @@ typeOrFresh (Just t) = return t
 
 isInstanceOf :: ComputationType -> ComputationType -> Infer ()
 isInstanceOf a b = do
-  () <- unify a b
+  -- This was necessary, not sure why
   b' <- subM b
-  if b == b' then return () else throwError "type error"
+  () <- unify a b'
+  b'' <- subM b'
+  if b' == b''
+    then return ()
+    else do
+      (_, subs) <- get
+      throwError ("isInstanceOf failed: " ++ unpack (pShow (a, b, subs)))
 
 inferMany :: Inferable a => TypeEnv -> [a] -> Infer [ComputationType]
 inferMany env = mapM (infer env)
@@ -371,6 +449,56 @@ instance Inferable Value where
 
     tArgs'' <- mapM subM tArgs
     tRet' <- subM tRetInferred
-    row <- freshR
-    return $ ComputationType row $ TypeArrow tArgs'' tRet'
+    vToC $ TypeArrow tArgs'' tRet'
+  infer env (Hdl (Handler ret clauses)) = do
+    -- Find the matching effect if available
+    let maybeEffect = find matchesClauses (Map.toList $ view effects env)
+    -- TODO: the name must be the full path to the effect to avoid conflicts
+    (name, signatures) <- case maybeEffect of
+      Just a -> return a
+      Nothing -> throwError "could not match handler with an effect"
+
+    -- Figure out the type of the return case
+    -- TODO: honor type declarations
+    from <- fresh
+    let fromV = TypeVar from
+    to <- freshV
+    let toC = ComputationType Empty to
+    tRet <- infer env (Fn ret)
+    unify
+      ( ComputationType
+          Empty
+          ( TypeArrow [ComputationType Empty fromV] toC
+          )
+      )
+      tRet
+
+    to' <- subM to
+    let toC' = ComputationType Empty to'
+
+    () <-
+      mapM_
+        ( \(OperationClause cName args body) -> do
+            let OperationSignature _ sigArgs sigRet = case findSig cName signatures of
+                  Just sig -> sig
+                  Nothing -> error "ICE"
+            let sigArgs' = map (Just . ComputationType Empty) sigArgs
+            let sigRet' = ComputationType Empty sigRet
+            let clauseFunc = Function (zip args sigArgs') (Just toC') body
+            infer
+              ( insertVar
+                  "resume"
+                  (TypeScheme [] [] $ ComputationType Empty (TypeArrow [sigRet'] toC'))
+                  env
+              )
+              (Fn clauseFunc)
+        )
+        clauses
+
+    vToC $ TypeHandler name from to'
+    where
+      sigNames = map (\(OperationSignature x _ _) -> x)
+      clauseNames = map (\(OperationClause x _ _) -> x) clauses
+      matchesClauses (_, signatures) = Set.fromList clauseNames == Set.fromList (sigNames signatures)
+      findSig x = find (\(OperationSignature y _ _) -> y == x)
   infer _ _ = error "Not implemented yet"

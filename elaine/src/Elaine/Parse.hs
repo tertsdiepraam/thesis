@@ -1,8 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module Elaine.Parse (parseProgram, parseExpr, ParseResult, Spans, Span) where
 
 import Data.Either (partitionEithers)
@@ -184,15 +179,13 @@ handler = do
         _ -> error "Handler cannot have multiple return arms"
   return $ Val $ Hdl $ Handler ret functions
 
-handlerArm :: Parser (Either HandleReturn OperationClause)
+handlerArm :: Parser (Either Function OperationClause)
 handlerArm =
   (Left <$> handleReturn)
     <|> (Right <$> operationClause)
 
-handleReturn :: Parser HandleReturn
-handleReturn = do
-  var <- try (keyword "return") >> parens ident
-  HandleReturn var <$> exprBlock
+handleReturn :: Parser Function
+handleReturn = try (keyword "return") >> function
 
 operationClause :: Parser OperationClause
 operationClause = OperationClause <$> ident <*> parens (ident `sepBy` comma) <*> exprBlock

@@ -148,7 +148,7 @@ testEval = describe "eval0" $ do
 
   it "handles an abort-like effect" $ do
     -- Returns a boolean to signify whether it ran to completion or aborted
-    let h = Val $ Hdl $ Handler (HandleReturn "x" tt) [OperationClause "abort" [] ff]
+    let h = Val $ Hdl $ Handler (Function [("x", Nothing)] Nothing tt) [OperationClause "abort" [] ff]
     f (Handle h (Let "x" Nothing (iv 5) (Var "x"))) `shouldBe` Bool True
     f (Handle h (Let "x" Nothing (App (Var "abort") []) (Var "x"))) `shouldBe` Bool False
 

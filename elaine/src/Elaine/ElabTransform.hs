@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module Elaine.ElabTransform where
 
 import Data.List (isSuffixOf)
@@ -30,7 +28,7 @@ elabTransExpr = \case
      in Val $
           Hdl $
             Handler
-              (HandleReturn "x" (Var "x"))
+              (Function [("x", Nothing)] Nothing (Var "x"))
               clauses'
   -- This is just the rest of the fold
   App e1 e2 -> App (f e1) (map f e2)
@@ -48,10 +46,10 @@ elabTransVal :: Value -> Value
 elabTransVal = \case
   Fn (Function params ret body) ->
     Fn $ Function params ret (elabTransExpr body)
-  Hdl (Handler (HandleReturn xRet eRet) clauses) ->
+  Hdl (Handler (Function params ret body) clauses) ->
     Hdl $
       Handler
-        (HandleReturn xRet (elabTransExpr eRet))
+        (Function params ret (elabTransExpr body))
         (transClauses clauses)
   Elb (Elaboration from to clauses) ->
     Elb $

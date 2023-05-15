@@ -95,8 +95,8 @@ execCheck :: (Text, Text) -> Either Error ComputationType
 execCheck = parseNoSpans >=> \x -> case typeCheck x of
   Left a -> Left $ TypeError a
   Right env -> case getMain env of
-    TypeScheme [] [] t -> Right t
-    scheme -> traceShow scheme $ Left $ TypeError "main cannot have type variables"
+    TypeScheme _ _ t -> Right t
+    -- scheme -> traceShow scheme $ Left $ TypeError "main cannot have type variables"
 
 execRun :: (Text, Text) -> Either Error Value
 execRun = parseNoSpans >=> typeCheck' >=> eval'

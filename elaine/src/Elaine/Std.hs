@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module Elaine.Std (stdBindings, stdTypes) where
 
 import Data.Map (Map, fromList)
