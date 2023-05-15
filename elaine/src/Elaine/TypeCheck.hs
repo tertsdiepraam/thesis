@@ -15,7 +15,6 @@ import Control.Monad.State
     evalState,
     (<=<),
   )
-import Data.Bifunctor (second)
 import Data.Foldable (foldlM)
 import Data.Map (Map)
 import qualified Data.Map as Map

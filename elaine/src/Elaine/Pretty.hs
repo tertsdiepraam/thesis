@@ -14,7 +14,7 @@ pBlock "" = "{}"
 pBlock s = "{\n" ++ indent s ++ "}"
 
 pParam :: (Ident, Maybe ComputationType) -> String
-pParam (name, typ) = name ++ ": " ++ maybe "_" pretty typ
+pParam (name, typ') = name ++ ": " ++ maybe "_" pretty typ'
 
 concatBlock :: Pretty a => [a] -> String
 concatBlock as = pBlock $ unlines (map pretty as)
