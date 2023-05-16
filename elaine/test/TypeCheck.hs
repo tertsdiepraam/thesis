@@ -321,22 +321,6 @@ testTypeCheck = describe "typeCheck" $ do
       };
     |] `shouldBe` Right (ComputationType Empty TypeString)
   
-  it "can apply a handler" $ do
-    check [r|
-      effect Foo {
-        bar(a) a
-      }
-
-      let h = handler {
-        return(x) { "hello" }
-        bar(x) { "world" }
-      };
-
-      let main = handle[h] {
-        bar(5)
-      };
-    |] `shouldBe` Right (ComputationType Empty TypeString)
-  
   it "cannot use operation outside of handle" $ do
     check [r|
       effect Foo {
@@ -380,3 +364,49 @@ testTypeCheck = describe "typeCheck" $ do
 
       let main = handle[h] { f() };
     |] `shouldBe` Right (ComputationType Empty TypeString)
+  
+  it "type for resume must match return type of operation" $ do
+    check [r|
+      effect Foo {
+        bar() Int
+      }
+
+      let h = handler {
+        return(x) { x }
+        bar() {
+          resume(5)
+        }
+      };
+
+      let main = handle[h] bar();
+    |] `shouldBe` Right (ComputationType Empty TypeInt)
+    
+    check [r|
+      effect Foo {
+        bar() Int
+      }
+
+      let h = handler {
+        return(x) { x }
+        bar() {
+          resume("hello")
+        }
+      };
+
+      let main = handle[h] bar();
+    |] `shouldSatisfy` isTypeError
+  
+  it "can use effects in function application" $ do
+    check [r|
+      use std;
+      effect Foo {
+        foo() Int
+      }
+
+      let hf = handler {
+        return(x) { x }
+        foo() { resume(2) }
+      };
+
+      let main = handle[hf] add(foo(), foo());
+    |] `shouldBe` Right (ComputationType Empty TypeInt)

@@ -12,7 +12,6 @@ import Prelude hiding (last, lookup)
 import Elaine.Pretty (pretty)
 import Control.Monad ((>=>))
 import Text.Pretty.Simple (pShow)
-import Debug.Trace (traceShow)
 
 last :: [a] -> Maybe a
 last = foldl (\_ x -> Just x) Nothing
@@ -117,4 +116,3 @@ exec command filename = do
   case cmd command x of
     Left a -> print a
     Right a -> putStrLn a
-    

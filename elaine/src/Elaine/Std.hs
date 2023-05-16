@@ -13,7 +13,7 @@ import Elaine.AST
   )
 
 arrow :: [ValueType] -> ValueType -> TypeScheme
-arrow args ret = TypeScheme [ExplicitVar "a", ExplicitVar "b"] [] $ ComputationType (Extend $ ExplicitVar "a") $ TypeArrow (map (ComputationType Empty) args) (ComputationType (Extend $ ExplicitVar "b") ret)
+arrow args ret = TypeScheme [] [ExplicitVar "a", ExplicitVar "b"] $ ComputationType (Extend $ ExplicitVar "a") $ TypeArrow (map (ComputationType Empty) args) (ComputationType (Extend $ ExplicitVar "b") ret)
 
 newBuiltIn :: Ident -> TypeScheme -> ([Value] -> Maybe Value) -> BuiltIn
 newBuiltIn name t f = BuiltIn name t $ \x -> case f x of
