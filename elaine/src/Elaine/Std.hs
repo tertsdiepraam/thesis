@@ -4,16 +4,21 @@ import Data.Map (Map, fromList)
 import Elaine.AST
   ( BuiltIn (..),
     ComputationType (ComputationType),
-    EffectRow (Empty, Extend),
     Ident,
     TypeScheme (TypeScheme),
-    TypeVar (ExplicitVar),
     Value (Bool, Constant, Int, String),
     ValueType (TypeArrow, TypeBool, TypeInt, TypeString),
   )
+import Elaine.TypeVar (TypeVar (ExplicitVar))
+import qualified Elaine.Row as Row
 
 arrow :: [ValueType] -> ValueType -> TypeScheme
-arrow args ret = TypeScheme [] [ExplicitVar "a", ExplicitVar "b"] $ ComputationType (Extend $ ExplicitVar "a") $ TypeArrow (map (ComputationType Empty) args) (ComputationType (Extend $ ExplicitVar "b") ret)
+arrow args ret =
+  TypeScheme [] [ExplicitVar "a", ExplicitVar "b"] $
+    ComputationType (Row.var $ ExplicitVar "a") $
+      TypeArrow
+        (map (ComputationType Row.empty) args)
+        (ComputationType (Row.var $ ExplicitVar "b") ret)
 
 newBuiltIn :: Ident -> TypeScheme -> ([Value] -> Maybe Value) -> BuiltIn
 newBuiltIn name t f = BuiltIn name t $ \x -> case f x of

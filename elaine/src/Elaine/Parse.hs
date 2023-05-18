@@ -1,10 +1,16 @@
 module Elaine.Parse (parseProgram, parseExpr, ParseResult, Spans, Span) where
 
+import Control.Monad.State (State, evalState, get, put, runState)
+import Data.Char (isLower)
 import Data.Either (partitionEithers)
 import Data.Maybe (fromMaybe)
+import qualified Data.MultiSet as MultiSet
 import Data.Text (Text, pack, unpack)
 import Data.Void
 import Elaine.AST
+import Elaine.Row (Row (Row))
+import qualified Elaine.Row as Row
+import Elaine.TypeVar (TypeVar (ExplicitVar))
 import Text.Megaparsec
   ( MonadParsec (eof, notFollowedBy, try),
     ParseErrorBundle,
@@ -12,22 +18,24 @@ import Text.Megaparsec
     between,
     empty,
     errorBundlePretty,
+    getInput,
+    getOffset,
     many,
     manyTill,
     oneOf,
     option,
     optional,
+    runParserT,
     sepBy,
-    (<|>), runParserT, getOffset, getInput,
+    (<|>),
   )
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
-import Data.Char (isLower)
-import Control.Monad.State (State, runState, put, get, evalState)
 import Prelude hiding (span)
 
 data Span = Span Int Int String
   deriving (Show)
+
 type Spans = [(Span, String)]
 
 type Parser = ParsecT Void Text (State Spans)
@@ -46,20 +54,18 @@ span c p = do
   return x
 
 parseProgram :: (Text, Text) -> Either String ([Declaration], Spans)
-parseProgram (name, s) = 
+parseProgram (name, s) =
   let parsed = runParserT program (unpack name) s
       afterState = runState parsed []
-  in case afterState of
-    (Left a, _) -> Left (errorBundlePretty a)
-    (Right p, s') -> Right (p, s')
+   in case afterState of
+        (Left a, _) -> Left (errorBundlePretty a)
+        (Right p, s') -> Right (p, s')
 
 -- This mostly exists for testing
 parseExpr :: String -> ParseResult Expr
-parseExpr s = 
-  let
-    parsed = runParserT expr s (pack s)
-  in
-    evalState parsed empty
+parseExpr s =
+  let parsed = runParserT expr s (pack s)
+   in evalState parsed empty
 
 -- WHITESPACE & BASIC SYMBOLS
 space' :: Parser ()
@@ -157,7 +163,7 @@ decUse = Use <$> try (keyword "use" >> ident <* semicolon)
 elaboration :: Parser Expr
 elaboration = do
   from <- try (keyword "elaboration") >> ident
-  to <- symbol "->" >> effectRow
+  to <- symbol "->" >> row
   Val . Elb . Elaboration from to <$> braces (many operationClause)
 
 decVal :: Parser DeclarationType
@@ -217,9 +223,9 @@ functionParam = do
 
 computationType :: Parser ComputationType
 computationType = do
-  effs <- optional effectRow
+  effs <- optional row
   v <- valueType
-  return $ ComputationType (fromMaybe Empty effs) v
+  return $ ComputationType (fromMaybe Row.empty effs) v
 
 valueType :: Parser ValueType
 valueType =
@@ -232,7 +238,7 @@ valueType =
             x <- ident
             return $
               if isLower $ head x
-                then TypeVar $ ExplicitVar x
+                then TypeV $ ExplicitVar x
                 else TypeName x
         )
     <|> try (parens valueType)
@@ -240,12 +246,12 @@ valueType =
 functionType :: Parser ValueType
 functionType = try (keyword "fn") >> TypeArrow <$> parens (computationType `sepBy` comma) <*> computationType
 
-effectRow :: Parser EffectRow
-effectRow =
+row :: Parser Row
+row =
   angles $ do
     effects <- ident `sepBy` comma
-    extend <- (Extend . ExplicitVar <$> (symbol "|" >> ident)) <|> return Empty
-    return $ foldr Cons extend effects
+    extend <- optional (ExplicitVar <$> (symbol "|" >> ident))
+    return $ Row (MultiSet.fromList effects) extend
 
 -- EXPRESSIONS
 data LetOrExpr = Let' String (Maybe ComputationType) Expr | Expr' Expr

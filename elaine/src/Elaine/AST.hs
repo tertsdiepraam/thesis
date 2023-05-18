@@ -1,9 +1,11 @@
 module Elaine.AST where
 
+import Elaine.TypeVar
+import Elaine.Row (Row, Effect)
+
 type Program = [Declaration]
 
 type Ident = String
-type Effect = String
 
 data Visibility = Private | Public
   deriving (Show, Eq)
@@ -22,7 +24,7 @@ data DeclarationType
 data OperationSignature = OperationSignature Ident [ValueType] ValueType
   deriving (Show, Eq)
 
-data Elaboration = Elaboration Ident EffectRow [OperationClause]
+data Elaboration = Elaboration Ident Row [OperationClause]
   deriving (Show, Eq)
 
 data Handler = Handler Function [OperationClause]
@@ -33,9 +35,6 @@ data Function = Function [(Ident, Maybe ComputationType)] (Maybe ComputationType
 
 lam :: [Ident] -> Expr -> Value
 lam a = Fn . Function (zip a (repeat Nothing)) Nothing
-
-data EffectRow = Cons Effect EffectRow | Empty | Extend TypeVar
-  deriving (Show, Eq, Ord)
 
 data Constructor = Constructor Ident [ComputationType]
   deriving (Show, Eq)
@@ -89,7 +88,7 @@ data MatchArm = MatchArm Pattern Expr
 data Pattern = Pattern Ident [Ident]
   deriving (Show, Eq)
 
-data ComputationType = ComputationType EffectRow ValueType
+data ComputationType = ComputationType Row ValueType
   deriving (Show, Eq, Ord)
 
 data TypeScheme = TypeScheme {
@@ -99,16 +98,13 @@ data TypeScheme = TypeScheme {
 }
   deriving (Show, Eq, Ord)
 
-data TypeVar = ImplicitVar Int | ExplicitVar String
-  deriving (Show, Eq, Ord)
-
 data ValueType
   = TypeInt
   | TypeString
   | TypeBool
   | TypeUnit
   | TypeName String
-  | TypeVar TypeVar
+  | TypeV TypeVar
   | TypeArrow [ComputationType] ComputationType
   | TypeHandler Effect TypeVar ValueType
   deriving (Show, Eq, Ord)

@@ -4,12 +4,14 @@ module TypeCheck (testTypeCheck) where
 
 import Data.Either (isLeft)
 import Data.Text (pack)
-import Elaine.AST ( ValueType(TypeHandler, TypeInt, TypeBool, TypeString), ComputationType(ComputationType), EffectRow (Empty) )
+import Elaine.AST ( ValueType(TypeHandler, TypeInt, TypeBool, TypeString, TypeArrow, TypeV), ComputationType(ComputationType))
+import Elaine.Row (Row)
+import qualified Elaine.Row as Row
 import Elaine.ElabTransform (elabTrans)
 import Elaine.Exec (exec, Result, pack', execCheck, isTypeError)
 import Elaine.Parse (ParseResult, parseExpr, parseProgram)
 import Elaine.Pretty (pretty)
-import Elaine.TypeCheck (TypeEnv (TypeEnv), getMain, getVar, typeCheck)
+import Elaine.TypeCheck (TypeEnv (TypeEnv), getMain, getVar, typeCheck, runInfer, unifyRows)
 import Test.Hspec
   ( Expectation,
     SpecWith,
@@ -22,9 +24,14 @@ import Test.Hspec
   )
 import Test.Hspec.Runner (SpecResult (specResultSuccess))
 import Text.RawString.QQ (r)
+import Prelude hiding (pure)
+import Elaine.TypeVar (TypeVar(ExplicitVar))
 
 check :: String -> Result ComputationType
 check = execCheck . pack' . (,) "test"
+
+pure :: ValueType -> ComputationType
+pure = ComputationType Row.empty
 
 testTypeCheck :: SpecWith ()
 testTypeCheck = describe "typeCheck" $ do
@@ -32,14 +39,14 @@ testTypeCheck = describe "typeCheck" $ do
     check [r|
       let main = if true { 5 } else { 10 };
     |]
-      `shouldBe` Right (ComputationType Empty TypeInt)
+      `shouldBe` Right (pure TypeInt)
 
   it "checks bindings" $ do
     check [r|
       let x = "Hello";
       let main = x;
     |]
-      `shouldBe` Right (ComputationType Empty TypeString)
+      `shouldBe` Right (pure TypeString)
 
   it "checks function applications" $ do
     check [r|
@@ -48,7 +55,7 @@ testTypeCheck = describe "typeCheck" $ do
       };
       let main = f(true, 5, 10);
     |]
-      `shouldBe` Right (ComputationType Empty TypeInt)
+      `shouldBe` Right (pure TypeInt)
 
   it "can type check used items" $ do
     check [r|
@@ -58,7 +65,7 @@ testTypeCheck = describe "typeCheck" $ do
       use A;
       let main = x;
     |]
-      `shouldBe` Right (ComputationType Empty TypeInt)
+      `shouldBe` Right (pure TypeInt)
 
   it "errors on undefined variable" $ do
     check
@@ -81,12 +88,12 @@ testTypeCheck = describe "typeCheck" $ do
     check [r|
       use std;
       let main = add(1, 2);
-    |] `shouldBe` Right (ComputationType Empty TypeInt)
+    |] `shouldBe` Right (pure TypeInt)
     
     check [r|
       use std;
       let main = concat("hello", concat(" ", " world"));
-    |] `shouldBe` Right (ComputationType Empty TypeString)
+    |] `shouldBe` Right (pure TypeString)
   
   it "checks input for built-ins" $ do
     check [r|
@@ -101,7 +108,7 @@ testTypeCheck = describe "typeCheck" $ do
     
     check [r|
       let main: String = "hello";
-    |] `shouldBe` Right (ComputationType Empty TypeString)
+    |] `shouldBe` Right (pure TypeString)
   
   it "cannot assign mono to poly" $ do
     check [r|
@@ -115,7 +122,7 @@ testTypeCheck = describe "typeCheck" $ do
         y
       };
       let main = f(5);
-    |] `shouldBe` Right (ComputationType Empty TypeInt)
+    |] `shouldBe` Right (pure TypeInt)
   
   it "can assign to explicit bound poly" $ do
     check [r|
@@ -124,7 +131,7 @@ testTypeCheck = describe "typeCheck" $ do
         y
       };
       let main = f(5);
-    |] `shouldBe` Right (ComputationType Empty TypeInt)
+    |] `shouldBe` Right (pure TypeInt)
   
   it "cannot use poly as specific type" $ do
     check [r|
@@ -133,6 +140,15 @@ testTypeCheck = describe "typeCheck" $ do
       };
       let main = f(2);
     |] `shouldSatisfy` isTypeError
+  
+  -- TODO: effect row of argument should be empty
+  it "can infer id applied to id" $ do
+    check [r|
+      let id = fn(x) { x };
+      let main = id(id);
+    |] `shouldSatisfy` \case
+        Right (ComputationType _ (TypeArrow [ComputationType _ (TypeV a)] (ComputationType _ (TypeV b)))) | a == b -> True
+        _ -> False
   
   it "uses the function body to infer types" $ do
     check [r|
@@ -149,7 +165,7 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = f(5);
-    |] `shouldBe` Right (ComputationType Empty TypeInt)
+    |] `shouldBe` Right (pure TypeInt)
     
     check [r|
       let f = fn(x: Int) Int {
@@ -171,7 +187,7 @@ testTypeCheck = describe "typeCheck" $ do
     check [r|
       let f: fn(Int) Int = fn(x) { x };
       let main = f(5);
-    |] `shouldBe` Right (ComputationType Empty TypeInt)
+    |] `shouldBe` Right (pure TypeInt)
     
     check [r|
       let f: fn(Int) Int = fn(x) { x };
@@ -187,7 +203,7 @@ testTypeCheck = describe "typeCheck" $ do
         }
       };
       let main = f(1)(2);
-    |] `shouldBe` Right (ComputationType Empty TypeInt)
+    |] `shouldBe` Right (pure TypeInt)
     
     check [r|
       use std;
@@ -218,7 +234,7 @@ testTypeCheck = describe "typeCheck" $ do
         let a = f(2);
         f("hello")
       };
-    |] `shouldBe` Right (ComputationType Empty TypeString)
+    |] `shouldBe` Right (pure TypeString)
 
   it "can call effectless functions in main" $ do
     check [r|
@@ -226,7 +242,7 @@ testTypeCheck = describe "typeCheck" $ do
         x
       };
       let main = f(5);
-    |] `shouldBe` Right (ComputationType Empty TypeInt)
+    |] `shouldBe` Right (pure TypeInt)
 
   it "cannot call effectful functions in main" $ do
     check [r|
@@ -244,10 +260,10 @@ testTypeCheck = describe "typeCheck" $ do
 
       let main = handler {
         return(x) { x }
-        bar(x) { resume(x) } 
+        bar(x) { resume(x) }
       };
     |] `shouldSatisfy` \case
-        Right (ComputationType Empty (TypeHandler "Foo" _ _)) -> True
+        Right (ComputationType _ (TypeHandler "Foo" _ _)) -> True
         _ -> False
   
   it "can infer handler types with specific types in the operations" $ do
@@ -263,7 +279,7 @@ testTypeCheck = describe "typeCheck" $ do
         bar(x) { resume(add(x, x)) } 
       };
     |] `shouldSatisfy` \case
-        Right (ComputationType Empty (TypeHandler "Foo" _ _)) -> True
+        Right (ComputationType _ (TypeHandler "Foo" _ _)) -> True
         _ -> False
 
   it "can cannot be more specific about types in handlers" $ do
@@ -302,7 +318,7 @@ testTypeCheck = describe "typeCheck" $ do
         bar(x) { "world" }
       };
     |] `shouldSatisfy` \case
-        Right (ComputationType Empty (TypeHandler "Foo" _ TypeString)) -> True
+        Right (ComputationType _ (TypeHandler "Foo" _ TypeString)) -> True
         _ -> False
   
   it "can apply a handler" $ do
@@ -319,7 +335,7 @@ testTypeCheck = describe "typeCheck" $ do
       let main = handle[h] {
         5
       };
-    |] `shouldBe` Right (ComputationType Empty TypeString)
+    |] `shouldBe` Right (pure TypeString)
   
   it "cannot use operation outside of handle" $ do
     check [r|
@@ -363,7 +379,7 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[h] { f() };
-    |] `shouldBe` Right (ComputationType Empty TypeString)
+    |] `shouldBe` Right (pure TypeString)
   
   it "type for resume must match return type of operation" $ do
     check [r|
@@ -379,7 +395,7 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[h] bar();
-    |] `shouldBe` Right (ComputationType Empty TypeInt)
+    |] `shouldBe` Right (pure TypeInt)
     
     check [r|
       effect Foo {
@@ -409,4 +425,132 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[hf] add(foo(), foo());
-    |] `shouldBe` Right (ComputationType Empty TypeInt)
+    |] `shouldBe` Right (pure TypeInt)
+  
+  it "can use effects in if" $ do
+    check [r|
+      use std;
+      effect Foo {
+        foo() Int
+      }
+
+      let hf = handler {
+        return(x) { x }
+        foo() { resume(2) }
+      };
+
+      let main = handle[hf] {
+        if gt(foo(), 0) {
+          foo()
+        } else {
+          sub(0, foo())
+        }
+      };
+    |] `shouldBe` Right (pure TypeInt)
+
+  it "accepts different orders of handlers" $ do
+    check [r|
+      use std;
+      
+      effect Foo {
+        foo() Int
+      }
+
+      let hf = handler {
+        return(x) { x }
+        foo() { resume(2) }
+      };
+
+      effect Bar {
+        bar() Int
+      }
+
+      let hb = handler {
+        return(x) { x }
+        bar() { resume(3) }
+      };
+
+      let main = add(
+        { handle[hf] handle[hb] add(foo(), bar()) },
+        { handle[hb] handle[hf] add(foo(), bar()) }
+      );
+    |] `shouldBe` Right (pure TypeInt)
+  
+  it "accepts different orders of handlers with explicitly typed function" $ do
+    check [r|
+      use std;
+      
+      effect Foo {
+        foo() Int
+      }
+
+      let hf = handler {
+        return(x) { x }
+        foo() { resume(2) }
+      };
+
+      effect Bar {
+        bar() Int
+      }
+
+      let hb = handler {
+        return(x) { x }
+        bar() { resume(3) }
+      };
+
+      let f = fn() <Foo,Bar> Int {
+        add(foo(), bar())
+      };
+
+      let main = add(
+        { handle[hf] handle[hb] f() },
+        { handle[hb] handle[hf] f() }
+      );
+    |] `shouldBe` Right (pure TypeInt)
+  
+  it "can figure out higher-order effectful functions" $ do
+    check [r|
+      use std;
+
+      effect Foo {
+        foo() Int
+      }
+
+      let addFoo = fn(x: Int) <Foo> Int {
+        add(foo(), x)
+      };
+
+      let applyTo2 = fn(f: fn(Int) <|e> Int) <|e> Int {
+        f(2)
+      };
+
+      let main = applyTo2(foo);
+    |] `shouldSatisfy` isTypeError
+    
+    check [r|
+      use std;
+
+      effect Foo {
+        foo() Int
+      }
+
+      let addFoo = fn(x: Int) <Foo> Int {
+        add(foo(), x)
+      };
+
+      let applyTo2 = fn(f: fn(Int) <|e> Int) <|e> Int {
+        f(2)
+      };
+
+      let hf = handler {
+        return(x) { x }
+        foo() { resume(5) }
+      };
+
+      let main = handle[hf] applyTo2(foo);
+    |] `shouldBe` Right (pure TypeInt)
+
+  describe "unifyRows" $ do
+    it "should unify rows with the same effects" $ do
+      let res = runInfer $ unifyRows (Row.open ("Foo"::String) (ExplicitVar "1")) (Row.open ("Foo"::String) (ExplicitVar "e2"))
+      res `shouldBe` Right ()

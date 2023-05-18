@@ -2,6 +2,9 @@ module Elaine.Pretty where
 
 import Data.List (intercalate)
 import Elaine.AST
+import Elaine.Row (Row (Row))
+import qualified Data.MultiSet as MultiSet
+import Elaine.TypeVar (TypeVar (ExplicitVar, ImplicitVar))
 
 -- Special typeclass for pretty printing the code
 class Pretty a where
@@ -42,7 +45,7 @@ instance Pretty OperationSignature where
     name ++ parens (map pretty args) ++ pretty ret
 
 instance Pretty Function where
-  pretty (Function params ret do') = "fn" ++ parens (map pParam params) ++ maybe "_" pretty ret ++ " " ++ pBlock (pretty do')
+  pretty (Function params ret do') = parens (map pParam params) ++ maybe "_" pretty ret ++ " " ++ pBlock (pretty do')
 
 instance Pretty Expr where
   pretty (Let x t e1 e2) = "let " ++ x ++ optionalType t ++ " = " ++ pretty e1 ++ "\n" ++ pretty e2
@@ -94,13 +97,14 @@ instance Pretty ComputationType where
   -- outside the function with parentheses
   pretty (ComputationType valueType effs) = pretty effs ++ " " ++ pretty valueType
 
-instance Pretty EffectRow where
+instance Pretty Row where
   pretty row = "<" ++ prettyRow row ++ ">"
     where
-      prettyRow Empty = ""
-      prettyRow (Extend x) = "|" ++ show x
-      prettyRow (Cons x xs@(Cons _ _)) = x ++ ", " ++ prettyRow xs
-      prettyRow (Cons x xs) = x ++ prettyRow xs
+      prettyRow (Row effects extend) = intercalate ", " (MultiSet.toList effects) ++ maybe "" (("|" ++) . pretty) extend
+
+instance Pretty TypeVar where
+  pretty (ExplicitVar s) = s
+  pretty (ImplicitVar i) = "#" ++ show i
 
 instance Pretty ValueType where
   pretty TypeInt = "Int"
@@ -108,7 +112,7 @@ instance Pretty ValueType where
   pretty TypeBool = "Bool"
   pretty TypeUnit = "()"
   pretty (TypeName a) = a
-  pretty (TypeVar i) = "<var " ++ show i ++ ">"
+  pretty (TypeV v) = pretty v
   pretty (TypeArrow args ret) = "(" ++ intercalate ", " (map show args) ++ ") -> " ++ show ret
 
 indent :: String -> String
