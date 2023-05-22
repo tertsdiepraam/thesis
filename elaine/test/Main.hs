@@ -97,8 +97,8 @@ testParseProgram = describe "parseProgram" $ do
         [ Declaration Private $
             DecEffect
               "A"
-              [ OperationSignature "put" [TypeInt] TypeUnit,
-                OperationSignature "get" [] TypeInt
+              [ OperationSignature "put" [ASTComputationType (Row [] Nothing) (TypeName "Int")] (ASTComputationType (Row [] Nothing) TypeUnit),
+                OperationSignature "get" [] (ASTComputationType (Row [] Nothing) (TypeName "Int"))
               ]
         ]
 
@@ -114,8 +114,8 @@ testParseProgram = describe "parseProgram" $ do
         [ Declaration Private $
             DecEffect
               "A!"
-              [ OperationSignature "put!" [TypeInt] TypeUnit,
-                OperationSignature "get!" [] TypeInt
+              [ OperationSignature "put!" [ASTComputationType (Row [] Nothing) (TypeName "Int")] (ASTComputationType (Row [] Nothing) TypeUnit),
+                OperationSignature "get!" [] (ASTComputationType (Row [] Nothing) (TypeName "Int"))
               ]
         ]
 

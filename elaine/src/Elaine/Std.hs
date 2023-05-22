@@ -3,22 +3,19 @@ module Elaine.Std (stdBindings, stdTypes) where
 import Data.Map (Map, fromList)
 import Elaine.AST
   ( BuiltIn (..),
-    ComputationType (ComputationType),
     Ident,
-    TypeScheme (TypeScheme),
     Value (Bool, Constant, Int, String),
-    ValueType (TypeArrow, TypeBool, TypeInt, TypeString),
   )
+import Elaine.Types (TypeScheme (TypeScheme), CompType (CompType), ValType (TypeArrow, TypeBool, TypeInt, TypeString), rowVar, rowEmpty, Arrow (Arrow))
 import Elaine.TypeVar (TypeVar (ExplicitVar))
-import qualified Elaine.Row as Row
 
-arrow :: [ValueType] -> ValueType -> TypeScheme
+arrow :: [ValType] -> ValType -> TypeScheme
 arrow args ret =
   TypeScheme [] [ExplicitVar "a", ExplicitVar "b"] $
-    ComputationType (Row.var $ ExplicitVar "a") $
-      TypeArrow
-        (map (ComputationType Row.empty) args)
-        (ComputationType (Row.var $ ExplicitVar "b") ret)
+    CompType (rowVar $ ExplicitVar "a") $
+      TypeArrow $ Arrow
+        (map (CompType rowEmpty) args)
+        (CompType (rowVar $ ExplicitVar "b") ret)
 
 newBuiltIn :: Ident -> TypeScheme -> ([Value] -> Maybe Value) -> BuiltIn
 newBuiltIn name t f = BuiltIn name t $ \x -> case f x of

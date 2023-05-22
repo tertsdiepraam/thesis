@@ -17,7 +17,9 @@ common extensions
                       LambdaCase,
                       DataKinds,
                       GADTs,
-                      OverloadedStrings
+                      OverloadedStrings,
+                      BlockArguments,
+                      PatternSynonyms
 
 common warnings
   ghc-options: -Wall
@@ -25,9 +27,11 @@ common warnings
 library
   import:           warnings, extensions
   exposed-modules:  Elaine.AST,
+                    Elaine.TypeVar,
                     Elaine.Parse,
                     Elaine.TypeCheck,
                     Elaine.Pretty,
+                    Elaine.Types,
                     Elaine.Eval,
                     Elaine.Exec,
                     Elaine.ElabTransform,
@@ -36,6 +40,7 @@ library
   build-depends:    base ^>=4.16.3.0,
                     mtl == 2.2.2,
                     containers == 0.6.5.1,
+                    multiset == 0.3.4.3,
                     megaparsec ^>=9.3.0,
                     ghc-prim == 0.8.0,
                     text == 1.2.5.0,
@@ -61,4 +66,5 @@ test-suite test-elaine
                       elaine,
                       hspec == 2.10.10,
                       raw-strings-qq == 1.1,
+                      containers,
                       text

@@ -3,7 +3,7 @@ module Elaine.Exec where
 import Data.Bifunctor (first)
 import Data.Text (Text, pack, unpack)
 import qualified Data.Text.Lazy as L
-import Elaine.AST (Program, Value, ComputationType, TypeScheme (TypeScheme))
+import Elaine.AST (Program, Value)
 import Elaine.ElabTransform (elabTrans)
 import Elaine.Eval (eval)
 import Elaine.Parse (parseProgram, Spans)
@@ -12,6 +12,7 @@ import Prelude hiding (last, lookup)
 import Elaine.Pretty (pretty)
 import Control.Monad ((>=>))
 import Text.Pretty.Simple (pShow)
+import Elaine.Types (CompType, TypeScheme (TypeScheme))
 
 last :: [a] -> Maybe a
 last = foldl (\_ x -> Just x) Nothing
@@ -90,7 +91,7 @@ execParse = parseNoSpans
 execSpans :: (Text, Text) -> Either Error Spans
 execSpans = parseSpans
 
-execCheck :: (Text, Text) -> Either Error ComputationType
+execCheck :: (Text, Text) -> Either Error CompType
 execCheck = parseNoSpans >=> \x -> case typeCheck x of
   Left a -> Left $ TypeError a
   Right env -> case getMain env of

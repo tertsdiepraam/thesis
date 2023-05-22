@@ -4,14 +4,14 @@ module TypeCheck (testTypeCheck) where
 
 import Data.Either (isLeft)
 import Data.Text (pack)
-import Elaine.AST ( ValueType(TypeHandler, TypeInt, TypeBool, TypeString, TypeArrow, TypeV), ComputationType(ComputationType))
-import Elaine.Row (Row)
-import qualified Elaine.Row as Row
+import qualified Data.Map as Map
+import Elaine.Types
 import Elaine.ElabTransform (elabTrans)
-import Elaine.Exec (exec, Result, pack', execCheck, isTypeError)
+import Elaine.Exec (Result, exec, execCheck, isTypeError, pack')
 import Elaine.Parse (ParseResult, parseExpr, parseProgram)
 import Elaine.Pretty (pretty)
-import Elaine.TypeCheck (TypeEnv (TypeEnv), getMain, getVar, typeCheck, runInfer, unifyRows)
+import Elaine.TypeCheck (TypeEnv (TypeEnv), getMain, getVar, runInfer, typeCheck, unifyRows)
+import Elaine.TypeVar (TypeVar (ExplicitVar))
 import Test.Hspec
   ( Expectation,
     SpecWith,
@@ -25,31 +25,34 @@ import Test.Hspec
 import Test.Hspec.Runner (SpecResult (specResultSuccess))
 import Text.RawString.QQ (r)
 import Prelude hiding (pure)
-import Elaine.TypeVar (TypeVar(ExplicitVar))
+import Data.Text.Internal.Read (IParser(P))
 
-check :: String -> Result ComputationType
+check :: String -> Result CompType
 check = execCheck . pack' . (,) "test"
 
-pure :: ValueType -> ComputationType
-pure = ComputationType Row.empty
+pure :: ValType -> CompType
+pure = CompType rowEmpty
 
 testTypeCheck :: SpecWith ()
 testTypeCheck = describe "typeCheck" $ do
   it "checks an if" $ do
-    check [r|
+    check
+      [r|
       let main = if true { 5 } else { 10 };
     |]
       `shouldBe` Right (pure TypeInt)
 
   it "checks bindings" $ do
-    check [r|
+    check
+      [r|
       let x = "Hello";
       let main = x;
     |]
       `shouldBe` Right (pure TypeString)
 
   it "checks function applications" $ do
-    check [r|
+    check
+      [r|
       let f = fn(c, x, y) {
         if c { x } else { y }
       };
@@ -58,7 +61,8 @@ testTypeCheck = describe "typeCheck" $ do
       `shouldBe` Right (pure TypeInt)
 
   it "can type check used items" $ do
-    check [r|
+    check
+      [r|
       mod A {
         pub let x = 5;
       }
@@ -71,131 +75,168 @@ testTypeCheck = describe "typeCheck" $ do
     check
       [r|
       let main = x;
-    |] `shouldSatisfy` isTypeError 
+    |]
+      `shouldSatisfy` isTypeError
 
   it "errors on if with branches of different types" $ do
-    check [r|
+    check
+      [r|
       let main = if true { 5 } else { "hello" };
-    |] `shouldSatisfy` isTypeError
+    |]
+      `shouldSatisfy` isTypeError
 
   it "errors on if with non-bool condition" $ do
     check
       [r|
       let main = if 1 { 5 } else { 10 };
-    |] `shouldSatisfy` isTypeError
-  
+    |]
+      `shouldSatisfy` isTypeError
+
   it "gets types from std" $ do
-    check [r|
+    check
+      [r|
       use std;
       let main = add(1, 2);
-    |] `shouldBe` Right (pure TypeInt)
-    
-    check [r|
+    |]
+      `shouldBe` Right (pure TypeInt)
+
+    check
+      [r|
       use std;
       let main = concat("hello", concat(" ", " world"));
-    |] `shouldBe` Right (pure TypeString)
-  
+    |]
+      `shouldBe` Right (pure TypeString)
+
   it "checks input for built-ins" $ do
-    check [r|
+    check
+      [r|
       use std;
       let main = add("hello", 4);
-    |] `shouldSatisfy` isTypeError
-  
+    |]
+      `shouldSatisfy` isTypeError
+
   it "respects let type annotations" $ do
-    check [r|
+    check
+      [r|
       let main: Int = "hello";
-    |] `shouldSatisfy` isTypeError
-    
-    check [r|
+    |]
+      `shouldSatisfy` isTypeError
+
+    check
+      [r|
       let main: String = "hello";
-    |] `shouldBe` Right (pure TypeString)
-  
+    |]
+      `shouldBe` Right (pure TypeString)
+
   it "cannot assign mono to poly" $ do
-    check [r|
+    check
+      [r|
       let main: a = "hello";
-    |] `shouldSatisfy` isTypeError
-  
+    |]
+      `shouldSatisfy` isTypeError
+
   it "can assign to bound poly" $ do
-    check [r|
+    check
+      [r|
       let f = fn(x: a) {
         let y = x;
         y
       };
       let main = f(5);
-    |] `shouldBe` Right (pure TypeInt)
-  
+    |]
+      `shouldBe` Right (pure TypeInt)
+
   it "can assign to explicit bound poly" $ do
-    check [r|
+    check
+      [r|
       let f = fn(x: a) {
         let y: a = x;
         y
       };
       let main = f(5);
-    |] `shouldBe` Right (pure TypeInt)
-  
+    |]
+      `shouldBe` Right (pure TypeInt)
+
   it "cannot use poly as specific type" $ do
-    check [r|
+    check
+      [r|
       let f = fn(x: a) {
         add(x, x)
       };
       let main = f(2);
-    |] `shouldSatisfy` isTypeError
-  
+    |]
+      `shouldSatisfy` isTypeError
+
   -- TODO: effect row of argument should be empty
   it "can infer id applied to id" $ do
-    check [r|
+    check
+      [r|
       let id = fn(x) { x };
       let main = id(id);
-    |] `shouldSatisfy` \case
-        Right (ComputationType _ (TypeArrow [ComputationType _ (TypeV a)] (ComputationType _ (TypeV b)))) | a == b -> True
+    |]
+      `shouldSatisfy` \case
+        Right (CompType _ (TypeArrow (Arrow [CompType _ (TypeV a)] (CompType _ (TypeV b))))) | a == b -> True
         _ -> False
-  
+
   it "uses the function body to infer types" $ do
-    check [r|
+    check
+      [r|
       let f = fn(x) {
         add(x, x)
       };
       let main = f("hello");
-    |] `shouldSatisfy` isTypeError
+    |]
+      `shouldSatisfy` isTypeError
 
   it "respects function type annotations" $ do
-    check [r|
+    check
+      [r|
       let f = fn(x: Int) Int {
         x
       };
 
       let main = f(5);
-    |] `shouldBe` Right (pure TypeInt)
-    
-    check [r|
+    |]
+      `shouldBe` Right (pure TypeInt)
+
+    check
+      [r|
       let f = fn(x: Int) Int {
         x
       };
 
       let main = f("hello");
-    |] `shouldSatisfy` isTypeError
+    |]
+      `shouldSatisfy` isTypeError
 
-    check [r|
+    check
+      [r|
       let f = fn(x) Int {
         x
       };
 
       let main = f("hello");
-    |] `shouldSatisfy` isTypeError
-  
+    |]
+      `shouldSatisfy` isTypeError
+
   it "checks function types" $ do
-    check [r|
+    check
+      [r|
       let f: fn(Int) Int = fn(x) { x };
       let main = f(5);
-    |] `shouldBe` Right (pure TypeInt)
-    
-    check [r|
+    |]
+      `shouldBe` Right (pure TypeInt)
+
+    check
+      [r|
       let f: fn(Int) Int = fn(x) { x };
       let main = f("hello");
-    |] `shouldSatisfy` isTypeError 
+    |]
+      `shouldSatisfy` isTypeError
 
   it "checks first class functions" $ do
-    check [r|
+    check
+      [r|
       use std;
       let f = fn(x) fn(Int) Int {
         fn(y) {
@@ -203,9 +244,11 @@ testTypeCheck = describe "typeCheck" $ do
         }
       };
       let main = f(1)(2);
-    |] `shouldBe` Right (pure TypeInt)
-    
-    check [r|
+    |]
+      `shouldBe` Right (pure TypeInt)
+
+    check
+      [r|
       use std;
       let f = fn(x) fn(Int) Int {
         fn(y) {
@@ -213,9 +256,11 @@ testTypeCheck = describe "typeCheck" $ do
         }
       };
       let main = f("hello")(2);
-    |] `shouldSatisfy` isTypeError
-    
-    check [r|
+    |]
+      `shouldSatisfy` isTypeError
+
+    check
+      [r|
       use std;
       let f = fn(x) fn(Int) Int {
         fn(y) {
@@ -223,10 +268,12 @@ testTypeCheck = describe "typeCheck" $ do
         }
       };
       let main = f(2)("hello");
-    |] `shouldSatisfy` isTypeError
-  
+    |]
+      `shouldSatisfy` isTypeError
+
   it "can do polymorphic functions" $ do
-    check [r|
+    check
+      [r|
       let f = fn(x) {
         x
       };
@@ -234,26 +281,32 @@ testTypeCheck = describe "typeCheck" $ do
         let a = f(2);
         f("hello")
       };
-    |] `shouldBe` Right (pure TypeString)
+    |]
+      `shouldBe` Right (pure TypeString)
 
   it "can call effectless functions in main" $ do
-    check [r|
+    check
+      [r|
       let f = fn(x: a) <> a {
         x
       };
       let main = f(5);
-    |] `shouldBe` Right (pure TypeInt)
+    |]
+      `shouldBe` Right (pure TypeInt)
 
   it "cannot call effectful functions in main" $ do
-    check [r|
+    check
+      [r|
       let f = fn(x: a) <A> a {
         x
       };
       let main = f(5);
-    |] `shouldSatisfy` isTypeError
-  
+    |]
+      `shouldSatisfy` isTypeError
+
   it "can infer handler types" $ do
-    check [r|
+    check
+      [r|
       effect Foo {
         bar(a) a
       }
@@ -262,12 +315,14 @@ testTypeCheck = describe "typeCheck" $ do
         return(x) { x }
         bar(x) { resume(x) }
       };
-    |] `shouldSatisfy` \case
-        Right (ComputationType _ (TypeHandler "Foo" _ _)) -> True
+    |]
+      `shouldSatisfy` \case
+        Right (CompType _ (TypeHandler (Effect ["Foo"] _) _ _)) -> True
         _ -> False
-  
+
   it "can infer handler types with specific types in the operations" $ do
-    check [r|
+    check
+      [r|
       use std;
 
       effect Foo {
@@ -278,12 +333,14 @@ testTypeCheck = describe "typeCheck" $ do
         return(x) { x }
         bar(x) { resume(add(x, x)) } 
       };
-    |] `shouldSatisfy` \case
-        Right (ComputationType _ (TypeHandler "Foo" _ _)) -> True
+    |]
+      `shouldSatisfy` \case
+        Right (CompType _ (TypeHandler (Effect ["Foo"] _) _ _)) -> True
         _ -> False
 
   it "can cannot be more specific about types in handlers" $ do
-    check [r|
+    check
+      [r|
       use std;
 
       effect Foo {
@@ -294,10 +351,12 @@ testTypeCheck = describe "typeCheck" $ do
         return(x) { x }
         bar(x) { add(x, x) } 
       };
-    |] `shouldSatisfy` isTypeError
-  
+    |]
+      `shouldSatisfy` isTypeError
+
   it "handler return types must match" $ do
-    check [r|
+    check
+      [r|
       effect Foo {
         bar(a) a
       }
@@ -306,9 +365,11 @@ testTypeCheck = describe "typeCheck" $ do
         return(x) { "hello" }
         bar(x) { 5 }
       };
-    |] `shouldSatisfy` isTypeError
-    
-    check [r|
+    |]
+      `shouldSatisfy` isTypeError
+
+    check
+      [r|
       effect Foo {
         bar(a) a
       }
@@ -317,12 +378,14 @@ testTypeCheck = describe "typeCheck" $ do
         return(x) { "hello" }
         bar(x) { "world" }
       };
-    |] `shouldSatisfy` \case
-        Right (ComputationType _ (TypeHandler "Foo" _ TypeString)) -> True
+    |]
+      `shouldSatisfy` \case
+        Right (CompType _ (TypeHandler (Effect ["Foo"] _) _ TypeString)) -> True
         _ -> False
-  
+
   it "can apply a handler" $ do
-    check [r|
+    check
+      [r|
       effect Foo {
         bar(a) a
       }
@@ -335,19 +398,23 @@ testTypeCheck = describe "typeCheck" $ do
       let main = handle[h] {
         5
       };
-    |] `shouldBe` Right (pure TypeString)
-  
+    |]
+      `shouldBe` Right (pure TypeString)
+
   it "cannot use operation outside of handle" $ do
-    check [r|
+    check
+      [r|
       effect Foo {
         bar(a) a
       }
 
       let main = bar(5);
-    |] `shouldSatisfy` isTypeError
-  
+    |]
+      `shouldSatisfy` isTypeError
+
   it "cannot use operation in effectless function" $ do
-    check [r|
+    check
+      [r|
       effect Foo {
         bar(a) a
       }
@@ -362,9 +429,11 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[h] { f() };
-    |] `shouldSatisfy` isTypeError
-    
-    check [r|
+    |]
+      `shouldSatisfy` isTypeError
+
+    check
+      [r|
       effect Foo {
         bar(a) a
       }
@@ -379,10 +448,32 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[h] { f() };
-    |] `shouldBe` Right (pure TypeString)
+    |]
+      `shouldBe` Right (pure TypeString)
   
-  it "type for resume must match return type of operation" $ do
+  it "can call function with effect in signature" $ do
     check [r|
+      effect A {
+        a() ()
+      }
+
+      let hf = handler {
+        return(x) { x }
+        a() { resume(()) }
+      };
+
+      let y = 5;
+
+      let f = fn(x: Int) <A> Int {
+        y
+      };
+
+      let main = handle[hf] f(5);
+    |] `shouldBe` Right (pure TypeInt)
+
+  it "type for resume must match return type of operation" $ do
+    check
+      [r|
       effect Foo {
         bar() Int
       }
@@ -395,9 +486,11 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[h] bar();
-    |] `shouldBe` Right (pure TypeInt)
-    
-    check [r|
+    |]
+      `shouldBe` Right (pure TypeInt)
+
+    check
+      [r|
       effect Foo {
         bar() Int
       }
@@ -410,10 +503,12 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[h] bar();
-    |] `shouldSatisfy` isTypeError
-  
+    |]
+      `shouldSatisfy` isTypeError
+
   it "can use effects in function application" $ do
-    check [r|
+    check
+      [r|
       use std;
       effect Foo {
         foo() Int
@@ -425,10 +520,12 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[hf] add(foo(), foo());
-    |] `shouldBe` Right (pure TypeInt)
-  
+    |]
+      `shouldBe` Right (pure TypeInt)
+
   it "can use effects in if" $ do
-    check [r|
+    check
+      [r|
       use std;
       effect Foo {
         foo() Int
@@ -446,10 +543,12 @@ testTypeCheck = describe "typeCheck" $ do
           sub(0, foo())
         }
       };
-    |] `shouldBe` Right (pure TypeInt)
+    |]
+      `shouldBe` Right (pure TypeInt)
 
   it "accepts different orders of handlers" $ do
-    check [r|
+    check
+      [r|
       use std;
       
       effect Foo {
@@ -474,10 +573,12 @@ testTypeCheck = describe "typeCheck" $ do
         { handle[hf] handle[hb] add(foo(), bar()) },
         { handle[hb] handle[hf] add(foo(), bar()) }
       );
-    |] `shouldBe` Right (pure TypeInt)
-  
+    |]
+      `shouldBe` Right (pure TypeInt)
+
   it "accepts different orders of handlers with explicitly typed function" $ do
-    check [r|
+    check
+      [r|
       use std;
       
       effect Foo {
@@ -506,10 +607,12 @@ testTypeCheck = describe "typeCheck" $ do
         { handle[hf] handle[hb] f() },
         { handle[hb] handle[hf] f() }
       );
-    |] `shouldBe` Right (pure TypeInt)
-  
+    |]
+      `shouldBe` Right (pure TypeInt)
+
   it "can figure out higher-order effectful functions" $ do
-    check [r|
+    check
+      [r|
       use std;
 
       effect Foo {
@@ -525,9 +628,11 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = applyTo2(foo);
-    |] `shouldSatisfy` isTypeError
-    
-    check [r|
+    |]
+      `shouldSatisfy` isTypeError
+
+    check
+      [r|
       use std;
 
       effect Foo {
@@ -548,9 +653,199 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[hf] applyTo2(foo);
-    |] `shouldBe` Right (pure TypeInt)
+    |]
+      `shouldBe` Right (pure TypeInt)
+  
+  it "can infer an elaboration" $ do
+    check [r|
+      effect Foo! {
+        foo!(Int) Int
+      }
 
-  describe "unifyRows" $ do
-    it "should unify rows with the same effects" $ do
-      let res = runInfer $ unifyRows (Row.open ("Foo"::String) (ExplicitVar "1")) (Row.open ("Foo"::String) (ExplicitVar "e2"))
-      res `shouldBe` Right ()
+      effect Bar {
+        bar() Int
+      }
+
+      let ef = elaboration Foo! -> <Bar> {
+        foo!(x) {
+          x
+        }
+      };
+
+      let main = ef;
+    |]
+      `shouldSatisfy`
+        \case
+        Right (CompType _ (TypeElaboration (Effect ["Foo!"] _) row)) -> True
+        _ -> False
+  
+  it "can infer explicit elab with empty row" $ do
+    check [r|
+      effect Foo! {
+        foo!() Int
+      }
+
+      let ef = elaboration Foo! -> <> {
+        foo!() { 5 }
+      };
+
+      let main = elab[ef] foo!();
+    |] `shouldBe` Right (pure TypeInt)
+  
+  it "can infer explicit elab with another effect" $ do
+    check [r|
+      effect Foo! {
+        foo!() Int
+      }
+
+      effect Bar {
+        bar() Int
+      }
+
+      let hb = handler {
+        return(x) { x }
+        bar() { resume(6) }
+      };
+
+      let ef = elaboration Foo! -> <Bar> {
+        foo!() { bar() }
+      };
+
+      let main = handle[hb] elab[ef] foo!();
+    |] `shouldBe` Right (pure TypeInt)
+    
+    check [r|
+      effect Foo! {
+        foo!() Int
+      }
+
+      effect Bar {
+        bar() Int
+      }
+
+      let hb = handler {
+        return(x) { x }
+        bar() { resume(6) }
+      };
+
+      let ef1 = elaboration Foo! -> <Bar> {
+        foo!() { bar() }
+      };
+
+      let main = elab[ef] foo!();
+    |] `shouldSatisfy` isTypeError
+  
+  it "elaborations must have the same type" $ do
+    check [r|
+      effect Foo! {
+        foo!() Int
+      }
+
+      effect Bar {
+        bar() Int
+      }
+
+      let hb = handler {
+        return(x) { x }
+        bar() { resume(6) }
+      };
+
+      let ef1 = elaboration Foo! -> <> {
+        foo!() { 5 }
+      };
+
+      let ef2 = elaboration Foo! -> <Bar> {
+        foo!() { bar() }
+      };
+
+      let main = handle[hb] elab[if true { ef1 } else { ef2 }] foo!();
+    |] `shouldSatisfy` isTypeError
+    
+    check [r|
+      effect Foo! {
+        foo!() Int
+      }
+
+      effect Bar {
+        bar() Int
+      }
+
+      let hb = handler {
+        return(x) { x }
+        bar() { resume(6) }
+      };
+
+      let ef1 = elaboration Foo! -> <Bar> {
+        foo!() { 5 }
+      };
+
+      let ef2 = elaboration Foo! -> <Bar> {
+        foo!() { bar() }
+      };
+
+      let main = handle[hb] elab[if true { ef1 } else { ef2 }] foo!();
+    |] `shouldBe` Right (pure TypeInt)
+  
+  it "can do handle through elab" $ do
+    check [r|
+      use std;
+
+      effect Foo! {
+        foo!() Int
+      }
+
+      effect Bar {
+        bar() Int
+      }
+
+      let ef = elaboration Foo! -> <> {
+        foo!() { 5 }
+      };
+
+      let hb = handler {
+        return(x) { x }
+        bar() { resume(6) }
+      };
+
+      let main = handle[hb] elab[ef] add(foo!(), bar());
+    |] `shouldBe` Right (pure TypeInt)
+  
+  it "does not accept a handler for elab" $ do
+    check [r|
+      effect Foo {
+        foo() Int
+      }
+
+      let hf = handler {
+        return(x) { x }
+        foo() { resume(5) }
+      };
+
+      let main = elab[hf] foo();
+    |] `shouldSatisfy` isTypeError
+
+  it "does not get confused between effects from different modules" $ do
+    check [r|
+      mod A {
+        effect Foo {
+          foo() String
+        }
+
+        pub let hf = handler {
+          return(x) { x }
+          foo() { resume("handler in A") }
+        };
+      }
+      
+      use A;
+      effect Foo {
+        foo() Int
+      }
+      let main = handle[hf] foo();
+    |] `shouldSatisfy` isTypeError
+
+testUnifyRows :: SpecWith ()
+testUnifyRows = describe "unifyRows" $ do
+  it "should unify rows with the same effects" $ do
+    let res = runInfer $ unifyRows (rowOpen [Effect ["Foo"] Map.empty] (ExplicitVar "1")) (rowOpen [Effect ["Foo"] Map.empty] (ExplicitVar "e2"))
+    res `shouldBe` Right ()

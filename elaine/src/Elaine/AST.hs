@@ -1,7 +1,7 @@
 module Elaine.AST where
 
 import Elaine.TypeVar
-import Elaine.Row (Row, Effect)
+import Elaine.Types (TypeScheme)
 
 type Program = [Declaration]
 
@@ -16,12 +16,12 @@ data Declaration = Declaration Visibility DeclarationType
 data DeclarationType
   = Use Ident
   | Module String [Declaration]
-  | DecLet Ident (Maybe ComputationType) Expr
+  | DecLet Ident (Maybe ASTComputationType) Expr
   | DecType Ident [Constructor]
-  | DecEffect Effect [OperationSignature]
+  | DecEffect Ident [OperationSignature]
   deriving (Show, Eq)
 
-data OperationSignature = OperationSignature Ident [ValueType] ValueType
+data OperationSignature = OperationSignature Ident [ASTComputationType] ASTComputationType
   deriving (Show, Eq)
 
 data Elaboration = Elaboration Ident Row [OperationClause]
@@ -30,13 +30,13 @@ data Elaboration = Elaboration Ident Row [OperationClause]
 data Handler = Handler Function [OperationClause]
   deriving (Show, Eq)
 
-data Function = Function [(Ident, Maybe ComputationType)] (Maybe ComputationType) Expr
+data Function = Function [(Ident, Maybe ASTComputationType)] (Maybe ASTComputationType) Expr
   deriving (Show, Eq)
 
 lam :: [Ident] -> Expr -> Value
 lam a = Fn . Function (zip a (repeat Nothing)) Nothing
 
-data Constructor = Constructor Ident [ComputationType]
+data Constructor = Constructor Ident [ASTComputationType]
   deriving (Show, Eq)
 
 data OperationClause = OperationClause Ident [Ident] Expr
@@ -53,7 +53,7 @@ data Expr
   | ImplicitElab Expr
   | Elab Expr Expr
   | Var Ident
-  | Let Ident (Maybe ComputationType) Expr Expr
+  | Let Ident (Maybe ASTComputationType) Expr Expr
   | Val Value
   deriving (Show, Eq)
 
@@ -88,23 +88,16 @@ data MatchArm = MatchArm Pattern Expr
 data Pattern = Pattern Ident [Ident]
   deriving (Show, Eq)
 
-data ComputationType = ComputationType Row ValueType
-  deriving (Show, Eq, Ord)
+data Row = Row [Ident] (Maybe Ident)
+  deriving (Show, Eq)
 
-data TypeScheme = TypeScheme {
-  typeVars :: [TypeVar],
-  effectVars :: [TypeVar],
-  typ :: ComputationType
-}
-  deriving (Show, Eq, Ord)
+data ASTComputationType = ASTComputationType Row ASTValueType
+  deriving (Show, Eq)
 
-data ValueType
-  = TypeInt
-  | TypeString
-  | TypeBool
+data ASTValueType
+  = TypeName String
   | TypeUnit
-  | TypeName String
-  | TypeV TypeVar
-  | TypeArrow [ComputationType] ComputationType
-  | TypeHandler Effect TypeVar ValueType
-  deriving (Show, Eq, Ord)
+  | TypeArrow [ASTComputationType] ASTComputationType
+  | TypeHandler Ident TypeVar ASTValueType
+  | TypeElaboration Ident Row
+  deriving (Show, Eq)

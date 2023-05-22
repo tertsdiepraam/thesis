@@ -2,7 +2,6 @@ module Elaine.Pretty where
 
 import Data.List (intercalate)
 import Elaine.AST
-import Elaine.Row (Row (Row))
 import qualified Data.MultiSet as MultiSet
 import Elaine.TypeVar (TypeVar (ExplicitVar, ImplicitVar))
 
@@ -14,7 +13,7 @@ pBlock :: String -> String
 pBlock "" = "{}"
 pBlock s = "{\n" ++ indent s ++ "}"
 
-pParam :: (Ident, Maybe ComputationType) -> String
+pParam :: (Ident, Maybe ASTComputationType) -> String
 pParam (name, typ') = name ++ ": " ++ maybe "_" pretty typ'
 
 concatBlock :: Pretty a => [a] -> String
@@ -92,27 +91,23 @@ instance Pretty Constructor where
 instance Pretty OperationClause where
   pretty (OperationClause name args expr) = name ++ parens args ++ pBlock (pretty expr)
 
-instance Pretty ComputationType where
+instance Pretty ASTComputationType where
   -- In the case where we have a function type and effects, we need to disambiguate that the effects belong
   -- outside the function with parentheses
-  pretty (ComputationType valueType effs) = pretty effs ++ " " ++ pretty valueType
+  pretty (ASTComputationType valueType effs) = pretty effs ++ " " ++ pretty valueType
 
 instance Pretty Row where
   pretty row = "<" ++ prettyRow row ++ ">"
     where
-      prettyRow (Row effects extend) = intercalate ", " (MultiSet.toList effects) ++ maybe "" (("|" ++) . pretty) extend
+      prettyRow (Row effects extend) = intercalate ", " effects ++ maybe "" ("|" ++) extend
 
 instance Pretty TypeVar where
   pretty (ExplicitVar s) = s
   pretty (ImplicitVar i) = "#" ++ show i
 
-instance Pretty ValueType where
-  pretty TypeInt = "Int"
-  pretty TypeString = "String"
-  pretty TypeBool = "Bool"
+instance Pretty ASTValueType where
   pretty TypeUnit = "()"
   pretty (TypeName a) = a
-  pretty (TypeV v) = pretty v
   pretty (TypeArrow args ret) = "(" ++ intercalate ", " (map show args) ++ ") -> " ++ show ret
 
 indent :: String -> String

@@ -17,42 +17,47 @@ import Control.Monad.State
     (<=<),
   )
 import Data.Foldable (foldlM)
-import Data.List (find)
+import Data.List (find, sortOn)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe (fromJust)
 import qualified Data.MultiSet as MS
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Elaine.AST
-import Elaine.Pretty (pretty, Pretty)
-import Elaine.Row (Row (Row))
-import qualified Elaine.Row as Row
+import Elaine.AST (ASTValueType)
+import Elaine.AST hiding (ASTValueType (..), Row)
+import qualified Elaine.AST as AST
+import Elaine.Pretty (Pretty, pretty)
 import Elaine.Std (stdTypes)
 import Elaine.TypeVar (TypeVar (ExplicitVar, ImplicitVar))
+import Elaine.Types (Arrow (Arrow), CompType (CompType), Effect (Effect), Row (..), TypeScheme (TypeScheme, effectVars, typ, typeVars), ValType (TypeArrow, TypeBool, TypeElaboration, TypeHandler, TypeInt, TypeString, TypeUnit, TypeV), rowEmpty, rowIsEmpty, rowOpen, rowVar, rowMaybe, rowUpdate)
+import Prelude hiding (pure)
+import Data.Char (isLower)
+import Elaine.Types (ValType(TypeName))
 
 type Infer = ExceptT String (State (Int, Substitutions))
 
 addStackTrace :: String -> Infer a -> Infer a
 addStackTrace s =
   withExceptT
-    ( \e ->
-        e
-          ++ "\n"
+    ( ++
+        "\n"
           ++ "while "
           ++ s
     )
 
 -- TypeVar to Type
 data Substitutions = Substitutions
-  { subTypeVars :: Map ValueType ValueType,
+  { subTypeVars :: Map ValType ValType,
     subEffectVars :: Map TypeVar Row
   }
   deriving (Show)
 
 -- Variable names to type
 data TypeEnv = TypeEnv
-  { _vars :: Map String TypeScheme,
-    _effects :: Map String [OperationSignature],
+  { _currentPath :: [Ident],
+    _vars :: Map String TypeScheme,
+    _effects :: Map Ident Effect,
     _mods :: Map String TypeEnv,
     _bound :: Set TypeVar
   }
@@ -69,7 +74,7 @@ get' m a = case Map.lookup a m of
 union :: TypeEnv -> TypeEnv -> TypeEnv
 union a = unionLens vars a . unionLens mods a . unionLens effects a
   where
-    unionLens :: Lens' TypeEnv (Map String b) -> TypeEnv -> TypeEnv -> TypeEnv
+    unionLens :: Ord a => Lens' TypeEnv (Map a b) -> TypeEnv -> TypeEnv -> TypeEnv
     unionLens l a' = over l (Map.union $ a' ^. l)
 
 getVar :: TypeEnv -> String -> Infer TypeScheme
@@ -90,41 +95,36 @@ insertVar k v = over vars $ Map.insert k v
 insertMod :: String -> TypeEnv -> TypeEnv -> TypeEnv
 insertMod k v = over mods $ Map.insert k v
 
-insertEffect :: String -> [OperationSignature] -> TypeEnv -> TypeEnv
-insertEffect k v = over effects $ Map.insert k v
-
 singletonVar :: String -> TypeScheme -> TypeEnv
 singletonVar k v = insertVar k v empty
 
 singletonMod :: String -> TypeEnv -> TypeEnv
 singletonMod k v = insertMod k v empty
 
-singletonEffect :: String -> [OperationSignature] -> TypeEnv
-singletonEffect k v = insertEffect k v empty
-
 empty :: TypeEnv
 empty =
   TypeEnv
-    { _vars = Map.empty,
+    { _currentPath = [],
+      _vars = Map.empty,
       _effects = Map.empty,
       _mods = Map.empty,
       _bound = Set.empty
     }
 
-inst :: TypeScheme -> Infer ComputationType
+inst :: TypeScheme -> Infer CompType
 inst (TypeScheme {typeVars, effectVars, typ}) = do
   freshTypeVars <- freshes typeVars
   let subTypeVars = Map.fromList $ zip (map TypeV typeVars) (map TypeV freshTypeVars)
 
   freshEffectVar <- freshes effectVars
-  let subEffectVars = Map.fromList $ zip effectVars (map Row.var freshEffectVar)
+  let subEffectVars = Map.fromList $ zip effectVars (map rowVar freshEffectVar)
   return $
     sub
       ( Substitutions {subTypeVars, subEffectVars}
       )
       typ
 
-gen :: TypeEnv -> ComputationType -> Infer TypeScheme
+gen :: TypeEnv -> CompType -> Infer TypeScheme
 gen env typ = do
   let typeVars = Set.toList $ freeTypeVars env typ
   freshTypeVars <- freshes typeVars
@@ -132,7 +132,7 @@ gen env typ = do
 
   let effectVars = Set.toList $ freeEffectVars env typ
   freshEffectVars <- freshes effectVars
-  let effectVarMap = zip effectVars (map Row.var freshEffectVars)
+  let effectVarMap = zip effectVars (map rowVar freshEffectVars)
 
   let subs =
         Substitutions
@@ -143,38 +143,34 @@ gen env typ = do
   let typ' = sub subs typ
 
   return $
-    TypeScheme
-      { typeVars = freshTypeVars,
-        effectVars = freshEffectVars,
-        typ = typ'
-      }
+    TypeScheme freshTypeVars freshEffectVars typ'
 
 freshes :: [a] -> Infer [TypeVar]
 freshes = mapM (const fresh)
 
-freeTypeVars :: TypeEnv -> ComputationType -> Set TypeVar
+freeTypeVars :: TypeEnv -> CompType -> Set TypeVar
 freeTypeVars env t = allTypeVars t Set.\\ view bound env
   where
-    allTypeVars (ComputationType _ typ) = allTypeVarsV typ
+    allTypeVars (CompType _ typ) = allTypeVarsV typ
 
     allTypeVarsV (TypeV v) = Set.singleton v
-    allTypeVarsV (TypeArrow args ret) = Set.unions (map allTypeVars (args ++ [ret]))
+    allTypeVarsV (TypeArrow (Arrow args ret)) = Set.unions (map allTypeVars (args ++ [ret]))
     allTypeVarsV (TypeHandler _ from to) = Set.delete from $ allTypeVarsV to
     allTypeVarsV _ = Set.empty
 
-freeEffectVars :: TypeEnv -> ComputationType -> Set TypeVar
+freeEffectVars :: TypeEnv -> CompType -> Set TypeVar
 freeEffectVars env t = allEffectVars t Set.\\ view bound env
   where
-    allEffectVars (ComputationType row typ) =
+    allEffectVars (CompType row typ) =
       Set.union
         (allEffectVarsR row)
         (allEffectVarsV typ)
 
-    allEffectVarsV (TypeArrow args ret) = Set.unions (map allEffectVars (args ++ [ret]))
+    allEffectVarsV (TypeArrow (Arrow args ret)) = Set.unions (map allEffectVars (args ++ [ret]))
     allEffectVarsV (TypeHandler _ _ to) = allEffectVarsV to
     allEffectVarsV _ = Set.empty
 
-    allEffectVarsR row = maybe Set.empty Set.singleton $ Row.extend row
+    allEffectVarsR row = maybe Set.empty Set.singleton $ rowExtension row
 
 fresh :: Infer TypeVar
 fresh = do
@@ -182,14 +178,14 @@ fresh = do
   put (i + 1, subs)
   return $ ImplicitVar i
 
-freshV :: Infer ValueType
+freshV :: Infer ValType
 freshV = TypeV <$> fresh
 
 freshR :: Infer Row
-freshR = Row.var <$> fresh
+freshR = rowVar <$> fresh
 
-freshC :: Infer ComputationType
-freshC = ComputationType <$> freshR <*> freshV
+freshC :: Infer CompType
+freshC = CompType <$> freshR <*> freshV
 
 subM :: Substitutable a => a -> Infer a
 subM a = do
@@ -199,7 +195,7 @@ subM a = do
 emptySubs :: Substitutions
 emptySubs = Substitutions Map.empty Map.empty
 
-addTypeSub :: ValueType -> ValueType -> Infer ()
+addTypeSub :: ValType -> ValType -> Infer ()
 addTypeSub k v = do
   (i, subs) <- get
   put (i, updateSubs $ subs {subTypeVars = Map.insert k v (subTypeVars subs)})
@@ -228,7 +224,7 @@ typeCheck decs = runInfer $ do
   -- we don't have any more handlers, to forcing to empty is ok.
   mainType <- inst $ view vars env Map.! "main"
   v <- freshV
-  let newMainType = ComputationType Row.empty v
+  let newMainType = CompType rowEmpty v
   () <- unify mainType newMainType
   mainType' <- subM mainType
   mainType'' <- gen env mainType'
@@ -257,42 +253,92 @@ typeCheckDec' :: TypeEnv -> DeclarationType -> Infer TypeEnv
 typeCheckDec' env = \case
   Use x -> getMod env x
   Module x decs -> do
-    modEnv <- typeCheckMod env decs
+    let path = view currentPath env ++ [x]
+    let env' = set currentPath path env
+    modEnv <- typeCheckMod env' decs
     return $ singletonMod x (snd modEnv)
   DecType _ _ -> throwError "Not implemented"
-  DecEffect name signatures ->
-    let sigsAsFunctions =
-          map
-            ( \(OperationSignature f args ret) ->
-                ( f,
-                  TypeScheme [] [ExplicitVar "a", ExplicitVar "b"] $
-                    ComputationType (Row.var $ ExplicitVar "a") $
-                      TypeArrow
-                        (map (ComputationType Row.empty) args)
-                        (ComputationType (Row.open name $ ExplicitVar "b") ret)
-                )
-            )
-            signatures
-        newEnv =
+  DecEffect name signatures -> do
+    let fullPath = view currentPath env ++ [name]
+    arrows <-
+      mapM
+        ( \(OperationSignature f args ret) -> do
+            args' <- mapM (resolveCompType env) args
+            ret' <- resolveCompType env ret
+            return (f, Arrow args' ret')
+        )
+        signatures
+
+    let eff = Effect fullPath (Map.fromList arrows)
+
+    sigsAsFunctions <-
+      mapM
+        ( \(f, Arrow args ret) -> do
+            ret' <- case ret of
+              CompType row retVal | rowIsEmpty row -> return $ CompType (rowOpen [eff] $ ExplicitVar "b") retVal
+              _ -> throwError "effect operation cannot have any effects"
+            return
+              ( f,
+                TypeScheme [] [ExplicitVar "a", ExplicitVar "b"] $
+                  CompType (rowVar $ ExplicitVar "a") $
+                    TypeArrow $
+                      Arrow args ret'
+              )
+        )
+        arrows
+    let newEnv =
           empty
             { _vars = Map.fromList sigsAsFunctions,
-              _effects = Map.singleton name signatures
+              _effects = Map.singleton name eff
             }
-     in return newEnv
+    return newEnv
   DecLet x mt expr -> do
     tExpr <- infer env expr >>= subM
-    () <- forM_ mt (force tExpr)
+    () <- forM_ mt (force tExpr <=< resolveCompType env)
     tExpr' <- subM tExpr >>= gen env
     return $ singletonVar x tExpr'
+
+resolveValType :: TypeEnv -> ASTValueType -> Infer ValType
+resolveValType _ AST.TypeUnit = return TypeUnit
+resolveValType _ (AST.TypeName "Bool") = return TypeBool
+resolveValType _ (AST.TypeName "String") = return TypeString
+resolveValType _ (AST.TypeName "Int") = return TypeInt
+resolveValType _ (AST.TypeName x) | isLower (head x) = return $ TypeV (ExplicitVar x)
+resolveValType _ (AST.TypeName x) = return $ TypeName x
+resolveValType env (AST.TypeArrow args ret) = do
+  args' <- mapM (resolveCompType env) args
+  ret' <- resolveCompType env ret
+  return $ TypeArrow (Arrow args' ret')
+resolveValType _ (AST.TypeHandler {}) = error "not implemented"
+resolveValType _ (AST.TypeElaboration {}) = error "not implemented"
+
+resolveCompType :: TypeEnv -> ASTComputationType -> Infer CompType
+resolveCompType env (ASTComputationType row valType) = do
+  row' <- resolveRow env row
+  valType' <- resolveValType env valType
+  return $ CompType row' valType'
+
+resolveRow :: TypeEnv -> AST.Row -> Infer Row
+resolveRow env (AST.Row effs maybeExtend) = do
+  effs' <- mapM (resolveEffect env) effs
+  return $ rowMaybe effs' (fmap ExplicitVar maybeExtend)
+
+resolveEffect :: TypeEnv -> Ident -> Infer Effect
+resolveEffect env eff = case Map.lookup eff (view effects env) of
+  Just e' -> return e'
+  Nothing -> throwError $ "Could not find effect " ++ eff
 
 class Substitutable a where
   sub :: Substitutions -> a -> a
 
-instance Substitutable ValueType where
+instance Substitutable ValType where
   sub subs vt | Just vt' <- Map.lookup vt (subTypeVars subs) = vt'
-  sub subs (TypeArrow args ret) = TypeArrow (map (sub subs) args) (sub subs ret)
+  sub subs (TypeArrow arr) = TypeArrow (sub subs arr)
   sub subs (TypeHandler name from to) = TypeHandler name from (sub subs to)
   sub _ vt = vt
+
+instance Substitutable Arrow where
+  sub subs (Arrow args ret) = Arrow (map (sub subs) args) (sub subs ret)
 
 instance Substitutable TypeEnv where
   sub subs = over vars (Map.map $ sub subs) . over mods (Map.map $ sub subs)
@@ -300,36 +346,40 @@ instance Substitutable TypeEnv where
 instance Substitutable TypeScheme where
   sub subs (TypeScheme v e t) = TypeScheme v e (sub subs t)
 
-instance Substitutable ComputationType where
-  sub subs (ComputationType row typ) = ComputationType (sub subs row) (sub subs typ)
+instance Substitutable CompType where
+  sub subs (CompType row typ) = CompType (sub subs row) (sub subs typ)
 
 instance Substitutable Row where
-  sub subs row = case Row.extend row of
+  sub subs row = case rowExtension row of
     Just var -> case Map.lookup var (subEffectVars subs) of
-      Just row' -> Row.update row row'
+      Just row' -> rowUpdate row row'
       Nothing -> row
     Nothing -> row
 
-unify :: ComputationType -> ComputationType -> Infer ()
-unify a b = addStackTrace ("unifying" ++ pretty a ++ pretty b) do
+unify :: CompType -> CompType -> Infer ()
+unify a b = addStackTrace ("unifying" ++ show a ++ show b) do
   a' <- subM a
   b' <- subM b
   unify' a' b'
   where
-    unify' (ComputationType rowA typA) (ComputationType rowB typB) = do
+    unify' (CompType rowA typA) (CompType rowB typB) = do
       () <- unifyRows rowA rowB
       unifyV typA typB
 
     unifyV a' b' | a' == b' = return ()
+    -- We give explicit vars priority to make it more likely that those
+    -- show up in error messages instead of implicit vars.
+    unifyV v@(TypeV (ExplicitVar _)) t = addTypeSub v t
+    unifyV t v@(TypeV (ExplicitVar _)) = addTypeSub v t
     unifyV v@(TypeV _) t = addTypeSub v t
     unifyV t v@(TypeV _) = addTypeSub v t
-    unifyV (TypeArrow args1 ret1) (TypeArrow args2 ret2) = do
+    unifyV (TypeArrow (Arrow args1 ret1)) (TypeArrow (Arrow args2 ret2)) = do
       () <- mapM_ (uncurry unify) (zip args1 args2)
       unify ret1 ret2
     unifyV (TypeHandler name1 from1 to1) (TypeHandler name2 from2 to2) = do
       () <- when (name1 /= name2) $ throwError "failed to unify handlers for different effects"
-      () <- unify (ComputationType Row.empty (TypeV from1)) (ComputationType Row.empty (TypeV from2))
-      () <- unify (ComputationType Row.empty to1) (ComputationType Row.empty to2)
+      () <- unifyV (TypeV from1) (TypeV from2)
+      () <- unifyV to1 to2
       return ()
     unifyV _ _ = throwError "Failed to unify: type error"
 
@@ -349,13 +399,13 @@ unifyRows a@(Row effsA maybeExA) b@(Row effsB maybeExB)
         | MS.isSubsetOf effsA effsB ->
             addEffectSub
               exA
-              (Row.closed $ effsB MS.\\ effsA)
+              (Row (effsB MS.\\ effsA) Nothing)
       -- If b is a subset of a, we can unify the extend of a with (a-b)
       (Nothing, Just exB)
         | MS.isSubsetOf effsB effsA ->
             addEffectSub
               exB
-              (Row.closed $ effsA MS.\\ effsB)
+              (Row (effsA MS.\\ effsB) Nothing)
       (Just exA, Just exB) -> do
         -- Create a new extend that's gonna be the extend of the combined row
         exC <- fresh
@@ -364,21 +414,21 @@ unifyRows a@(Row effsA maybeExA) b@(Row effsB maybeExB)
         () <-
           addEffectSub
             exA
-            (Row.open (effsB MS.\\ effsA) exC)
+            (Row (effsB MS.\\ effsA) (Just exC))
         () <-
           addEffectSub
             exB
-            (Row.open (effsA MS.\\ effsB) exC)
+            (Row (effsA MS.\\ effsB) (Just exC))
         return ()
       _ -> throwError err
   where
     err = "Cannot unify rows: " ++ show a ++ " and " ++ show b
 
 class Pretty a => Inferable a where
-  infer :: TypeEnv -> a -> Infer ComputationType
+  infer :: TypeEnv -> a -> Infer CompType
   infer env a = addStackTrace ("inferring " ++ pretty a) (infer' env a)
 
-  infer' :: TypeEnv -> a -> Infer ComputationType
+  infer' :: TypeEnv -> a -> Infer CompType
 
 -- Algorithm W
 instance Inferable Expr where
@@ -387,39 +437,39 @@ instance Inferable Expr where
       Val v -> infer env v
       Var x -> do
         t <- getVar env x
-        inst t
+        openRow <=< inst $ t
       If e1 e2 e3 -> do
         t1 <- infer env e1
         t2 <- infer env e2
         t3 <- infer env e3
         row <- freshR
         vt <- freshV
-        () <- unify t1 (ComputationType row TypeBool)
-        () <- unify t2 (ComputationType row vt)
-        () <- unify t3 (ComputationType row vt)
-        subM (ComputationType row vt)
+        () <- unify t1 (CompType row TypeBool)
+        () <- unify t2 (CompType row vt)
+        () <- unify t3 (CompType row vt)
+        subM (CompType row vt)
       App f args -> do
         tf <- infer env f
         tArgs <- inferMany env args
         tRet <- freshC
         row <- freshR
         () <- forM_ (map getRow tArgs) (unifyRows row)
-        () <- unify tf (ComputationType row (TypeArrow (map emptyEff tArgs) tRet))
-        subM tRet
+        () <- unify tf (CompType row (TypeArrow $ Arrow (map emptyEff tArgs) tRet))
+        openRow <=< subM $ tRet
         where
-          getRow (ComputationType r _) = r
-          emptyEff (ComputationType _ v) = ComputationType Row.empty v
+          getRow (CompType r _) = r
+          emptyEff (CompType _ v) = CompType rowEmpty v
       Let x mt e1 e2 -> do
         t1 <- infer env e1
         t1' <- subM t1 >>= gen env
-        () <- forM_ mt (force t1)
+        () <- forM_ mt (force t1 <=< resolveCompType env)
         infer (insertVar x t1' env) e2
       Handle e1 e2 -> do
         t1 <- infer env e1
-        rowVar <- fresh
-        let restRow = Row.var rowVar
+        rVar <- fresh
+        let restRow = rowVar rVar
         vt <- freshV
-        () <- unify (ComputationType restRow vt) t1
+        () <- unify (CompType restRow vt) t1
 
         vt' <- subM vt
         (name, from, to) <- case vt' of
@@ -427,24 +477,46 @@ instance Inferable Expr where
           _ -> throwError "handle did not get a handler"
 
         t2 <- infer env e2
-        () <- unify (ComputationType (Row.open name rowVar) (TypeV from)) t2
+        () <- unify (CompType (rowOpen [name] rVar) (TypeV from)) t2
 
-        subM $ ComputationType restRow to
+        subM $ CompType restRow to
+      Elab e1 e2 -> do
+        t1 <- infer env e1
+        rVar <- fresh
+        let restRow = rowVar rVar
+        vt <- freshV
+        () <- unify (CompType restRow vt) t1
+
+        vt' <- subM vt
+        (name, row) <- case vt' of
+          TypeElaboration name row -> return (name, row)
+          _ -> throwError "elab did not get an elaboration"
+
+        CompType row2 vt2 <- infer env e2
+        () <- unifyRows (rowOpen [name] rVar) row2
+
+        let Row expandEffs ex = row
+
+        () <- case ex of
+          Just _ -> throwError "Cannot elaborate into an open effect row"
+          Nothing -> return ()
+
+        subM $ CompType (Row expandEffs (Just rVar)) vt2
       x -> error $ "Not implemented: " ++ show x
 
-extractVal :: ComputationType -> ValueType
-extractVal (ComputationType _ v) = v
+extractVal :: CompType -> ValType
+extractVal (CompType _ v) = v
 
-typeOrFresh :: Maybe ComputationType -> Infer ComputationType
-typeOrFresh Nothing = freshC
-typeOrFresh (Just t) = return t
+typeOrFresh :: TypeEnv -> Maybe ASTComputationType -> Infer CompType
+typeOrFresh _ Nothing = freshC
+typeOrFresh env (Just t) = resolveCompType env t
 
 -- Force a type to another type
 -- Essentially a one-way unify where we force the first argument to the second
-force :: ComputationType -> ComputationType -> Infer ()
-force a b = addStackTrace ("forcing " ++ pretty a ++ " to " ++ pretty b) do
-  ComputationType rowA valueA <- subM a
-  ComputationType rowB valueB <- subM b
+force :: CompType -> CompType -> Infer ()
+force a b = addStackTrace ("forcing " ++ show a ++ " to " ++ show b) do
+  CompType rowA valueA <- subM a
+  CompType rowB valueB <- subM b
   () <- forceRow rowA rowB
   () <- forceValue valueA valueB
   return ()
@@ -469,62 +541,48 @@ forceRow a@(Row effsA maybeExA) b@(Row effsB maybeExB) = case (maybeExA, maybeEx
       else throwError err
       --
   where
-    err = "Cannot force rows: " ++ pretty a ++ " to " ++ pretty b
+    err = "Cannot force rows: " ++ show a ++ " to " ++ show b
 
-forceValue :: ValueType -> ValueType -> Infer ()
+forceValue :: ValType -> ValType -> Infer ()
 forceValue a b | a == b = return ()
 forceValue v@(TypeV _) b = addTypeSub v b
-forceValue (TypeArrow args1 ret1) (TypeArrow args2 ret2) = do
+forceValue (TypeArrow (Arrow args1 ret1)) (TypeArrow (Arrow args2 ret2)) = do
   () <- mapM_ (uncurry force) (zip args1 args2)
   force ret1 ret2
 forceValue (TypeHandler name1 from1 to1) (TypeHandler name2 from2 to2) = do
   () <- when (name1 /= name2) $ throwError "failed to unify handlers for different effects"
-  () <- force (ComputationType Row.empty (TypeV from1)) (ComputationType Row.empty (TypeV from2))
-  () <- force (ComputationType Row.empty to1) (ComputationType Row.empty to2)
+  () <- forceValue (TypeV from1) (TypeV from2)
+  () <- forceValue to1 to2
   return ()
-forceValue a b = throwError $ "Failed to force: " ++ pretty a ++ " to " ++ pretty b
+forceValue a b = throwError $ "Failed to force: " ++ show a ++ " to " ++ show b
 
-inferMany :: Inferable a => TypeEnv -> [a] -> Infer [ComputationType]
+inferMany :: Inferable a => TypeEnv -> [a] -> Infer [CompType]
 inferMany env = mapM (infer env)
 
-vToC :: ValueType -> Infer ComputationType
-vToC v = do
+pure :: ValType -> Infer CompType
+pure v = do
   row <- fresh
-  return $ ComputationType (Row.var row) v
+  return $ CompType (rowVar row) v
 
 instance Inferable Value where
   infer' env = \case
-    Int _ -> vToC TypeInt
-    String _ -> vToC TypeString
-    Bool _ -> vToC TypeBool
-    Unit -> vToC TypeUnit
-    Fn (Function args tRet body) -> do
+    Int _ -> pure TypeInt
+    String _ -> pure TypeString
+    Bool _ -> pure TypeBool
+    Unit -> pure TypeUnit
+    Fn (Function args ret body) -> do
       -- Extract the argument names
-      let args' = map fst args
+      let (argNames, argTypes) = unzip args
 
       -- Extract types for arguments or give them a fresh type var
-      tArgs <- mapM (typeOrFresh . snd) args
+      tArgs <- mapM (typeOrFresh env) argTypes
+      tRet <- mapM (resolveCompType env) ret
 
-      -- Any type vars in the signature need to be bound inside
-      -- so we need to extract them
-      let typeVars = Set.unions $ map (freeTypeVars env) tArgs
-
-      let tArgs' = map (TypeScheme [] []) tArgs
-
-      -- The body needs the variables and the bound type vars
-      let bodyEnv = addTypeVars typeVars $ extendVars (zip args' tArgs') env
-
-      tRetInferred <- infer bodyEnv body
-      () <- forM_ tRet (force tRetInferred)
-
-      tArgs'' <- mapM subM tArgs
-      tRet' <- subM tRetInferred
-      vToC $ TypeArrow tArgs'' tRet'
+      inferFunctionLike env argNames tArgs tRet body
     Hdl (Handler ret clauses) -> do
       -- Find the matching effect if available
-      let maybeEffect = find matchesClauses (Map.toList $ view effects env)
-      -- TODO: the name must be the full path to the effect to avoid conflicts
-      (name, signatures) <- case maybeEffect of
+      let maybeEffect = find matchesClauses (Map.elems $ view effects env)
+      eff@(Effect _ signatures) <- case maybeEffect of
         Just a -> return a
         Nothing -> throwError "could not match handler with an effect"
 
@@ -538,28 +596,22 @@ instance Inferable Value where
         Function [(x, Nothing)] Nothing body -> return (x, body)
         _ -> throwError "return case cannot have type annotations"
 
-      toInferred <- infer (insertVar x (TypeScheme [] [] $ ComputationType Row.empty fromV) env) body
+      toInferred <- infer (insertVar x (TypeScheme [] [] $ CompType rowEmpty fromV) env) body
 
-      () <- unify toInferred (ComputationType Row.empty to)
+      () <- unify toInferred (CompType rowEmpty to)
       to' <- subM to
-      let toC' = ComputationType Row.empty to'
+      let toC' = CompType rowEmpty to'
 
       () <-
         mapM_
           ( \(OperationClause cName args body') -> do
-              let OperationSignature _ sigArgs sigRet = case findSig cName signatures of
-                    Just sig -> sig
-                    Nothing -> error "ICE"
-              let sigArgs' = map (Just . ComputationType Row.empty) sigArgs
-              let sigRet' = ComputationType Row.empty sigRet
-              let clauseFunc = Function (zip args sigArgs') (Just toC') body'
-              infer
-                ( insertVar
-                    "resume"
-                    (TypeScheme [] [] $ ComputationType Row.empty (TypeArrow [sigRet'] toC'))
-                    env
-                )
-                (Fn clauseFunc)
+              let Arrow sigArgs sigRet = signatures Map.! cName
+                  env' =
+                    insertVar
+                      "resume"
+                      (TypeScheme [] [] $ CompType rowEmpty (TypeArrow $ Arrow [sigRet] toC'))
+                      env
+               in inferFunctionLike env' args sigArgs (Just toC') body'
           )
           clauses
 
@@ -568,10 +620,60 @@ instance Inferable Value where
       let from' = case fromV' of
             TypeV v -> v
             _ -> error "handler must be generic"
-      vToC $ TypeHandler name from' to''
+      pure $ TypeHandler eff from' to''
       where
-        sigNames = map (\(OperationSignature x _ _) -> x)
         clauseNames = map (\(OperationClause x _ _) -> x) clauses
-        matchesClauses (_, signatures) = Set.fromList clauseNames == Set.fromList (sigNames signatures)
-        findSig x = find (\(OperationSignature y _ _) -> y == x)
+        matchesClauses (Effect _ signatures) = Set.fromList clauseNames == Set.fromList (Map.keys signatures)
+    Elb (Elaboration name row clauses) -> do
+      -- Find the matching effect if available
+      let maybeEffect = Map.lookup name (view effects env)
+      -- TODO: the name must be resolved to the full path to the effect to avoid conflicts
+      eff@(Effect _ sigs) <- case maybeEffect of
+        Just a -> return a
+        Nothing -> throwError "could not match handler with an effect"
+
+      -- Match up the clauses and signatures
+      let clauses' = sortOn (\(OperationClause x _ _) -> x) clauses
+      let sigs' = sortOn fst (Map.toList sigs)
+
+      -- FIXME: This row should be used for the clauses too
+      row' <- resolveRow env row
+      () <-
+        mapM_
+          ( \(OperationClause cName args body', (sName, Arrow sigArgs sigRet)) -> do
+              when (cName /= sName) $ throwError "clauses do not match signatures in elaboration"
+              let CompType retRow retVal = sigRet
+              when (retRow /= rowEmpty) $ throwError "ICE signature cannot have a row on the return type"
+              inferFunctionLike env args sigArgs (Just $ CompType row' retVal) body'
+          )
+          (zip clauses' sigs')
+      pure $ TypeElaboration eff row'
     _ -> error "Not implemented yet"
+
+inferFunctionLike :: TypeEnv -> [Ident] -> [CompType] -> Maybe CompType -> Expr -> Infer CompType
+inferFunctionLike env argNames argTypes tRet body = do
+  -- Any type vars in the signature need to be bound inside
+  -- so we need to extract them
+  let typeVars = Set.unions $ map (freeTypeVars env) argTypes
+
+  -- Argument must be used
+  let argSchemes = map (TypeScheme [] []) argTypes
+
+  -- The body needs the variables and the bound type vars
+  let bodyEnv = addTypeVars typeVars $ extendVars (zip argNames argSchemes) env
+
+  tRetInferred <- infer bodyEnv body
+  () <- mapM_ (force tRetInferred) tRet
+
+  argTypes' <- mapM subM argTypes
+  tRet' <- subM tRetInferred
+  pure $ TypeArrow $ Arrow argTypes' tRet'
+
+findSig :: String -> [OperationSignature] -> OperationSignature
+findSig x sig = fromJust $ find (\(OperationSignature y _ _) -> y == x) sig
+
+openRow :: CompType -> Infer CompType
+openRow (CompType row t) = f row >>= \x -> return $ CompType x t
+  where
+    f (Row effs Nothing) = Row effs . Just <$> fresh
+    f r = return r

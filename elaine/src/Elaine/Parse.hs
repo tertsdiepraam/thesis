@@ -1,16 +1,11 @@
 module Elaine.Parse (parseProgram, parseExpr, ParseResult, Spans, Span) where
 
 import Control.Monad.State (State, evalState, get, put, runState)
-import Data.Char (isLower)
 import Data.Either (partitionEithers)
 import Data.Maybe (fromMaybe)
-import qualified Data.MultiSet as MultiSet
 import Data.Text (Text, pack, unpack)
 import Data.Void
 import Elaine.AST
-import Elaine.Row (Row (Row))
-import qualified Elaine.Row as Row
-import Elaine.TypeVar (TypeVar (ExplicitVar))
 import Text.Megaparsec
   ( MonadParsec (eof, notFollowedBy, try),
     ParseErrorBundle,
@@ -202,59 +197,49 @@ decEffect = do
   DecEffect name <$> braces (many operationSignature)
 
 operationSignature :: Parser OperationSignature
-operationSignature = OperationSignature <$> ident <*> parens (valueType `sepBy` comma) <*> valueType
+operationSignature = OperationSignature <$> ident <*> parens (computationType `sepBy` comma) <*> computationType
 
 decType :: Parser DeclarationType
 decType = do
   name <- try (keyword "type") >> ident
   DecType name <$> braces (many constructor)
 
-functionParams :: Parser [(Ident, Maybe ComputationType)]
+functionParams :: Parser [(Ident, Maybe ASTComputationType)]
 functionParams = parens (functionParam `sepBy` comma)
 
 constructor :: Parser Constructor
 constructor = Constructor <$> ident <*> parens (computationType `sepBy` comma)
 
-functionParam :: Parser (Ident, Maybe ComputationType)
+functionParam :: Parser (Ident, Maybe ASTComputationType)
 functionParam = do
   name <- ident
   typ' <- optional (colon >> computationType)
   return (name, typ')
 
-computationType :: Parser ComputationType
+computationType :: Parser ASTComputationType
 computationType = do
   effs <- optional row
-  v <- valueType
-  return $ ComputationType (fromMaybe Row.empty effs) v
+  ASTComputationType (fromMaybe (Row [] Nothing) effs) <$> valueType
 
-valueType :: Parser ValueType
+valueType :: Parser ASTValueType
 valueType =
   try (parens $ pure TypeUnit)
-    <|> (TypeInt <$ keyword "Int")
-    <|> (TypeString <$ keyword "String")
-    <|> (TypeBool <$ keyword "Bool")
     <|> functionType
-    <|> ( do
-            x <- ident
-            return $
-              if isLower $ head x
-                then TypeV $ ExplicitVar x
-                else TypeName x
-        )
+    <|> (TypeName <$> ident)
     <|> try (parens valueType)
 
-functionType :: Parser ValueType
+functionType :: Parser ASTValueType
 functionType = try (keyword "fn") >> TypeArrow <$> parens (computationType `sepBy` comma) <*> computationType
 
 row :: Parser Row
 row =
   angles $ do
     effects <- ident `sepBy` comma
-    extend <- optional (ExplicitVar <$> (symbol "|" >> ident))
-    return $ Row (MultiSet.fromList effects) extend
+    extend <- optional (symbol "|" >> ident)
+    return $ Row effects extend
 
 -- EXPRESSIONS
-data LetOrExpr = Let' String (Maybe ComputationType) Expr | Expr' Expr
+data LetOrExpr = Let' String (Maybe ASTComputationType) Expr | Expr' Expr
 
 exprBlock :: Parser Expr
 exprBlock = do
