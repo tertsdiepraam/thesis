@@ -1,0 +1,54 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "elaine"
+		}
+	],
+	"settings": {
+		"cSpell.words": [
+			"asgn",
+			"behaviour",
+			"castagna",
+			"concat",
+			"cond",
+			"Decomp",
+			"effectful",
+			"Eithers",
+			"elab",
+			"Elab",
+			"elabs",
+			"fmapbody",
+			"foldl",
+			"foldr",
+			"heffect",
+			"Hindley",
+			"HLINT",
+			"Hspec",
+			"idents",
+			"Koka",
+			"Milner",
+			"moggi",
+			"monomorphization",
+			"multiset",
+			"multisets",
+			"newtype",
+			"overapproximation",
+			"paren",
+			"parens",
+			"poulsen",
+			"Redex",
+			"stmts",
+			"thunked",
+			"transactionality",
+			"typeclass",
+			"typeclasses",
+			"unlines",
+			"unrecognised",
+			"unwords",
+			"vals"
+		]
+	}
+}
