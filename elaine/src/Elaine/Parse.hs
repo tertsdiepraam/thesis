@@ -6,6 +6,7 @@ import Data.Maybe (fromMaybe)
 import Data.Text (Text, pack, unpack)
 import Data.Void
 import Elaine.AST
+import Elaine.Ident (Ident(Ident), Location(LocOffset))
 import Text.Megaparsec
   ( MonadParsec (eof, notFollowedBy, try),
     ParseErrorBundle,
@@ -117,13 +118,14 @@ firstIdentChars = ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['_']
 otherIdentChars :: [Char]
 otherIdentChars = firstIdentChars ++ ['0' .. '9']
 
-ident :: Parser String
+ident :: Parser Ident
 ident = span "identifier" $ lexeme $ do
+  location <- LocOffset <$> getOffset
   firstChar <- oneOf firstIdentChars
   rest <- many (oneOf otherIdentChars)
   ticks <- many (char '\'')
   exc <- option "" (symbol "!")
-  return $ [firstChar] ++ rest ++ ticks ++ unpack exc
+  return $ Ident ([firstChar] ++ rest ++ ticks ++ unpack exc) location
 
 -- PROGRAM
 -- A program is simply a sequence of modules, but the parser requires parsing
@@ -239,7 +241,7 @@ row =
     return $ Row effects extend
 
 -- EXPRESSIONS
-data LetOrExpr = Let' String (Maybe ASTComputationType) Expr | Expr' Expr
+data LetOrExpr = Let' Ident (Maybe ASTComputationType) Expr | Expr' Expr
 
 exprBlock :: Parser Expr
 exprBlock = do
@@ -250,8 +252,8 @@ exprBlock = do
   where
     f (Expr' e1) Nothing = Just e1
     f (Let' {}) Nothing = error "last expression in a block cannot be let"
-    f (Expr' e1) (Just e2) = Just $ Let "_" Nothing e1 e2
-    f (Let' x t e1) (Just e2) = Just $ Let x t e1 e2
+    f (Expr' e1) (Just e2) = Just $ Let Nothing Nothing e1 e2
+    f (Let' x t e1) (Just e2) = Just $ Let (Just x) t e1 e2
 
 letOrExpr :: Parser LetOrExpr
 letOrExpr = let' <|> Expr' <$> expr

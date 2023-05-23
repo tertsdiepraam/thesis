@@ -27,6 +27,7 @@ import Text.RawString.QQ (r)
 import Prelude hiding (pure)
 import Data.Text.Internal.Read (IParser(P))
 import Data.Bifunctor (second)
+import Elaine.Ident (Ident(..), Location (LocNone))
 
 check :: String -> Result CompType
 check = execCheck . pack' . (,) "test"
@@ -318,7 +319,7 @@ testTypeCheck = describe "typeCheck" $ do
       };
     |]
       `shouldSatisfy` \case
-        Right (CompType _ (TypeHandler (Effect ["Foo"] _) _ _)) -> True
+        Right (CompType _ (TypeHandler (Effect [Ident "Foo" _] _) _ _)) -> True
         _ -> False
 
   it "can infer handler types with specific types in the operations" $ do
@@ -336,7 +337,7 @@ testTypeCheck = describe "typeCheck" $ do
       };
     |]
       `shouldSatisfy` \case
-        Right (CompType _ (TypeHandler (Effect ["Foo"] _) _ _)) -> True
+        Right (CompType _ (TypeHandler (Effect [Ident "Foo" _] _) _ _)) -> True
         _ -> False
 
   it "can cannot be more specific about types in handlers" $ do
@@ -381,7 +382,7 @@ testTypeCheck = describe "typeCheck" $ do
       };
     |]
       `shouldSatisfy` \case
-        Right (CompType _ (TypeHandler (Effect ["Foo"] _) _ TypeString)) -> True
+        Right (CompType _ (TypeHandler (Effect [Ident "Foo" _] _) _ TypeString)) -> True
         _ -> False
 
   it "can apply a handler" $ do
@@ -677,7 +678,7 @@ testTypeCheck = describe "typeCheck" $ do
     |]
       `shouldSatisfy`
         \case
-        Right (CompType _ (TypeElaboration (Effect ["Foo!"] _) row)) -> True
+        Right (CompType _ (TypeElaboration (Effect [Ident "Foo!" _] _) row)) -> True
         _ -> False
   
   it "can infer explicit elab with empty row" $ do
@@ -861,5 +862,8 @@ testTypeCheck = describe "typeCheck" $ do
 testUnifyRows :: SpecWith ()
 testUnifyRows = describe "unifyRows" $ do
   it "should unify rows with the same effects" $ do
-    let res = runInfer $ unifyRows (rowOpen [Effect ["Foo"] Map.empty] (ExplicitVar "1")) (rowOpen [Effect ["Foo"] Map.empty] (ExplicitVar "e2"))
+    let e1 = ExplicitVar $ Ident "1" LocNone
+    let e2 = ExplicitVar $ Ident "2" LocNone
+    let foo = Ident "Foo" LocNone
+    let res = runInfer $ unifyRows (rowOpen [Effect [foo] Map.empty] e1) (rowOpen [Effect [foo] Map.empty] e2)
     second fst res `shouldBe` Right ()

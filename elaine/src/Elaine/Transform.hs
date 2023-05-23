@@ -1,9 +1,10 @@
 module Elaine.Transform where
 
 import Data.List (isSuffixOf)
+import Data.Map (Map, (!))
 import Elaine.AST
 import Elaine.Eval (subst)
-import Data.Map (Map, (!))
+import Elaine.Ident (Ident (Ident, idText), Location (LocNone))
 
 elabToHandle :: Program -> Program
 elabToHandle = foldProgram elabToHandle'
@@ -16,12 +17,14 @@ elabToHandle' = \case
         App (App (Var x) (map (Val . lam []) args)) []
   Val (Elb (Elaboration _ _ clauses)) ->
     let mapping params = zip params (map (\p -> App (Var p) []) params)
-        f' (OperationClause x params e) = OperationClause x params (App (Var "resume") [Val $ lam [] (subst (mapping params) e)])
+        x = Ident "x" LocNone
+        resume = Ident "resume" LocNone
+        f' (OperationClause x' params e) = OperationClause x' params (App (Var resume) [Val $ lam [] (subst (mapping params) e)])
         clauses' = map f' clauses
      in Val $
           Hdl $
             Handler
-              (Function [("x", Nothing)] Nothing (Var "x"))
+              (Function [(x, Nothing)] Nothing (Var x))
               clauses'
   e -> e
 
@@ -78,4 +81,4 @@ isAlgebraic :: Ident -> Bool
 isAlgebraic = not . isHigherOrder
 
 isHigherOrder :: Ident -> Bool
-isHigherOrder x = "!" `isSuffixOf` x
+isHigherOrder x = "!" `isSuffixOf` idText x

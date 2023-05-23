@@ -12,6 +12,7 @@ import Data.Maybe (fromJust, fromMaybe, isJust)
 import Elaine.AST
 import Elaine.Pretty (pretty)
 import Elaine.Std (stdBindings)
+import Elaine.Ident (Ident (Ident, idText), Location (LocNone, LocBuiltIn))
 import Prelude hiding (exp, lookup)
 
 -- The decomposition is a list of functions that plug an expression into
@@ -51,7 +52,8 @@ reduce = \case
       Fn (Function params _ body) -> subst (zip (map fst params) args) body
       Constant (BuiltIn _ _ body) -> Val $ body (map (fromJust . toVal) args)
       _ -> error ("Tried to call a non-function: " ++ pretty v)
-  Let x _ (Val v) e -> Just $ subst [(x, Val v)] e
+  Let (Just x) _ (Val v) e -> Just $ subst [(x, Val v)] e
+  Let Nothing _ (Val _) e -> Just e
   Handle (Val v) e ->
     let h = case v of
           Hdl h' -> h'
@@ -115,7 +117,8 @@ ctxE exp = ctxCommon exp <|> ctxE' exp
     ctxE' = \case
       Handle (Val h) e' -> Just (e', Handle $ Val h)
       Handle e1 e2 -> Just (e1, \x -> Handle x e2)
-      Elab e1' e2' -> Just (e2', Elab e1')
+      Elab (Val el) e' -> Just (e', Elab $ Val el)
+      Elab e1 e2 -> Just (e1, \x -> Elab x e2)
       _ -> Nothing
 
 ctxHandler :: Ident -> Ctx
@@ -123,7 +126,7 @@ ctxHandler op exp = ctxCommon exp <|> ctxHandler' exp
   where
     ctxHandler' = \case
       Handle (Val (Hdl h)) e ->
-        if not (op `isOpIn` h)
+        if not (op `opInH` h)
           then Just (e, Handle $ Val $ Hdl h)
           else Nothing
       Handle e1 e2 -> Just (e1, \x -> Handle x e2)
@@ -134,13 +137,17 @@ ctxHandler op exp = ctxCommon exp <|> ctxHandler' exp
 -- The context for an elaboration can go into handles, but not other elabs.
 -- This assumes that each elab elaborates **all** higher-order effects, which
 -- should be verified by the type system.
-ctxElab :: Ctx
-ctxElab exp = ctxCommon exp <|> ctxElab' exp
+ctxElab :: Ident -> Ctx
+ctxElab op exp = ctxCommon exp <|> ctxElab' exp
   where
     ctxElab' = \case
       Handle (Val h) e -> Just (e, Handle $ Val h)
       Handle e1 e2 -> Just (e1, \x -> Handle x e2)
-      Elab _ _ -> Nothing
+      Elab (Val (Elb el)) e ->
+        if not (op `opInE` el)
+          then Just (e, Elab $ Val $ Elb el)
+          else Nothing
+      Elab e1 e2 -> Just (e1, \x -> Elab x e2)
       _ -> Nothing
 
 -- Step out of the current expression, by popping the head of the context
@@ -178,8 +185,11 @@ evalExpr env e = evalExpr env . fst $ step env (e, [])
 -- Helper functions
 -------------------------
 
-isOpIn :: Ident -> Handler -> Bool
-isOpIn x h = x `elem` map opName (ops h)
+opInH :: Ident -> Handler -> Bool
+opInH x (Handler _ cs) = x `elem` map opName cs
+
+opInE :: Ident -> Elaboration -> Bool
+opInE x (Elaboration _ _ cs) = x `elem` map opName cs
 
 isVal :: Expr -> Bool
 isVal = isJust . toVal
@@ -189,17 +199,17 @@ toVal (Val v) = Just v
 toVal _ = Nothing
 
 -- Substitution of multiple variables at the same time
-subst :: [(String, Expr)] -> Expr -> Expr
+subst :: [(Ident, Expr)] -> Expr -> Expr
 subst subs e = foldl (flip subst1) e subs
 
-subst1 :: (String, Expr) -> Expr -> Expr
+subst1 :: (Ident, Expr) -> Expr -> Expr
 subst1 (x, new) = \case
   Var y -> if x == y then new else Var y
   App e es -> App (f e) (map f es)
   If e1 e2 e3 -> If (f e1) (f e2) (f e3)
   Handle e1 e2 -> Handle (f e1) (f e2)
   Elab e1 e2 -> Elab (f e1) (f e2)
-  Let y t e1 e2 -> if x == y then Let y t (f e1) e2 else Let y t (f e1) (f e2)
+  Let y t e1 e2 -> if Just x == y then Let y t (f e1) e2 else Let y t (f e1) (f e2)
   -- TODO prevent name shadowing in match arms
   Match e arms -> Match (f e) (map mapArms arms)
     where
@@ -210,7 +220,7 @@ subst1 (x, new) = \case
         clauses' =
           map
             ( \c@(OperationClause name params body) ->
-                if (x `elem` params) || (x == "resume")
+                if (x `elem` params) || (idText x == "resume")
                   then c
                   else OperationClause name params (f body)
             )
@@ -274,20 +284,24 @@ reduceHandler h e = case e of
           -- Because we don't want the handler body to affect it anyway, so if they
           -- use y it works and the function will have to be applied before we can
           -- do anything with it.
-          k = Val $ lam ["y"] $ Handle (Val $ Hdl h) $ compose (Var "y", cs)
-          cont = [("resume", k)]
+          k = Val $ lam [Ident "y" LocNone] $ Handle (Val $ Hdl h) $ compose (Var (Ident "y" LocNone), cs)
+          cont = [(Ident "resume" LocNone, k)]
       _ -> Nothing
 
 reduceElab :: Elaboration -> Expr -> Maybe Expr
-reduceElab elab e = case decompose ctxElab e of
-  (Var x, c : cs) -> do
-    let Elaboration _ _ clauses = elab
-    OperationClause _ params body <- find (\c' -> clauseName c' == x) clauses
-    case c (Var x) of
-      App (Var _) args ->
-        Just $ compose (subst (zip params (map (Elab (Val $ Elb elab)) args)) body, cs)
+reduceElab elab@(Elaboration _ _ clauses) e = applyOps clauses
+  where
+    applyOps [] = Nothing
+    applyOps (o:os) = case applyOp o of
+      Just e' -> Just e'
+      Nothing -> applyOps os
+    
+    applyOp (OperationClause op params body) = case decompose (ctxElab op) e of
+      (Var x, c:cs) | x == op ->
+        case c (Var x) of
+          App (Var _) args -> Just $ compose (subst (zip params (map (Elab (Val $ Elb elab)) args)) body, cs)
+          _ -> Nothing
       _ -> Nothing
-  _ -> Nothing
 
 -- And environment represents a module
 newEnv :: Env
@@ -302,12 +316,12 @@ updateEnv :: Env -> DeclarationType -> Env
 -- Import adds the imported module to the current environment
 updateEnv m (Use x) = case lookup x (envModules m) of
   Just imported -> imported
-  Nothing -> error $ "Could not import module " ++ x
+  Nothing -> error $ "Could not import module " ++ show x
 -- Type adds type constructors
 updateEnv _ (DecType typeIdent decs) =
   let -- We create a function for every constructor returning a Data value
       -- The parameters are called param0, param1, param2, etc.
-      lamParams params = map (\i -> "param" ++ show i) (take (length params) [0 ..] :: [Int])
+      lamParams params = map (\i -> (Ident ("param" ++ show i) LocNone)) (take (length params) [0 ..] :: [Int])
       f (Constructor x params) =
         ( x,
           lam (lamParams params) (Val $ Data typeIdent x (map Var (lamParams params)))
@@ -340,12 +354,12 @@ mergeEnv a b =
     }
 
 eval :: Program -> Either String Value
-eval decs = case lookup "main" $ envBindings $ privateEnv $ evalModule initialEnv decs of
+eval decs = case lookup (Ident "main" LocNone) $ envBindings $ privateEnv $ evalModule initialEnv decs of
   Just a -> Right a
   Nothing -> Left "No main binding found"
   where
     stdEnv = newEnv {envBindings = stdBindings}
-    initialEnv = newEnv {envModules = singleton "std" stdEnv}
+    initialEnv = newEnv {envModules = singleton (Ident "std" LocBuiltIn) stdEnv}
 
 evalModule :: Env -> [Declaration] -> EvalResult
 evalModule env = foldl updateResult initialResult

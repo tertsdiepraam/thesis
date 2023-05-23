@@ -2,10 +2,9 @@ module Elaine.AST where
 
 import Elaine.TypeVar
 import Elaine.Types (TypeScheme)
+import Elaine.Ident (Ident (Ident))
 
 type Program = [Declaration]
-
-type Ident = String
 
 data Visibility = Private | Public
   deriving (Show, Eq)
@@ -15,7 +14,7 @@ data Declaration = Declaration Visibility DeclarationType
 
 data DeclarationType
   = Use Ident
-  | Module String [Declaration]
+  | Module Ident [Declaration]
   | DecLet Ident (Maybe ASTComputationType) Expr
   | DecType Ident [Constructor]
   | DecEffect Ident [OperationSignature]
@@ -54,7 +53,7 @@ data Expr
   | ImplicitElab Int Expr
   | Elab Expr Expr
   | Var Ident
-  | Let Ident (Maybe ASTComputationType) Expr Expr
+  | Let (Maybe Ident) (Maybe ASTComputationType) Expr Expr
   | Val Value
   deriving (Show, Eq)
 
@@ -66,14 +65,14 @@ data Value
   | Hdl Handler
   | Elb Elaboration
   | Constant BuiltIn
-  | Data String String [Expr]
+  | Data Ident Ident [Expr]
   | Unit
   deriving (Show, Eq)
 
 data BuiltIn = BuiltIn Ident TypeScheme ([Value] -> Value)
 
 instance Show BuiltIn where
-  show (BuiltIn x _ _) = "<built-in " ++ x ++ ">"
+  show (BuiltIn (Ident x _) _ _) = "<built-in " ++ x ++ ">"
 
 instance Eq BuiltIn where
   (BuiltIn x _ _) == (BuiltIn y _  _) = x == y
@@ -96,7 +95,7 @@ data ASTComputationType = ASTComputationType Row ASTValueType
   deriving (Show, Eq)
 
 data ASTValueType
-  = TypeName String
+  = TypeName Ident
   | TypeUnit
   | TypeArrow [ASTComputationType] ASTComputationType
   | TypeHandler Ident TypeVar ASTValueType

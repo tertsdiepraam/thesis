@@ -29,6 +29,7 @@ import Elaine.AST (ASTValueType)
 import Elaine.AST hiding (ASTValueType (..), Row)
 import qualified Elaine.AST as AST
 import Elaine.Pretty (Pretty, pretty)
+import Elaine.Ident (Ident (idText, Ident), Location (LocNone, LocBuiltIn))
 import Elaine.Std (stdTypes)
 import Elaine.TypeVar (TypeVar (ExplicitVar, ImplicitVar))
 import Elaine.Types (Arrow (Arrow), CompType (CompType), Effect (Effect), Row (..), TypeScheme (TypeScheme, effectVars, typ, typeVars), ValType (TypeArrow, TypeBool, TypeElaboration, TypeHandler, TypeInt, TypeName, TypeString, TypeUnit, TypeV), rowEmpty, rowIsEmpty, rowMaybe, rowOpen, rowUpdate, rowVar)
@@ -44,9 +45,9 @@ data Substitutions = Substitutions
 -- Variable names to type
 data TypeEnv = TypeEnv
   { _currentPath :: [Ident],
-    _vars :: Map String TypeScheme,
+    _vars :: Map Ident TypeScheme,
     _effects :: Map Ident Effect,
-    _mods :: Map String TypeEnv,
+    _mods :: Map Ident TypeEnv,
     _bound :: Set TypeVar
   }
   deriving (Show)
@@ -64,17 +65,50 @@ addStackTrace s =
           ++ s
     )
 
+data Metadata = Metadata {
+  definitions :: [(Ident, Ident)],
+  elabs :: Map Int [Ident]
+  -- types :: [(Ident, TypeScheme)],
+  -- handlers :: [(Ident, Ident)],
+  -- elaborations :: [(Ident, Ident)]
+}
+  deriving (Show)
+
+metaEmpty :: Metadata
+metaEmpty = Metadata [] Map.empty
+
 data CheckState = CheckState
   { stateCounter :: Int,
     stateSubs :: Substitutions,
-    stateElabs :: Map Int [Ident]
+    stateMetadata :: Metadata
   }
 
+stateEmpty :: CheckState
+stateEmpty = CheckState 0 emptySubs metaEmpty
+
+recordMeta :: (Metadata -> Metadata) -> Infer ()
+recordMeta f = do
+  s <- get
+  let meta = stateMetadata s
+  let meta' = f meta
+  put $ s { stateMetadata = meta' }
+
+recordMetaDefinition :: Ident -> Ident -> Infer ()
+recordMetaDefinition x y = recordMeta f
+  where f meta = meta { definitions = (x,y):definitions meta }
+
+recordMetaElab :: Int -> [Ident] -> Infer ()
+recordMetaElab x y = recordMeta f
+  where f meta = meta { elabs = Map.insert x y $ elabs meta }
+
 -- A version of lookup/! that uses the Infer monad in case of an error
-get' :: Map String b -> String -> Infer b
-get' m a = case Map.lookup a m of
-  Just b -> return b
-  Nothing -> throwError $ "undefined identifier: " ++ a
+-- It also returns the key, because with identifiers a lookup might succeed
+-- but the identifiers could still have different location that we want to know
+-- about.
+get' :: Map Ident b -> Ident -> Infer (Ident, b)
+get' m a = case Map.lookupIndex a m of
+  Just index -> return (Map.elemAt index m)
+  Nothing -> throwError $ "undefined identifier: " ++ show a
 
 union :: TypeEnv -> TypeEnv -> TypeEnv
 union a = unionLens vars a . unionLens mods a . unionLens effects a
@@ -82,28 +116,34 @@ union a = unionLens vars a . unionLens mods a . unionLens effects a
     unionLens :: Ord a => Lens' TypeEnv (Map a b) -> TypeEnv -> TypeEnv -> TypeEnv
     unionLens l a' = over l (Map.union $ a' ^. l)
 
-getVar :: TypeEnv -> String -> Infer TypeScheme
-getVar = get' . view vars
+getVar :: TypeEnv -> Ident -> Infer TypeScheme
+getVar env x = do
+  (defId, defType) <- get' (view vars env) x
+  () <- recordMetaDefinition x defId
+  return defType
 
-extendVars :: [(String, TypeScheme)] -> TypeEnv -> TypeEnv
+extendVars :: [(Ident, TypeScheme)] -> TypeEnv -> TypeEnv
 extendVars newVars = over vars (Map.union $ Map.fromList newVars)
 
 addTypeVars :: Set TypeVar -> TypeEnv -> TypeEnv
 addTypeVars newBound = over bound (Set.union newBound)
 
-getMod :: TypeEnv -> String -> Infer TypeEnv
-getMod = get' . view mods
+getMod :: TypeEnv -> Ident -> Infer TypeEnv
+getMod env x = do
+  (defId, env') <- get' (view mods env) x
+  () <- recordMetaDefinition x defId
+  return env'
 
-insertVar :: String -> TypeScheme -> TypeEnv -> TypeEnv
+insertVar :: Ident -> TypeScheme -> TypeEnv -> TypeEnv
 insertVar k v = over vars $ Map.insert k v
 
-insertMod :: String -> TypeEnv -> TypeEnv -> TypeEnv
+insertMod :: Ident -> TypeEnv -> TypeEnv -> TypeEnv
 insertMod k v = over mods $ Map.insert k v
 
-singletonVar :: String -> TypeScheme -> TypeEnv
+singletonVar :: Ident -> TypeScheme -> TypeEnv
 singletonVar k v = insertVar k v empty
 
-singletonMod :: String -> TypeEnv -> TypeEnv
+singletonMod :: Ident -> TypeEnv -> TypeEnv
 singletonMod k v = insertMod k v empty
 
 empty :: TypeEnv
@@ -222,14 +262,8 @@ updateSubs subs =
       subEffectVars = Map.map (sub subs) (subEffectVars subs)
     }
 
-addExplicitElab :: Int -> [Ident] -> Infer ()
-addExplicitElab i e = do
-  s <- get
-  let elabs = stateElabs s
-  put $ s {stateElabs = Map.insert i e elabs}
-
 runInfer :: Infer a -> Either String (a, CheckState)
-runInfer a = case runState (runExceptT a) (CheckState 0 emptySubs Map.empty) of
+runInfer a = case runState (runExceptT a) stateEmpty of
   (Left x, _) -> Left x
   (Right x, y) -> Right (x, y)
 
@@ -240,19 +274,19 @@ typeCheck decs = runInfer $ do
   -- We're forcing main to not have any effects
   -- Most of the type, it will be polymorphic over some effects, but
   -- we don't have any more handlers, to forcing to empty is ok.
-  mainType <- inst $ view vars env Map.! "main"
+  mainType <- inst $ view vars env Map.! (Ident "main" LocNone)
   v <- freshV
   let newMainType = CompType rowEmpty v
   () <- unify mainType newMainType
   mainType' <- subM mainType
   mainType'' <- gen env mainType'
-  subM (insertVar "main" mainType'' env)
+  subM (insertVar (Ident "main" LocNone) mainType'' env)
   where
     stdTypeEnv types = set vars types empty
-    initialEnv types = singletonMod "std" (stdTypeEnv types)
+    initialEnv types = singletonMod (Ident "std" LocBuiltIn) (stdTypeEnv types)
 
 getMain :: TypeEnv -> TypeScheme
-getMain = flip (Map.!) "main" . view vars
+getMain = flip (Map.!) (Ident "main" LocNone) . view vars
 
 -- Returns both the private and public TypeEnv
 typeCheckMod :: TypeEnv -> [Declaration] -> Infer (TypeEnv, TypeEnv)
@@ -292,13 +326,15 @@ typeCheckDec' env = \case
     sigsAsFunctions <-
       mapM
         ( \(f, Arrow args ret) -> do
+            let a = ExplicitVar (Ident "a" LocNone)
+            let b = ExplicitVar (Ident "b" LocNone)
             ret' <- case ret of
-              CompType row retVal | rowIsEmpty row -> return $ CompType (rowOpen [eff] $ ExplicitVar "b") retVal
+              CompType row retVal | rowIsEmpty row -> return $ CompType (rowOpen [eff] b) retVal
               _ -> throwError "effect operation cannot have any effects"
             return
               ( f,
-                TypeScheme [] [ExplicitVar "a", ExplicitVar "b"] $
-                  CompType (rowVar $ ExplicitVar "a") $
+                TypeScheme [] [a, b] $
+                  CompType (rowVar a) $
                     TypeArrow $
                       Arrow args ret'
               )
@@ -318,10 +354,10 @@ typeCheckDec' env = \case
 
 resolveValType :: TypeEnv -> ASTValueType -> Infer ValType
 resolveValType _ AST.TypeUnit = return TypeUnit
-resolveValType _ (AST.TypeName "Bool") = return TypeBool
-resolveValType _ (AST.TypeName "String") = return TypeString
-resolveValType _ (AST.TypeName "Int") = return TypeInt
-resolveValType _ (AST.TypeName x) | isLower (head x) = return $ TypeV (ExplicitVar x)
+resolveValType _ (AST.TypeName (Ident "Bool" _)) = return TypeBool
+resolveValType _ (AST.TypeName (Ident "String" _)) = return TypeString
+resolveValType _ (AST.TypeName (Ident "Int" _)) = return TypeInt
+resolveValType _ (AST.TypeName x) | isLower (head $ idText x) = return $ TypeV (ExplicitVar x)
 resolveValType _ (AST.TypeName x) = return $ TypeName x
 resolveValType env (AST.TypeArrow args ret) = do
   args' <- mapM (resolveCompType env) args
@@ -344,7 +380,7 @@ resolveRow env (AST.Row effs maybeExtend) = do
 resolveEffect :: TypeEnv -> Ident -> Infer Effect
 resolveEffect env eff = case Map.lookup eff (view effects env) of
   Just e' -> return e'
-  Nothing -> throwError $ "Could not find effect " ++ eff
+  Nothing -> throwError $ "Could not find effect " ++ pretty eff
 
 class Substitutable a where
   sub :: Substitutions -> a -> a
@@ -487,7 +523,9 @@ instance Inferable Expr where
         t1 <- infer env e1
         t1' <- subM t1 >>= gen env
         () <- forM_ mt (force t1 <=< resolveCompType env)
-        infer (insertVar x t1' env) e2
+        case x of
+          Just ident -> infer (insertVar ident t1' env) e2
+          Nothing -> infer env e2
       Handle e1 e2 -> do
         t1 <- infer env e1
         rVar <- fresh
@@ -529,18 +567,18 @@ instance Inferable Expr where
       ImplicitElab i e1 -> do
         CompType row vt1 <- infer env e1
         let Row effs extend = row
-        let (hEffs, aEffs) = MS.partition (\(Effect path _) -> last (last path) == '!') effs
+        let (hEffs, aEffs) = MS.partition (\(Effect path _) -> last (idText $ last path) == '!') effs
         elabs <- mapM findElab (MS.toList hEffs)
         let elabIdents = map fst elabs
-        () <- addExplicitElab i elabIdents
-        let elabRow = foldr rowUpdate rowEmpty (map snd elabs)
+        () <- recordMetaElab i elabIdents
+        let elabRow = foldr (rowUpdate . snd) rowEmpty elabs
 
         let row' = rowUpdate elabRow (Row aEffs extend)
         return $ CompType row' vt1
         where
           findElab (Effect path _) = case findMaybe (f path) (Map.toList (view vars env)) of
             Just (x, e) -> return (x, e)
-            Nothing -> throwError $ "Could not find elaboration for: " ++ intercalate "::" path
+            Nothing -> throwError $ "Could not find elaboration for: " ++ intercalate "::" (map pretty path)
           
           f path1 (x, TypeScheme _ _ (CompType _ (TypeElaboration (Effect path2 _) row))) | path1 == path2 = Just (x, row)
           f _ _ = Nothing
@@ -656,7 +694,7 @@ instance Inferable Value where
               let Arrow sigArgs sigRet = signatures Map.! cName
                   env' =
                     insertVar
-                      "resume"
+                      (Ident "resume" LocNone)
                       (TypeScheme [] [] $ CompType rowEmpty (TypeArrow $ Arrow [sigRet] toC'))
                       env
                in inferFunctionLike env' args sigArgs (Just toC') body'
@@ -717,7 +755,7 @@ inferFunctionLike env argNames argTypes tRet body = do
   tRet' <- subM tRetInferred
   pure $ TypeArrow $ Arrow argTypes' tRet'
 
-findSig :: String -> [OperationSignature] -> OperationSignature
+findSig :: Ident -> [OperationSignature] -> OperationSignature
 findSig x sig = fromJust $ find (\(OperationSignature y _ _) -> y == x) sig
 
 openRow :: CompType -> Infer CompType

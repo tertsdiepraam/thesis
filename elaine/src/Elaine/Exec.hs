@@ -7,13 +7,14 @@ import Elaine.AST (Program, Value)
 import Elaine.Transform (elabToHandle, makeElabExplicit)
 import Elaine.Eval (eval)
 import Elaine.Parse (parseProgram, Spans)
-import Elaine.TypeCheck (typeCheck, getMain, CheckState (stateElabs))
+import Elaine.TypeCheck (typeCheck, getMain, Metadata (elabs), Metadata, CheckState (stateMetadata))
 import Prelude hiding (last, lookup)
 import Elaine.Pretty (pretty)
 import Control.Monad ((>=>))
 import Text.Pretty.Simple (pShow)
 import Elaine.Types (CompType, TypeScheme (TypeScheme))
 import Data.Map (Map)
+import Elaine.Ident (Ident)
 
 last :: [a] -> Maybe a
 last = foldl (\_ x -> Just x) Nothing
@@ -69,12 +70,12 @@ parseSpans a = case parse' a of
   Left b -> Left b
   Right b -> Right $ snd b
 
-typeCheck' :: Program -> Result (Program, Map Int [String])
+typeCheck' :: Program -> Result (Program, Map Int [Ident])
 typeCheck' x = case typeCheck x of
   Left a -> Left $ TypeError a
-  Right (_, state) -> Right (x, stateElabs state)
+  Right (_, state) -> Right (x, elabs $ stateMetadata state)
 
-makeElabExplicit' :: (Program, Map Int [String]) -> Result Program
+makeElabExplicit' :: (Program, Map Int [Ident]) -> Result Program
 makeElabExplicit' (p, m) = Right $ makeElabExplicit m p
 
 transform' :: Program -> Result Program
@@ -89,6 +90,9 @@ show' = Right . show
 pShow' :: Show a => a -> Result String
 pShow' = Right . L.unpack . pShow
 
+execPretty :: (Text, Text) -> Either Error String
+execPretty = parseNoSpans >=> pretty'
+
 execParse :: (Text, Text) -> Either Error Program
 execParse = parseNoSpans
 
@@ -101,6 +105,11 @@ execCheck = parseNoSpans >=> \x -> case typeCheck x of
   Right (env, _) -> case getMain env of
     TypeScheme _ _ t -> Right t
 
+execCheckMetadata :: (Text, Text) -> Either Error Metadata
+execCheckMetadata = parseNoSpans >=> \x -> case typeCheck x of
+  Left a -> Left $ TypeError a
+  Right (_, s) -> Right $ stateMetadata s
+
 execExplicit :: (Text, Text) -> Either Error String
 execExplicit = parseNoSpans >=> typeCheck' >=> makeElabExplicit' >=> pretty'
 
@@ -109,10 +118,12 @@ execRun = parseNoSpans >=> typeCheck' >=> makeElabExplicit' >=> eval'
 
 cmd :: String -> (Text, Text) -> Either Error String
 cmd "parse" = execParse >=> show'
+cmd "pretty" = execPretty
 cmd "spans" = execSpans >=> pShow'
 cmd "check" = execCheck >=> show'
 cmd "run" = execRun >=> show'
 cmd "explicit" = execExplicit
+cmd "metadata" = execCheckMetadata >=> pShow'
 cmd _ = error "unrecognized command"
 
 pack' :: (String, String) -> (Text, Text)

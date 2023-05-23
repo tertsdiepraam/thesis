@@ -3,22 +3,26 @@ module Elaine.Std (stdBindings, stdTypes) where
 import Data.Map (Map, fromList)
 import Elaine.AST
   ( BuiltIn (..),
-    Ident,
     Value (Bool, Constant, Int, String),
   )
+import Elaine.Ident (Ident (Ident), Location(LocBuiltIn))
 import Elaine.Types (TypeScheme (TypeScheme), CompType (CompType), ValType (TypeArrow, TypeBool, TypeInt, TypeString), rowVar, rowEmpty, Arrow (Arrow))
 import Elaine.TypeVar (TypeVar (ExplicitVar))
 
 arrow :: [ValType] -> ValType -> TypeScheme
 arrow args ret =
-  TypeScheme [] [ExplicitVar "a", ExplicitVar "b"] $
-    CompType (rowVar $ ExplicitVar "a") $
-      TypeArrow $ Arrow
-        (map (CompType rowEmpty) args)
-        (CompType (rowVar $ ExplicitVar "b") ret)
+  let 
+    a = ExplicitVar (Ident "a" LocBuiltIn)
+    b = ExplicitVar (Ident "b" LocBuiltIn)
+  in
+    TypeScheme [] [a, b] $
+      CompType (rowVar a) $
+        TypeArrow $ Arrow
+          (map (CompType rowEmpty) args)
+          (CompType (rowVar b) ret)
 
-newBuiltIn :: Ident -> TypeScheme -> ([Value] -> Maybe Value) -> BuiltIn
-newBuiltIn name t f = BuiltIn name t $ \x -> case f x of
+newBuiltIn :: String -> TypeScheme -> ([Value] -> Maybe Value) -> BuiltIn
+newBuiltIn name t f = BuiltIn (Ident name LocBuiltIn) t $ \x -> case f x of
   Just a -> a
   Nothing -> error ("incorrect arguments for <" ++ name ++ ">")
 

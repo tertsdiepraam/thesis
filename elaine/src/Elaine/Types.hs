@@ -3,10 +3,11 @@ module Elaine.Types (Arrow (..), Row (..), TypeScheme (..), CompType (..), ValTy
 import Data.MultiSet (MultiSet)
 import qualified Data.MultiSet as MultiSet
 import Elaine.TypeVar
+import Elaine.Ident (Ident)
 import Data.Map (Map)
 import Data.Maybe (isNothing)
 
-type Path = [String]
+type Path = [Ident]
 
 data TypeScheme = TypeScheme
   { typeVars :: [TypeVar],
@@ -18,7 +19,7 @@ data TypeScheme = TypeScheme
 data CompType = CompType Row ValType
   deriving (Show, Eq, Ord)
 
-data Effect = Effect Path (Map String Arrow)
+data Effect = Effect Path (Map Ident Arrow)
   deriving (Show, Eq, Ord)
 
 data Arrow = Arrow [CompType] CompType
@@ -29,7 +30,7 @@ data ValType
   | TypeString
   | TypeBool
   | TypeUnit
-  | TypeName String
+  | TypeName Ident
   | TypeV TypeVar
   | TypeArrow Arrow
   | TypeHandler Effect TypeVar ValType

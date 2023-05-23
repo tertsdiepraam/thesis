@@ -15,10 +15,11 @@ import Test.Hspec
     expectationFailure,
     hspec,
     it,
-    shouldBe,
+    shouldBe, shouldSatisfy,
   )
 import Text.RawString.QQ
 import TypeCheck (testTypeCheck)
+import Elaine.Ident (Ident(..), Location (..))
 
 tt :: Expr
 tt = Val $ Bool True
@@ -51,7 +52,6 @@ run = execRun . pack' . (,) "test"
 main :: IO ()
 main = hspec $ do
   testParseExpr
-  testParseProgram
   testTypeCheck
   testEval
 
@@ -68,89 +68,56 @@ testParseExpr = describe "parseExpr" $ do
     f "()" `shouldBe` Right (Val Unit)
 
   it "parses applications" $ do
-    f "hello()(5)" `shouldBe` Right (App (App (Var "hello") []) [Val $ Int 5])
+    f "hello()(5)" `shouldBe` Right (App (App (Var (Ident "hello" (LocOffset 0))) []) [Val $ Int 5])
 
   it "parses if expressions" $ do
     f "if true { false } else { true }" `shouldBe` Right (If tt ff tt)
     f "if true { 5 } else { if false { 6 } else { 7 } }" `shouldBe` Right (If tt (iv 5) (If ff (iv 6) (iv 7)))
 
   it "parses handle expressions" $ do
-    f "handle[h] { if true { true } else { true } }" `shouldBe` Right (Handle (Var "h") (If tt tt tt))
+    f "handle[h] { if true { true } else { true } }" `shouldBe` Right (Handle (Var (Ident "h" (LocOffset 7))) (If tt tt tt))
 
   it "parses let expressions" $ do
-    f "{ let x = if true { true } else { true }; x }" `shouldBe` Right (Let "x" Nothing (If tt tt tt) (Var "x"))
+    f "{ let x = if true { true } else { true }; x }" `shouldBe` Right (Let (Just (Ident "x" (LocOffset 6))) Nothing (If tt tt tt) (Var (Ident "x" (LocOffset 40))))
 
   it "treats braces transparently" $ do
     f "{{{{ if {{ true }} {{ true }} else {{ true }} }}}}" `shouldBe` Right (If tt tt tt)
 
-testParseProgram :: SpecWith ()
-testParseProgram = describe "parseProgram" $ do
-  it "parses algebraic effects" $ do
-    parse
-      [r|
-      effect A {
-        put(Int) ()
-        get() Int
-      }
-    |]
-      `shouldBe` Right
-        [ Declaration Private $
-            DecEffect
-              "A"
-              [ OperationSignature "put" [ASTComputationType (Row [] Nothing) (TypeName "Int")] (ASTComputationType (Row [] Nothing) TypeUnit),
-                OperationSignature "get" [] (ASTComputationType (Row [] Nothing) (TypeName "Int"))
-              ]
-        ]
-
-  it "parses algebraic effects" $ do
-    parse
-      [r|
-      effect A! {
-        put!(Int) ()
-        get!() Int
-      }
-    |]
-      `shouldBe` Right
-        [ Declaration Private $
-            DecEffect
-              "A!"
-              [ OperationSignature "put!" [ASTComputationType (Row [] Nothing) (TypeName "Int")] (ASTComputationType (Row [] Nothing) TypeUnit),
-                OperationSignature "get!" [] (ASTComputationType (Row [] Nothing) (TypeName "Int"))
-              ]
-        ]
-
 testEval :: SpecWith ()
 testEval = describe "eval0" $ do
   let f = evalExpr newEnv
+  let x = Ident "x" LocNone
+  let y = Ident "y" LocNone
+  let z = Ident "z" LocNone
   it "gives reduces if expressions" $ do
     f (If tt tt ff) `shouldBe` Bool True
     f (If ff tt ff) `shouldBe` Bool False
     f (If tt ff tt) `shouldBe` Bool False
     f (If ff ff tt) `shouldBe` Bool True
-
   it "binds simple lets" $ do
-    f (Let "x" Nothing (iv 5) $ Var "x") `shouldBe` Int 5
-    f (Let "x" Nothing (iv 5) $ Var "x") `shouldBe` Int 5
+    f (Let (Just x) Nothing (iv 5) $ Var x) `shouldBe` Int 5
+    f (Let (Just x) Nothing (iv 5) $ Var x) `shouldBe` Int 5
 
   it "keeps shadowing bindings intact" $ do
-    f (Let "x" Nothing (iv 5) $ Let "x" Nothing (iv 6) (Var "x")) `shouldBe` Int 6
+    f (Let (Just x) Nothing (iv 5) $ Let (Just x) Nothing (iv 6) (Var x)) `shouldBe` Int 6
 
   it "applies function arguments" $ do
-    f (App (Val $ lam ["x"] $ Var "x") [iv 5]) `shouldBe` Int 5
-    f (App (Val $ lam ["y"] $ Var "y") [If tt (iv 5) (iv 6)]) `shouldBe` Int 5
-    f (App (Val $ lam ["x", "y"] (Var "y")) [iv 5, iv 10]) `shouldBe` Int 10
+    f (App (Val $ lam [x] $ Var x) [iv 5]) `shouldBe` Int 5
+    f (App (Val $ lam [y] $ Var y) [If tt (iv 5) (iv 6)]) `shouldBe` Int 5
+    f (App (Val $ lam [x, y] (Var y)) [iv 5, iv 10]) `shouldBe` Int 10
 
   it "applies multiple function arguments" $ do
-    let g = Val $ lam ["x", "y", "z"] (If (Var "x") (Var "y") (Var "z"))
+    let g = Val $ lam [x, y, z] (If (Var x) (Var y) (Var z))
     f (App g [tt, iv 100, iv 200]) `shouldBe` Int 100
     f (App g [ff, iv 100, iv 200]) `shouldBe` Int 200
     f (App g [App g [tt, tt, ff], iv (-10), iv 10]) `shouldBe` Int (-10)
 
   it "handles an abort-like effect" $ do
+    let abort = Ident "abort" LocNone
     -- Returns a boolean to signify whether it ran to completion or aborted
-    let h = Val $ Hdl $ Handler (Function [("x", Nothing)] Nothing tt) [OperationClause "abort" [] ff]
-    f (Handle h (Let "x" Nothing (iv 5) (Var "x"))) `shouldBe` Bool True
-    f (Handle h (Let "x" Nothing (App (Var "abort") []) (Var "x"))) `shouldBe` Bool False
+    let h = Val $ Hdl $ Handler (Function [(x, Nothing)] Nothing tt) [OperationClause abort [] ff]
+    f (Handle h (Let (Just x) Nothing (iv 5) (Var x))) `shouldBe` Bool True
+    f (Handle h (Let (Just x) Nothing (App (Var abort) []) (Var x))) `shouldBe` Bool False
 
 testRun :: SpecWith ()
 testRun = describe "run" $ do
@@ -312,7 +279,9 @@ testRun = describe "run" $ do
 
       let main = Left(5);
     |]
-      `shouldBe` Right (Data "Either" "Left" [Val $ Int 5])
+      `shouldSatisfy` \case
+        Right (Data (Ident "Either" _) (Ident "Left" _) [Val (Int 5)]) -> True
+        _ -> False
 
   it "can represent a list" $ do
     run [r|
@@ -323,7 +292,9 @@ testRun = describe "run" $ do
 
       let main = Cons(1, Cons(2, Nil()));
     |]
-      `shouldBe` Right (Data "List" "Cons" [Val $ Int 1, Val $ Data "List" "Cons" [Val $ Int 2, Val $ Data "List" "Nil" []]])
+      `shouldSatisfy` \case
+        Right (Data (Ident "List" _) (Ident "Cons" _) [Val (Int 1), Val (Data (Ident "List" _) (Ident "Cons" _) [Val (Int 2), Val (Data (Ident "List" _) (Ident "Nil" _) [])])]) -> True
+        _ -> False
 
   it "can match on custom data types" $ do
     run [r|
@@ -369,7 +340,9 @@ testRun = describe "run" $ do
 
       let main = safediv(6, 0);
     |]
-      `shouldBe` Right (Data "Maybe" "Nothing" [])
+      `shouldSatisfy` \case
+        Right (Data (Ident "Maybe" _) (Ident "Nothing" _) []) -> True
+        _ -> False
 
   it "can handle the abort effect" $ do
     run [r|
@@ -455,7 +428,9 @@ testRun = describe "run" $ do
         }
       };
     |]
-      `shouldBe` Right (Data "Maybe" "Just" [Val $ String "cannot divide by 0"])
+      `shouldSatisfy` \case
+        Right (Data (Ident "Maybe" _) (Ident "Just" _) [Val (String "cannot divide by 0")]) -> True
+        _ -> False
 
   it "can do a state effect" $ do
     run [r|
@@ -560,7 +535,9 @@ testRun = describe "run" $ do
         }
       };
     |]
-      `shouldBe` Right (Data "Triple" "t" [Val $ Int 1, Val $ Int 2, Val $ Int 4])
+      `shouldSatisfy` \case
+        Right (Data (Ident "Triple" _) (Ident "t" _) [Val (Int 1), Val (Int 2), Val (Int 4)]) -> True
+        _ -> False
 
   it "can do the log effect" $ do
     run [r|

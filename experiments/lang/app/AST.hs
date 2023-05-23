@@ -3,8 +3,8 @@ module AST where
 import Data.Set
 import Data.Map
 
+
 type Op = String
-type Ident = String
 
 ----------------
 -- Types
