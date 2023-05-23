@@ -4,7 +4,7 @@ module Main (main) where
 
 import Data.Text (pack)
 import Elaine.AST
-import Elaine.ElabTransform (elabTrans)
+import Elaine.Transform (elabToHandle)
 import Elaine.Eval (evalExpr, newEnv)
 import Elaine.Exec (Command (..), Result (..), exec, execParse, execRun, pack')
 import Elaine.Parse (parseExpr)

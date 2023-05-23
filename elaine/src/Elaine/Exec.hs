@@ -4,15 +4,16 @@ import Data.Bifunctor (first)
 import Data.Text (Text, pack, unpack)
 import qualified Data.Text.Lazy as L
 import Elaine.AST (Program, Value)
-import Elaine.ElabTransform (elabTrans)
+import Elaine.Transform (elabToHandle, makeElabExplicit)
 import Elaine.Eval (eval)
 import Elaine.Parse (parseProgram, Spans)
-import Elaine.TypeCheck (typeCheck, getMain)
+import Elaine.TypeCheck (typeCheck, getMain, CheckState (stateElabs))
 import Prelude hiding (last, lookup)
 import Elaine.Pretty (pretty)
 import Control.Monad ((>=>))
 import Text.Pretty.Simple (pShow)
 import Elaine.Types (CompType, TypeScheme (TypeScheme))
+import Data.Map (Map)
 
 last :: [a] -> Maybe a
 last = foldl (\_ x -> Just x) Nothing
@@ -68,16 +69,19 @@ parseSpans a = case parse' a of
   Left b -> Left b
   Right b -> Right $ snd b
 
-typeCheck' :: Program -> Result Program
+typeCheck' :: Program -> Result (Program, Map Int [String])
 typeCheck' x = case typeCheck x of
   Left a -> Left $ TypeError a
-  Right _ -> Right x
+  Right (_, state) -> Right (x, stateElabs state)
+
+makeElabExplicit' :: (Program, Map Int [String]) -> Result Program
+makeElabExplicit' (p, m) = Right $ makeElabExplicit m p
 
 transform' :: Program -> Result Program
-transform' = Right . elabTrans
+transform' = Right . elabToHandle
 
-pretty' :: Program -> Result Text
-pretty' = Right . pack . pretty
+pretty' :: Program -> Result String
+pretty' = Right . pretty
 
 show' :: Show a => a -> Result String
 show' = Right . show
@@ -94,18 +98,21 @@ execSpans = parseSpans
 execCheck :: (Text, Text) -> Either Error CompType
 execCheck = parseNoSpans >=> \x -> case typeCheck x of
   Left a -> Left $ TypeError a
-  Right env -> case getMain env of
+  Right (env, _) -> case getMain env of
     TypeScheme _ _ t -> Right t
-    -- scheme -> traceShow scheme $ Left $ TypeError "main cannot have type variables"
+
+execExplicit :: (Text, Text) -> Either Error String
+execExplicit = parseNoSpans >=> typeCheck' >=> makeElabExplicit' >=> pretty'
 
 execRun :: (Text, Text) -> Either Error Value
-execRun = parseNoSpans >=> typeCheck' >=> eval'
+execRun = parseNoSpans >=> typeCheck' >=> makeElabExplicit' >=> eval'
 
 cmd :: String -> (Text, Text) -> Either Error String
 cmd "parse" = execParse >=> show'
 cmd "spans" = execSpans >=> pShow'
 cmd "check" = execCheck >=> show'
 cmd "run" = execRun >=> show'
+cmd "explicit" = execExplicit
 cmd _ = error "unrecognized command"
 
 pack' :: (String, String) -> (Text, Text)

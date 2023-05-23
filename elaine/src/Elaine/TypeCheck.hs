@@ -13,11 +13,12 @@ import Control.Monad.Except (ExceptT, MonadError (throwError), runExceptT, withE
 import Control.Monad.State
   ( MonadState (get, put),
     State,
-    evalState,
-    (<=<),
+    runState,
+    (<=<)
   )
+import Data.Char (isLower)
 import Data.Foldable (foldlM)
-import Data.List (find, sortOn)
+import Data.List (find, sortOn, intercalate)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromJust)
@@ -30,21 +31,8 @@ import qualified Elaine.AST as AST
 import Elaine.Pretty (Pretty, pretty)
 import Elaine.Std (stdTypes)
 import Elaine.TypeVar (TypeVar (ExplicitVar, ImplicitVar))
-import Elaine.Types (Arrow (Arrow), CompType (CompType), Effect (Effect), Row (..), TypeScheme (TypeScheme, effectVars, typ, typeVars), ValType (TypeArrow, TypeBool, TypeElaboration, TypeHandler, TypeInt, TypeString, TypeUnit, TypeV), rowEmpty, rowIsEmpty, rowOpen, rowVar, rowMaybe, rowUpdate)
+import Elaine.Types (Arrow (Arrow), CompType (CompType), Effect (Effect), Row (..), TypeScheme (TypeScheme, effectVars, typ, typeVars), ValType (TypeArrow, TypeBool, TypeElaboration, TypeHandler, TypeInt, TypeName, TypeString, TypeUnit, TypeV), rowEmpty, rowIsEmpty, rowMaybe, rowOpen, rowUpdate, rowVar)
 import Prelude hiding (pure)
-import Data.Char (isLower)
-import Elaine.Types (ValType(TypeName))
-
-type Infer = ExceptT String (State (Int, Substitutions))
-
-addStackTrace :: String -> Infer a -> Infer a
-addStackTrace s =
-  withExceptT
-    ( ++
-        "\n"
-          ++ "while "
-          ++ s
-    )
 
 -- TypeVar to Type
 data Substitutions = Substitutions
@@ -64,6 +52,23 @@ data TypeEnv = TypeEnv
   deriving (Show)
 
 makeLenses ''TypeEnv
+
+type Infer = ExceptT String (State CheckState)
+
+addStackTrace :: String -> Infer a -> Infer a
+addStackTrace s =
+  withExceptT
+    ( ++
+        "\n"
+          ++ "while "
+          ++ s
+    )
+
+data CheckState = CheckState
+  { stateCounter :: Int,
+    stateSubs :: Substitutions,
+    stateElabs :: Map Int [Ident]
+  }
 
 -- A version of lookup/! that uses the Infer monad in case of an error
 get' :: Map String b -> String -> Infer b
@@ -174,8 +179,9 @@ freeEffectVars env t = allEffectVars t Set.\\ view bound env
 
 fresh :: Infer TypeVar
 fresh = do
-  (i, subs) <- get
-  put (i + 1, subs)
+  s <- get
+  let i = stateCounter s
+  put (s {stateCounter = i + 1})
   return $ ImplicitVar i
 
 freshV :: Infer ValType
@@ -189,21 +195,25 @@ freshC = CompType <$> freshR <*> freshV
 
 subM :: Substitutable a => a -> Infer a
 subM a = do
-  (_, subs) <- get
-  return $ sub subs a
+  s <- get
+  return $ sub (stateSubs s) a
 
 emptySubs :: Substitutions
 emptySubs = Substitutions Map.empty Map.empty
 
 addTypeSub :: ValType -> ValType -> Infer ()
 addTypeSub k v = do
-  (i, subs) <- get
-  put (i, updateSubs $ subs {subTypeVars = Map.insert k v (subTypeVars subs)})
+  s <- get
+  let subs = stateSubs s
+  let newSubs = updateSubs $ subs {subTypeVars = Map.insert k v (subTypeVars subs)}
+  put $ s {stateSubs = newSubs}
 
 addEffectSub :: TypeVar -> Row -> Infer ()
 addEffectSub k v = do
-  (i, subs) <- get
-  put (i, updateSubs $ subs {subEffectVars = Map.insert k v (subEffectVars subs)})
+  s <- get
+  let subs = stateSubs s
+  let newSubs = updateSubs $ subs {subEffectVars = Map.insert k v (subEffectVars subs)}
+  put $ s {stateSubs = newSubs}
 
 updateSubs :: Substitutions -> Substitutions
 updateSubs subs =
@@ -212,10 +222,18 @@ updateSubs subs =
       subEffectVars = Map.map (sub subs) (subEffectVars subs)
     }
 
-runInfer :: Infer a -> Either String a
-runInfer a = evalState (runExceptT a) (0, emptySubs)
+addExplicitElab :: Int -> [Ident] -> Infer ()
+addExplicitElab i e = do
+  s <- get
+  let elabs = stateElabs s
+  put $ s {stateElabs = Map.insert i e elabs}
 
-typeCheck :: [Declaration] -> Either String TypeEnv
+runInfer :: Infer a -> Either String (a, CheckState)
+runInfer a = case runState (runExceptT a) (CheckState 0 emptySubs Map.empty) of
+  (Left x, _) -> Left x
+  (Right x, y) -> Right (x, y)
+
+typeCheck :: [Declaration] -> Either String (TypeEnv, CheckState)
 typeCheck decs = runInfer $ do
   (env, _) <- typeCheckMod (initialEnv stdTypes) decs
 
@@ -384,7 +402,13 @@ unify a b = addStackTrace ("unifying" ++ show a ++ show b) do
     unifyV _ _ = throwError "Failed to unify: type error"
 
 unifyRows :: Row -> Row -> Infer ()
-unifyRows a@(Row effsA maybeExA) b@(Row effsB maybeExB)
+unifyRows a b = do
+  a' <- subM a
+  b' <- subM b
+  unifyRows' a' b'
+
+unifyRows' :: Row -> Row -> Infer ()
+unifyRows' a@(Row effsA maybeExA) b@(Row effsB maybeExB)
   -- Short circuit on equality: nothing left to unify
   | a == b = return ()
   -- We have to check for the existence of extend variables
@@ -451,10 +475,10 @@ instance Inferable Expr where
       App f args -> do
         tf <- infer env f
         tArgs <- inferMany env args
-        tRet <- freshC
-        row <- freshR
-        () <- forM_ (map getRow tArgs) (unifyRows row)
-        () <- unify tf (CompType row (TypeArrow $ Arrow (map emptyEff tArgs) tRet))
+        tRet@(CompType row _) <- freshC
+        () <- mapM_ (unifyRows row . getRow) tArgs
+        row' <- subM row
+        () <- unify tf (CompType row' (TypeArrow $ Arrow (map emptyEff tArgs) tRet))
         openRow <=< subM $ tRet
         where
           getRow (CompType r _) = r
@@ -502,6 +526,30 @@ instance Inferable Expr where
           Nothing -> return ()
 
         subM $ CompType (Row expandEffs (Just rVar)) vt2
+      ImplicitElab i e1 -> do
+        CompType row vt1 <- infer env e1
+        let Row effs extend = row
+        let (hEffs, aEffs) = MS.partition (\(Effect path _) -> last (last path) == '!') effs
+        elabs <- mapM findElab (MS.toList hEffs)
+        let elabIdents = map fst elabs
+        () <- addExplicitElab i elabIdents
+        let elabRow = foldr rowUpdate rowEmpty (map snd elabs)
+
+        let row' = rowUpdate elabRow (Row aEffs extend)
+        return $ CompType row' vt1
+        where
+          findElab (Effect path _) = case findMaybe (f path) (Map.toList (view vars env)) of
+            Just (x, e) -> return (x, e)
+            Nothing -> throwError $ "Could not find elaboration for: " ++ intercalate "::" path
+          
+          f path1 (x, TypeScheme _ _ (CompType _ (TypeElaboration (Effect path2 _) row))) | path1 == path2 = Just (x, row)
+          f _ _ = Nothing
+
+          findMaybe _ [] = Nothing
+          findMaybe g (x:xs) = case g x of
+            Just a -> Just a
+            Nothing -> findMaybe g xs
+
       x -> error $ "Not implemented: " ++ show x
 
 extractVal :: CompType -> ValType
@@ -630,7 +678,7 @@ instance Inferable Value where
       -- TODO: the name must be resolved to the full path to the effect to avoid conflicts
       eff@(Effect _ sigs) <- case maybeEffect of
         Just a -> return a
-        Nothing -> throwError "could not match handler with an effect"
+        Nothing -> throwError "could not match elaboration with an effect"
 
       -- Match up the clauses and signatures
       let clauses' = sortOn (\(OperationClause x _ _) -> x) clauses

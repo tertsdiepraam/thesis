@@ -232,8 +232,7 @@ subst1 (x, new) = \case
           )
   Val (Data y i args) -> Val $ Data y i (map f args)
   Val y -> Val y
-  -- x' -> error ("Could not substitute" ++ show x')
-  ImplicitElab _ -> error "Implicit elab should have been made explicit"
+  ImplicitElab _ _ -> error "Implicit elab should have been made explicit"
   where
     f = subst1 (x, new)
     subFun (Function params ret body) =

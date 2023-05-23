@@ -6,7 +6,7 @@ import Data.Either (isLeft)
 import Data.Text (pack)
 import qualified Data.Map as Map
 import Elaine.Types
-import Elaine.ElabTransform (elabTrans)
+import Elaine.Transform (elabToHandle)
 import Elaine.Exec (Result, exec, execCheck, isTypeError, pack')
 import Elaine.Parse (ParseResult, parseExpr, parseProgram)
 import Elaine.Pretty (pretty)
@@ -26,6 +26,7 @@ import Test.Hspec.Runner (SpecResult (specResultSuccess))
 import Text.RawString.QQ (r)
 import Prelude hiding (pure)
 import Data.Text.Internal.Read (IParser(P))
+import Data.Bifunctor (second)
 
 check :: String -> Result CompType
 check = execCheck . pack' . (,) "test"
@@ -844,8 +845,21 @@ testTypeCheck = describe "typeCheck" $ do
       let main = handle[hf] foo();
     |] `shouldSatisfy` isTypeError
 
+  it "can figure out implicit elab for one elaboration" $ do
+    check [r|
+      effect Foo! {
+        foo!() Int
+      }
+
+      let ef = elaboration Foo! -> <> {
+        foo!() { 5 }
+      };
+
+      let main = elab foo!();
+    |] `shouldBe` Right (pure TypeInt)
+
 testUnifyRows :: SpecWith ()
 testUnifyRows = describe "unifyRows" $ do
   it "should unify rows with the same effects" $ do
     let res = runInfer $ unifyRows (rowOpen [Effect ["Foo"] Map.empty] (ExplicitVar "1")) (rowOpen [Effect ["Foo"] Map.empty] (ExplicitVar "e2"))
-    res `shouldBe` Right ()
+    second fst res `shouldBe` Right ()

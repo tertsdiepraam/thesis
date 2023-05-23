@@ -34,7 +34,7 @@ library
                     Elaine.Types,
                     Elaine.Eval,
                     Elaine.Exec,
-                    Elaine.ElabTransform,
+                    Elaine.Transform,
                     Elaine.Std
   hs-source-dirs:   src
   build-depends:    base ^>=4.16.3.0,

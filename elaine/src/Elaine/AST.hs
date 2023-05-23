@@ -50,7 +50,8 @@ data Expr
   | If Expr Expr Expr
   | Handle Expr Expr
   | Match Expr [MatchArm]
-  | ImplicitElab Expr
+  -- The integer is mapped to a unique identifier while type checking
+  | ImplicitElab Int Expr
   | Elab Expr Expr
   | Var Ident
   | Let Ident (Maybe ASTComputationType) Expr Expr

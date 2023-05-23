@@ -2,8 +2,9 @@ module Elaine.Pretty where
 
 import Data.List (intercalate)
 import Elaine.AST
-import qualified Data.MultiSet as MultiSet
 import Elaine.TypeVar (TypeVar (ExplicitVar, ImplicitVar))
+import qualified Elaine.Types as Types
+import qualified Data.MultiSet as MS
 
 -- Special typeclass for pretty printing the code
 class Pretty a where
@@ -33,7 +34,7 @@ instance Pretty Declaration where
 instance Pretty DeclarationType where
   pretty (Use s) = "use " ++ s ++ ";"
   pretty (Module x decs) = "mod " ++ x ++ concatBlock decs
-  pretty (DecLet name t expr) = "let " ++ name ++ optionalType t ++ " = " ++ pretty expr
+  pretty (DecLet name t expr) = "let " ++ name ++ optionalType t ++ " = " ++ pretty expr ++ ";"
   pretty (DecType name constructors) =
     "type " ++ name ++ " " ++ concatBlock constructors
   pretty (DecEffect name operations) =
@@ -47,14 +48,14 @@ instance Pretty Function where
   pretty (Function params ret do') = parens (map pParam params) ++ maybe "_" pretty ret ++ " " ++ pBlock (pretty do')
 
 instance Pretty Expr where
-  pretty (Let x t e1 e2) = "let " ++ x ++ optionalType t ++ " = " ++ pretty e1 ++ "\n" ++ pretty e2
+  pretty (Let x t e1 e2) = "let " ++ x ++ optionalType t ++ " = " ++ pretty e1 ++ ";\n" ++ pretty e2
   pretty (If c e1 e2) = "if " ++ pretty c ++ " then " ++ pBlock (pretty e1) ++ " else " ++ pBlock (pretty e2)
   pretty (App name params) = pretty name ++ "(" ++ intercalate ", " (map pretty params) ++ ")"
   -- pretty (Handle handler computation) = "handle " ++ pretty handler ++ " " ++ pretty computation
-  pretty (Handle _ computation) = "handle ... " ++ pretty computation
+  pretty (Handle h computation) = "handle[" ++ pretty h ++ "]" ++ pretty computation
   -- pretty (Elab e computation) = "elab[" ++ pretty e ++ "] " ++ pretty computation
-  pretty (Elab _ computation) = "elab[...] " ++ pretty computation
-  pretty (ImplicitElab e) = "elab " ++ pretty e
+  pretty (Elab e computation) = "elab[" ++ pretty e ++ "] " ++ pretty computation
+  pretty (ImplicitElab _ e) = "elab " ++ pretty e
   pretty (Match e arms) = "match " ++ pretty e ++ " " ++ concatBlock arms
   pretty (Var var) = var
   pretty (Val v) = pretty v
@@ -94,7 +95,7 @@ instance Pretty OperationClause where
 instance Pretty ASTComputationType where
   -- In the case where we have a function type and effects, we need to disambiguate that the effects belong
   -- outside the function with parentheses
-  pretty (ASTComputationType valueType effs) = pretty effs ++ " " ++ pretty valueType
+  pretty (ASTComputationType effs valueType) = pretty effs ++ " " ++ pretty valueType
 
 instance Pretty Row where
   pretty row = "<" ++ prettyRow row ++ ">"
@@ -110,5 +111,9 @@ instance Pretty ASTValueType where
   pretty (TypeName a) = a
   pretty (TypeArrow args ret) = "(" ++ intercalate ", " (map show args) ++ ") -> " ++ show ret
 
+instance Pretty Types.Row where
+  pretty (Types.Row effs ext) = "<" ++ intercalate ", " (map (intercalate "::" . p) (MS.toList effs)) ++ maybe "" (("|" ++) . pretty) ext ++ ">"
+    where 
+      p (Types.Effect path _) = path
 indent :: String -> String
 indent s = concatMap (\s' -> "  " ++ s' ++ "\n") $ lines s

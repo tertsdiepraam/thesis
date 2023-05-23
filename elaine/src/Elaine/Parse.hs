@@ -301,7 +301,11 @@ elab = do
   elaborationExpr <- optional (brackets expr)
   case elaborationExpr of
     Just a -> Elab a <$> expr
-    Nothing -> ImplicitElab <$> expr
+    Nothing -> do
+      -- Implicit elabs need a unique identifier for the transformation
+      -- The offset is unique, so might as well use that.
+      off <- getOffset
+      ImplicitElab off <$> expr
 
 match' :: Parser Expr
 match' = do
