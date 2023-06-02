@@ -1,0 +1,26 @@
+effect Logic {
+    or() Bool
+    fail() a
+}
+
+effect HLogic! {
+    once!(a) a
+}
+
+# Pffft I need lists too, preferably with some syntactic sugar
+let hLogic = handle {
+    return(x) { [x] }
+    or() {
+        let a = resume(true);
+        let b = resume(false);
+        concat(a, b)
+    }
+    fail() { [] }
+}
+
+let eLogic = elaboration <Logic!> -> <Logic> {
+    once!(x) {
+        let h = handle[hLogic] x;
+        head(h)
+    }
+}
