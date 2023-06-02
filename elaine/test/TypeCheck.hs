@@ -629,7 +629,7 @@ testTypeCheck = describe "typeCheck" $ do
         f(2)
       };
 
-      let main = applyTo2(foo);
+      let main = applyTo2(addFoo);
     |]
       `shouldSatisfy` isTypeError
 
@@ -654,7 +654,7 @@ testTypeCheck = describe "typeCheck" $ do
         foo() { resume(5) }
       };
 
-      let main = handle[hf] applyTo2(foo);
+      let main = handle[hf] applyTo2(addFoo);
     |]
       `shouldBe` Right (pure TypeInt)
   
@@ -858,6 +858,17 @@ testTypeCheck = describe "typeCheck" $ do
 
       let main = elab foo!();
     |] `shouldBe` Right (pure TypeInt)
+
+  it "number of function arguments should match" $ do
+    check [r|
+      let id = fn(x) { x };
+
+      let call = fn(f: fn() a) a {
+          f()
+      };
+
+      let main = call(id);
+    |] `shouldSatisfy` isTypeError
 
 testUnifyRows :: SpecWith ()
 testUnifyRows = describe "unifyRows" $ do

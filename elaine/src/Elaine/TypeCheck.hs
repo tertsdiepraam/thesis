@@ -14,22 +14,23 @@ import Control.Monad.State
   ( MonadState (get, put),
     State,
     runState,
-    (<=<)
+    (<=<),
   )
 import Data.Char (isLower)
 import Data.Foldable (foldlM)
-import Data.List (find, sortOn, intercalate)
+import Data.List (find, intercalate, sortOn)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromJust)
 import qualified Data.MultiSet as MS
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Debug.Trace (trace, traceShowId)
 import Elaine.AST (ASTValueType)
 import Elaine.AST hiding (ASTValueType (..), Row)
 import qualified Elaine.AST as AST
+import Elaine.Ident (Ident (Ident, idText), Location (LocBuiltIn, LocNone))
 import Elaine.Pretty (Pretty, pretty)
-import Elaine.Ident (Ident (idText, Ident), Location (LocNone, LocBuiltIn))
 import Elaine.Std (stdTypes)
 import Elaine.TypeVar (TypeVar (ExplicitVar, ImplicitVar))
 import Elaine.Types (Arrow (Arrow), CompType (CompType), Effect (Effect), Row (..), TypeScheme (TypeScheme, effectVars, typ, typeVars), ValType (TypeArrow, TypeBool, TypeElaboration, TypeHandler, TypeInt, TypeName, TypeString, TypeUnit, TypeV), rowEmpty, rowIsEmpty, rowMaybe, rowOpen, rowUpdate, rowVar)
@@ -65,13 +66,13 @@ addStackTrace s =
           ++ s
     )
 
-data Metadata = Metadata {
-  definitions :: [(Ident, Ident)],
-  elabs :: Map Int [Ident]
-  -- types :: [(Ident, TypeScheme)],
-  -- handlers :: [(Ident, Ident)],
-  -- elaborations :: [(Ident, Ident)]
-}
+data Metadata = Metadata
+  { definitions :: [(Ident, Ident)],
+    elabs :: Map Int [Ident]
+    -- types :: [(Ident, TypeScheme)],
+    -- handlers :: [(Ident, Ident)],
+    -- elaborations :: [(Ident, Ident)]
+  }
   deriving (Show)
 
 metaEmpty :: Metadata
@@ -91,15 +92,17 @@ recordMeta f = do
   s <- get
   let meta = stateMetadata s
   let meta' = f meta
-  put $ s { stateMetadata = meta' }
+  put $ s {stateMetadata = meta'}
 
 recordMetaDefinition :: Ident -> Ident -> Infer ()
 recordMetaDefinition x y = recordMeta f
-  where f meta = meta { definitions = (x,y):definitions meta }
+  where
+    f meta = meta {definitions = (x, y) : definitions meta}
 
 recordMetaElab :: Int -> [Ident] -> Infer ()
 recordMetaElab x y = recordMeta f
-  where f meta = meta { elabs = Map.insert x y $ elabs meta }
+  where
+    f meta = meta {elabs = Map.insert x y $ elabs meta}
 
 -- A version of lookup/! that uses the Infer monad in case of an error
 -- It also returns the key, because with identifiers a lookup might succeed
@@ -411,10 +414,17 @@ instance Substitutable Row where
     Nothing -> row
 
 unify :: CompType -> CompType -> Infer ()
-unify a b = addStackTrace ("unifying" ++ show a ++ show b) do
-  a' <- subM a
-  b' <- subM b
-  unify' a' b'
+unify a b = addStackTrace
+  ( "unifying "
+      ++ "\n    "
+      ++ pretty a
+      ++ "\n    "
+      ++ pretty b
+  )
+  do
+    a' <- subM a
+    b' <- subM b
+    unify' a' b'
   where
     unify' (CompType rowA typA) (CompType rowB typB) = do
       () <- unifyRows rowA rowB
@@ -428,6 +438,9 @@ unify a b = addStackTrace ("unifying" ++ show a ++ show b) do
     unifyV v@(TypeV _) t = addTypeSub v t
     unifyV t v@(TypeV _) = addTypeSub v t
     unifyV (TypeArrow (Arrow args1 ret1)) (TypeArrow (Arrow args2 ret2)) = do
+      () <-
+        when (length args1 /= length args2) $
+          throwError "function does not have the right number of arguments"
       () <- mapM_ (uncurry unify) (zip args1 args2)
       unify ret1 ret2
     unifyV (TypeHandler name1 from1 to1) (TypeHandler name2 from2 to2) = do
@@ -482,7 +495,7 @@ unifyRows' a@(Row effsA maybeExA) b@(Row effsB maybeExB)
         return ()
       _ -> throwError err
   where
-    err = "Cannot unify rows: " ++ show a ++ " and " ++ show b
+    err = "Cannot unify rows: " ++ pretty a ++ " and " ++ pretty b
 
 class Pretty a => Inferable a where
   infer :: TypeEnv -> a -> Infer CompType
@@ -579,28 +592,27 @@ instance Inferable Expr where
           findElab (Effect path _) = case findMaybe (f path) (Map.toList (view vars env)) of
             Just (x, e) -> return (x, e)
             Nothing -> throwError $ "Could not find elaboration for: " ++ intercalate "::" (map pretty path)
-          
+
           f path1 (x, TypeScheme _ _ (CompType _ (TypeElaboration (Effect path2 _) row))) | path1 == path2 = Just (x, row)
           f _ _ = Nothing
 
           findMaybe _ [] = Nothing
-          findMaybe g (x:xs) = case g x of
+          findMaybe g (x : xs) = case g x of
             Just a -> Just a
             Nothing -> findMaybe g xs
-
       x -> error $ "Not implemented: " ++ show x
 
 extractVal :: CompType -> ValType
 extractVal (CompType _ v) = v
 
-typeOrFresh :: TypeEnv -> Maybe ASTComputationType -> Infer CompType
-typeOrFresh _ Nothing = freshC
-typeOrFresh env (Just t) = resolveCompType env t
+typeOrEmpty :: TypeEnv -> Maybe ASTComputationType -> Infer CompType
+typeOrEmpty _ Nothing = CompType rowEmpty <$> freshV
+typeOrEmpty env (Just t) = resolveCompType env t
 
 -- Force a type to another type
 -- Essentially a one-way unify where we force the first argument to the second
 force :: CompType -> CompType -> Infer ()
-force a b = addStackTrace ("forcing " ++ show a ++ " to " ++ show b) do
+force a b = addStackTrace ("forcing " ++ pretty a ++ " to " ++ pretty b) do
   CompType rowA valueA <- subM a
   CompType rowB valueB <- subM b
   () <- forceRow rowA rowB
@@ -627,12 +639,15 @@ forceRow a@(Row effsA maybeExA) b@(Row effsB maybeExB) = case (maybeExA, maybeEx
       else throwError err
       --
   where
-    err = "Cannot force rows: " ++ show a ++ " to " ++ show b
+    err = "Cannot force rows: " ++ pretty a ++ " to " ++ pretty b
 
 forceValue :: ValType -> ValType -> Infer ()
 forceValue a b | a == b = return ()
 forceValue v@(TypeV _) b = addTypeSub v b
 forceValue (TypeArrow (Arrow args1 ret1)) (TypeArrow (Arrow args2 ret2)) = do
+  () <-
+    when (length args1 /= length args2) $
+      throwError "function does not have the right number of arguments"
   () <- mapM_ (uncurry force) (zip args1 args2)
   force ret1 ret2
 forceValue (TypeHandler name1 from1 to1) (TypeHandler name2 from2 to2) = do
@@ -640,7 +655,7 @@ forceValue (TypeHandler name1 from1 to1) (TypeHandler name2 from2 to2) = do
   () <- forceValue (TypeV from1) (TypeV from2)
   () <- forceValue to1 to2
   return ()
-forceValue a b = throwError $ "Failed to force: " ++ show a ++ " to " ++ show b
+forceValue a b = throwError $ "Failed to force: " ++ pretty a ++ " to " ++ pretty b
 
 inferMany :: Inferable a => TypeEnv -> [a] -> Infer [CompType]
 inferMany env = mapM (infer env)
@@ -661,7 +676,7 @@ instance Inferable Value where
       let (argNames, argTypes) = unzip args
 
       -- Extract types for arguments or give them a fresh type var
-      tArgs <- mapM (typeOrFresh env) argTypes
+      tArgs <- mapM (typeOrEmpty env) argTypes
       tRet <- mapM (resolveCompType env) ret
 
       inferFunctionLike env argNames tArgs tRet body
@@ -676,21 +691,20 @@ instance Inferable Value where
       -- TODO: honor type declarations
       from <- fresh
       let fromV = TypeV from
-      to <- freshV
 
       (x, body) <- case ret of
         Function [(x, Nothing)] Nothing body -> return (x, body)
         _ -> throwError "return case cannot have type annotations"
 
-      toInferred <- infer (insertVar x (TypeScheme [] [] $ CompType rowEmpty fromV) env) body
+      CompType toRow to <- infer (insertVar x (TypeScheme [] [] $ CompType rowEmpty fromV) env) body
 
-      () <- unify toInferred (CompType rowEmpty to)
-      to' <- subM to
-      let toC' = CompType rowEmpty to'
+      () <- forceRow toRow rowEmpty
+      let toC' = CompType rowEmpty to
+      let !_ = trace ("from " ++ pretty from ++ ", " ++ "to " ++ pretty to) ()
 
       () <-
         mapM_
-          ( \(OperationClause cName args body') -> do
+          ( \op@(OperationClause cName args body') -> addStackTrace ("inferring " ++ pretty op) do
               let Arrow sigArgs sigRet = signatures Map.! cName
                   env' =
                     insertVar
@@ -701,12 +715,11 @@ instance Inferable Value where
           )
           clauses
 
-      to'' <- subM to'
       fromV' <- subM fromV
       let from' = case fromV' of
             TypeV v -> v
             _ -> error "handler must be generic"
-      pure $ TypeHandler eff from' to''
+      pure $ TypeHandler eff from' to
       where
         clauseNames = map (\(OperationClause x _ _) -> x) clauses
         matchesClauses (Effect _ signatures) = Set.fromList clauseNames == Set.fromList (Map.keys signatures)
@@ -722,7 +735,6 @@ instance Inferable Value where
       let clauses' = sortOn (\(OperationClause x _ _) -> x) clauses
       let sigs' = sortOn fst (Map.toList sigs)
 
-      -- FIXME: This row should be used for the clauses too
       row' <- resolveRow env row
       () <-
         mapM_
@@ -744,6 +756,10 @@ inferFunctionLike env argNames argTypes tRet body = do
 
   -- Argument must be used
   let argSchemes = map (TypeScheme [] []) argTypes
+
+  () <-
+    when (length argNames /= length argSchemes) $
+      throwError "function does not have the right number of arguments"
 
   -- The body needs the variables and the bound type vars
   let bodyEnv = addTypeVars typeVars $ extendVars (zip argNames argSchemes) env

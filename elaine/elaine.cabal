@@ -27,6 +27,7 @@ common warnings
 library
   import:           warnings, extensions
   exposed-modules:  Elaine.AST,
+                    Elaine.Ident,
                     Elaine.TypeVar,
                     Elaine.Parse,
                     Elaine.TypeCheck,

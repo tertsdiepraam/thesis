@@ -5,6 +5,8 @@ import qualified Data.MultiSet as MS
 import Elaine.AST
 import Elaine.Ident (Ident (Ident))
 import Elaine.TypeVar (TypeVar (ExplicitVar, ImplicitVar))
+import Elaine.Types (CompType (CompType))
+import qualified Elaine.Types as T
 import qualified Elaine.Types as Types
 
 -- Special typeclass for pretty printing the code
@@ -58,7 +60,7 @@ instance Pretty Expr where
   pretty (If c e1 e2) = "if " ++ pretty c ++ " then " ++ pBlock (pretty e1) ++ " else " ++ pBlock (pretty e2)
   pretty (App name params) = pretty name ++ "(" ++ intercalate ", " (map pretty params) ++ ")"
   -- pretty (Handle handler computation) = "handle " ++ pretty handler ++ " " ++ pretty computation
-  pretty (Handle h computation) = "handle[" ++ pretty h ++ "]" ++ pretty computation
+  pretty (Handle h computation) = "handle[" ++ pretty h ++ "] " ++ pretty computation
   -- pretty (Elab e computation) = "elab[" ++ pretty e ++ "] " ++ pretty computation
   pretty (Elab e computation) = "elab[" ++ pretty e ++ "] " ++ pretty computation
   pretty (ImplicitElab _ e) = "elab " ++ pretty e
@@ -120,13 +122,13 @@ instance Pretty Row where
           ++ maybe "" (("|" ++) . pretty) extend
 
 instance Pretty TypeVar where
-  pretty (ExplicitVar s) = show s
+  pretty (ExplicitVar s) = pretty s
   pretty (ImplicitVar i) = "#" ++ show i
 
 instance Pretty ASTValueType where
   pretty TypeUnit = "()"
   pretty (TypeName a) = pretty a
-  pretty (TypeArrow args ret) = "(" ++ intercalate ", " (map show args) ++ ") -> " ++ show ret
+  pretty (TypeArrow args ret) = "(" ++ intercalate ", " (map pretty args) ++ ") -> " ++ pretty ret
 
 instance Pretty Types.Row where
   pretty (Types.Row effs ext) = "<" ++ intercalate ", " (map (intercalate "::" . p) (MS.toList effs)) ++ maybe "" (("|" ++) . pretty) ext ++ ">"
@@ -135,3 +137,17 @@ instance Pretty Types.Row where
 
 indent :: String -> String
 indent s = concatMap (\s' -> "  " ++ s' ++ "\n") $ lines s
+
+instance Pretty CompType where
+  pretty (CompType r v) = pretty r ++ " " ++ pretty v
+
+instance Pretty T.ValType where
+  pretty T.TypeUnit = "()"
+  pretty T.TypeInt = "Int"
+  pretty T.TypeString = "String"
+  pretty T.TypeBool = "Bool"
+  pretty (T.TypeHandler _ _ _) = "handler"
+  pretty (T.TypeElaboration _ _) = "elaboration"
+  pretty (T.TypeV v) = pretty v
+  pretty (T.TypeName x) = pretty x
+  pretty (T.TypeArrow (T.Arrow args ret)) = "(" ++ intercalate ", " (map pretty args) ++ ") -> " ++ pretty ret

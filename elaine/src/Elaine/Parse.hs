@@ -22,10 +22,10 @@ import Text.Megaparsec
     option,
     optional,
     runParserT,
-    sepBy,
+    sepEndBy,
     (<|>),
   )
-import Text.Megaparsec.Char
+import Text.Megaparsec.Char ( char, space, space1, string )
 import qualified Text.Megaparsec.Char.Lexer as L
 import Prelude hiding (span)
 
@@ -191,7 +191,7 @@ handleReturn :: Parser Function
 handleReturn = try (keyword "return") >> function
 
 operationClause :: Parser OperationClause
-operationClause = OperationClause <$> ident <*> parens (ident `sepBy` comma) <*> exprBlock
+operationClause = OperationClause <$> ident <*> parens (ident `sepEndBy` comma) <*> exprBlock
 
 decEffect :: Parser DeclarationType
 decEffect = do
@@ -199,7 +199,7 @@ decEffect = do
   DecEffect name <$> braces (many operationSignature)
 
 operationSignature :: Parser OperationSignature
-operationSignature = OperationSignature <$> ident <*> parens (computationType `sepBy` comma) <*> computationType
+operationSignature = OperationSignature <$> ident <*> parens (computationType `sepEndBy` comma) <*> computationType
 
 decType :: Parser DeclarationType
 decType = do
@@ -207,10 +207,10 @@ decType = do
   DecType name <$> braces (many constructor)
 
 functionParams :: Parser [(Ident, Maybe ASTComputationType)]
-functionParams = parens (functionParam `sepBy` comma)
+functionParams = parens (functionParam `sepEndBy` comma)
 
 constructor :: Parser Constructor
-constructor = Constructor <$> ident <*> parens (computationType `sepBy` comma)
+constructor = Constructor <$> ident <*> parens (computationType `sepEndBy` comma)
 
 functionParam :: Parser (Ident, Maybe ASTComputationType)
 functionParam = do
@@ -231,12 +231,12 @@ valueType =
     <|> try (parens valueType)
 
 functionType :: Parser ASTValueType
-functionType = try (keyword "fn") >> TypeArrow <$> parens (computationType `sepBy` comma) <*> computationType
+functionType = try (keyword "fn") >> TypeArrow <$> parens (computationType `sepEndBy` comma) <*> computationType
 
 row :: Parser Row
 row =
   angles $ do
-    effects <- ident `sepBy` comma
+    effects <- ident `sepEndBy` comma
     extend <- optional (symbol "|" >> ident)
     return $ Row effects extend
 
@@ -245,7 +245,7 @@ data LetOrExpr = Let' Ident (Maybe ASTComputationType) Expr | Expr' Expr
 
 exprBlock :: Parser Expr
 exprBlock = do
-  exprs <- braces (letOrExpr `sepBy` semicolon)
+  exprs <- braces (letOrExpr `sepEndBy` semicolon)
   case foldr f Nothing exprs of
     Just a -> return a
     Nothing -> return $ Val Unit
@@ -270,7 +270,7 @@ expr = do
       <|> handler
       <|> elaboration
       <|> (Var <$> ident)
-  applications <- many (parens (expr `sepBy` comma))
+  applications <- many (parens (expr `sepEndBy` comma))
   return $ foldl App root applications
 
 value :: Parser Value
@@ -317,7 +317,7 @@ match' = do
 matchArm :: Parser MatchArm
 matchArm = do
   name <- ident
-  p <- parens (ident `sepBy` comma)
+  p <- parens (ident `sepEndBy` comma)
   e <- symbol "=>" >> expr
   return $ MatchArm (Pattern name p) e
 

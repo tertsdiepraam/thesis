@@ -1,21 +1,26 @@
-mod main {
-    type Maybe[a] {
-        Just(a)
-        Nothing()
-    }
-
-    effect !Abort {
-        abort(): a
-    }
-
-    # Question: What if the handler requires e.g. !State?
-    # TODO: Handler types
-    handler abort: a !Abort -> Maybe[a] {
-        return(x) {
-            Just(x)
-        }
-        abort(): a {
-            Nothing
-        }
-    }
+# This is an abort effect without a Maybe type
+# instead it provides a default value
+use std;
+effect Abort {
+    abort() a
 }
+
+let hAbort = fn(default) {
+    handler {
+        return(x) { x }
+        abort() { default }
+    }
+};
+
+let safe_div = fn(x, y) <Abort> Int {
+    if eq(y, 0) {
+        abort()
+    } else {
+        div(x, y)
+    }
+};
+
+let main = add(
+    handle[hAbort(0)] safe_div(3,0),
+    handle[hAbort(0)] safe_div(10, 2),
+);

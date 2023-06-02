@@ -116,12 +116,16 @@ execExplicit = parseNoSpans >=> typeCheck' >=> makeElabExplicit' >=> pretty'
 execRun :: (Text, Text) -> Either Error Value
 execRun = parseNoSpans >=> typeCheck' >=> makeElabExplicit' >=> eval'
 
+execRunUnchecked :: (Text, Text) -> Either Error Value
+execRunUnchecked = parseNoSpans >=> eval'
+
 cmd :: String -> (Text, Text) -> Either Error String
 cmd "parse" = execParse >=> show'
 cmd "pretty" = execPretty
 cmd "spans" = execSpans >=> pShow'
 cmd "check" = execCheck >=> show'
 cmd "run" = execRun >=> show'
+cmd "run-unchecked" = execRunUnchecked >=> show'
 cmd "explicit" = execExplicit
 cmd "metadata" = execCheckMetadata >=> pShow'
 cmd _ = error "unrecognized command"
