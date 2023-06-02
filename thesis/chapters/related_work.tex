@@ -1,0 +1,14 @@
+\chapter{Related Work}\label{chap:related_work}
+
+\begin{itemize}
+\item Koka
+\item Frank
+\item Eff
+\item etc.
+\end{itemize}
+
+In parallel with the work to define theoretical frameworks for effects, several libraries and languages have been designed that include effects as first-class concepts, allowing the programmer to define their own effects and handlers. For example, there are some libraries available for Haskell, like \lib{fused-effects}{https://github.com/fused-effects/fused-effects}, \lib{polysemy}{https://github.com/polysemy-research/polysemy}, \lib{freer-simple}{https://github.com/lexi-lambda/freer-simple} and \lib{eff}{https://github.com/hasura/eff}, each encoding effects in a slightly different way.
+
+Notable examples of languages with support for algebraic effects are Eff \autocite{bauer_programming_2015}, Koka \autocite{leijen_type_2017} and Frank \autocite{lindley_be_2017}. OCaml also gained support for effects \autocite{sivaramakrishnan_retrofitting_2021}. By building algebraic effects into the language, instead of delegating to a library, is advantageous because the language can provide more convenient syntax. In these languages, some concepts that were traditionally only available with explicit language support, can be expressed by the programmer via algebraic effects. This includes exception handling and asynchronous programming.
+
+\todo[inline]{Recognize advancements in algebraic effects beyond what is used here. E.g. named effects.}

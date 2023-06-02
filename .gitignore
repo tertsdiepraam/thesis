@@ -32,3 +32,4 @@ cabal.project.local~
 *.blg
 *.run.xml
 *.toc
+aux/

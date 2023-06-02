@@ -1,66 +1,17 @@
-\chapter{Introduction}
-\todo[inline]{This is currently mostly a short history of effects, not quite an introduction yet.}
+\chapter{Introduction}\label{chap:introduction}
 
-In an idealized perspective on computer science, computer programs are simple functions of their input, deterministically calculating their output. In practice, we find ourselves in a world full of impure programs; programs that interact that read from memory or the network, write to the terminal, access the file system and modify state. We call these interactions \emph{effects}. Speaking broadly, effects concern the aspects of the program besides the pure computation. \cite{moggi_computational_1989}
+In an idealized perspective on computation, programs and their subcomponents are \emph{pure} functions. They take some input and for every set of inputs they return the same output, without interacting with other parts of the program or with the system. There is a certain elegance to this view: pure programs are relatively easy to reason about and analyse.
 
-Any programming language that supports impure functionality needs to support effects somehow. The simplest approach is to give the programmer unrestricted access to a set of effectful operations. Effects are then fully opaque to the type system, but can be used freely. In C, for example, any memory location belonging to the program can be accessed at any time and any part of the program is allowed to access the file system, so long as the whole program has the right permissions to do so.
+However, in practice, many programs are \emph{impure}. These programs might interact with memory and the network, write to and read from the terminal. Additionally, programs might be clearer when they can be expressed with more complex control flow structures like exceptions and coroutines. We call these extensions on top of pure computation \emph{effects} \autocite{moggi_computational_1989}.
 
-In classic $\lambda$-calculus, there is no model for effects of the computation, only of the result. In their seminal paper, \textcite{moggi_computational_1989} unified monads with computational Effects. Functional programming languages often rely on monads to perform effectful computations. Haskell, for example, uses an \texttt{IO} monad for printing output and reading input. The computation is then kept pure and impure operations (like reading and printing) are delegated to the system. However, a limitation of treating effects as monads is that monads do not compose well.
+Some programming languages, such as C and many of the languages it inspired, have opted to give the programmer unrestriced access to effectful operations. In particular, any part of the program can access memory, the filesystem and even allowed to use \el{goto} to jump to other parts outside of regular control flow. This unrestricted use has famously been criticized by \textcite{dijkstra_letters_1968} and others. An open challenge in language design is then to design a language which allows for (limited) impure calculation, while retaining the attractive qualities of pure languages.
 
-\textcite{goos_adequacy_2001} showed that effects can be represented as equational theories. The effects that can be represented in this framework are called algebraic effects. The \texttt{State} and the \texttt{Maybe} monads can for example be expressed in this framework.
+A promising aproach to striking this balance is the framework of algebraic effects by \textcite{goos_adequacy_2001} and extended by \textcite{castagna_handlers_2009}. Here, algebraic effects are only allowed within \emph{handlers}, which have some, but still limited, control over the flow of the program via continuations. In recent years, some languages (e.g. Koka \autocite{leijen_type_2017}) have been created with support for algebraic effects. However, there are some common patterns of effects that cannot be represented as algebraic effects, namely higher-order effects, that is, effects whose operations that take effectful computations as arguments.
 
-Continuing their work, \textcite{castagna_handlers_2009} then introduced effect handlers, allowing the programmer to destruct effects by placing handlers around effectful expressions. This provides a way to treat exception handling using effects. However, the scope in which an effect is handled can only be changed by adding handlers. Effect operations cannot define their own scope. To support this, a system for higher-order effects is required, which are effects that take effectful operations as parameters.
+To overcome this limitation, \textcite{bach_poulsen_hefty_2023} have extended algebraic effects with \emph{hefty algebras}. They introduce \emph{elaborations} in addition to handlers, which can encode higher-order effects.
 
-A solution to this were scoped effects \cite{wu_effect_2014}. However, scoped effects require a significant increase in complexity and cannot express effects that are neither algebraic nor scoped, such as lambda abstractions \cite{oh_latent_2021}. Latent effects \cite{oh_latent_2021} were subsequently introduced as an alternative that encapsulates a larger set of effects.
+In this thesis, we build on the work by \textcite{bach_poulsen_hefty_2023}, applying the theory of hefty algebras as a first-class construct in a novel programming language called \emph{Elaine}. Like Koka and other languages with support for algebraic effects, Elaine supports handlers. In addition, elaborations and higher-order effects are also supported.
 
-As an alternative approach, \textcite{bach_poulsen_hefty_2023} introduced hefty algebras. With hefty algebras, higher-order effects are treated separately from algebraic effects. Higher-order effects are not handled, but elaborated into algebraic effects, which can then be handled. The advantage is that the treatment of algebraic effects remains intact and that the process of elaboration is relatively simple.
+We provide a novel reduction semantics and type system for a language with supporting elaborations. Furthermore, we introduce two transformations on Elaine programs. The first transformation is a type directed inference of elaborations, allowing the names of elaborations in use to be omitted. The second is a transformation from a program with higher-order effects and elaborations to a program with only algebraic effects. This transformation shows that elaborations can be added to existing languages and libraries for effects with relative ease.
 
-In parallel with the work to define theoretical frameworks for effects, several libraries and languages have been designed that include effects as first-class concepts, allowing the programmer to define their own effects and handlers. For example, there are some libraries available for Haskell, like \lib{fused-effects}{https://github.com/fused-effects/fused-effects}, \lib{polysemy}{https://github.com/polysemy-research/polysemy}, \lib{freer-simple}{https://github.com/lexi-lambda/freer-simple} and \lib{eff}{https://github.com/hasura/eff}, each encoding effects in a slightly different way.
-
-Notable examples of languages with support for algebraic effects are Eff \cite{bauer_programming_2015}, Koka \cite{leijen_type_2017} and Frank \cite{lindley_be_2017}. OCaml also gained support for effects \cite{sivaramakrishnan_retrofitting_2021}. By building algebraic effects into the language, instead of delegating to a library, is advantageous because the language can provide more convenient syntax. In these languages, some concepts that were traditionally only available with language support, can be expressed by the programmer. This includes exception handling and asynchronous programming.
-
-These languages either only support algebraic effects or scoped effects. This means that their support for higher-order effects is limited. The exception is \lib{heft}{https://github.com/heft-lang/heft}, which is produced in conjunction with the work in \cite{bach_poulsen_hefty_2023}.
-
-The aim of this thesis is to build on the work by \citeauthor{bach_poulsen_hefty_2023} and create a new language which
-
-\begin{itemize}
-    \item supports higher-order effects using hefty algebras, with separate elaborations and handlers,
-    \item implicitly resolves elaborations, and
-    \item can be compiled to a representation with only algebraic effects.
-\end{itemize}
-
-To this end, we need to show that the compilation of implicitly resolved effects is equivalent to the operational semantics for elaborations. By showing that elaborations can be removed at compile-time, we show that it is possible to compile programs in our language using the techniques from \cite{leijen_type_2017}.
-
-In addition, we provide an implementation of this language, which is published on GitHub under the name \lib{elaine}{https://github.com/tertsdiepraam/thesis/tree/main/elaine} (sharing a prefix with ``elaboration'') as part  of the repository that hosts this thesis.
-
-Throughout this thesis, the code examples will be given in \texttt{elaine}, a programming language designed and implemented as part of this thesis. This language supports both algebraic and higher-order effects, aspects which will be further explored in \cref{chap:alg,chap:elab}. In this chapter, we will explain the parts of \texttt{elaine} that are necessary to understand the rest of the thesis.
-
-The \texttt{elaine} language is based on the lambda calculus, with support for modules, bindings, branching and some basic data types. The following example demonstrates its basic features. The full syntax and semantics are detailed in \cref{apdx:spec}
-
-\begin{lstlisting}[style=fancy]
-mod math {
-    import std;
-    pub let double = fn(x) {
-        mul(2, x)
-    };
-    pub let abs = fn(x) {
-        if lt(x, 0) {
-            sub(0, x)
-        } else {
-            x
-        }
-    };
-}
-mod main {
-    import math;
-    let main = {
-        let x = -10;
-        let y = double(x);
-        abs(doubled)
-    };
-}
-\end{lstlisting}
-
-A module is declared with \lstinline{mod}, which takes a name and a block of declarations. Each declaration prefixed with \lstinline{pub} will be imported to other modules that reference this module. Modules cannot be nested. The built-in \lstinline{std} module defines a few basic functions for boolean, integer and string manipulation (e.g. \lstinline{mul}, \lstinline{lt} and \lstinline{minus}). Functions are defined anonymously with \lstinline{fn}, followed by a list of argument, a return type and a function body. Functions are called with parentheses.
-
-The entry point of the program is the \lstinline{main} binding in the \lstinline{main} module, which must be the last binding and last module, respectively. It is only possible to reference previously defined modules and bindings. Hence, regular recursion is not possible, though it is possible to achieve via the y-combinator.
+In addition, we provide a full implementation of this language\footnote{available at \url{https://github.com/tertsdiepraam/thesis/tree/main/elaine}}. This implementation includes a parser, type checker, pretty printer, type checker and the two transformations described in this thesis.

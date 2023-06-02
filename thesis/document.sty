@@ -1,4 +1,4 @@
-% !TeX root = thesis.tex
+% !TeX root = ./thesis.tex
 \ProvidesPackage{document}
 
 % Requirements
@@ -14,7 +14,7 @@
 \usepackage{xltxtra}
 \usepackage{fontspec}
 \usepackage{xunicode}
-\setmainfont{TeX Gyre Pagella}  % Palatino clone
+% \setmainfont{TeX Gyre Pagella}  % Palatino clone
 \setmonofont[
    Numbers =,
    Scale = 0.9,
@@ -34,7 +34,6 @@
 \usepackage{mathtools}
 \usepackage{physics}
 \usepackage{stmaryrd} % \llbracket, \rrbracket, \llparenthesis & \rrparenthesis
-\usepackage{cmap} % makes mathematical symbols searchable
 \usepackage{proof}
 
 % References
@@ -109,7 +108,9 @@
 \newcommandx{\question}[2][1=]{\todo[linecolor=yellow,backgroundcolor=yellow!25,bordercolor=yellow,#1]{#2}}
 \newcommandx{\change}[2][1=]{\todo[linecolor=blue,backgroundcolor=blue!25,bordercolor=blue,#1]{#2}}
 \newcommandx{\info}[2][1=]{\todo[linecolor=OliveGreen,backgroundcolor=OliveGreen!25,bordercolor=OliveGreen,#1]{#2}}
+\newcommandx{\reword}[1][1=]{\todo[linecolor=OliveGreen,backgroundcolor=OliveGreen!25,bordercolor=OliveGreen,#1]{reword}}
 \newcommandx{\improvement}[2][1=]{\todo[linecolor=Plum,backgroundcolor=Plum!25,bordercolor=Plum,#1]{#2}}
+\newcommandx{\citationneeded}[1][1=]{\scalebox{.5}{\todo[inline,linecolor=Plum,backgroundcolor=Plum!25,bordercolor=Plum,noinlinepar,inlinewidth=2.4cm,#1]{Citation needed}}}
 \newcommandx{\thiswillnotshow}[2][1=]{\todo[disable,#1]{#2}}
 \newcommand\fixme[1]{\textcolor{red}{#1}}
 
@@ -128,16 +129,9 @@
 % Bibliography
 \usepackage[
   backend=biber,
-  % style=authoryear
-  style=numeric
+  style=authoryear,
+  % style=numeric
 ]{biblatex}
-
-
-% Continuous counter
-\usepackage{xassoccnt}
-\DeclareCoupledCountersGroup{figtheoexadef}
-\DeclareCoupledCounters[name=figtheoexadef]{figure,table}
-
 
 % Table of Contents
 \setcounter{tocdepth}{1}
@@ -180,19 +174,22 @@
 
 \definecolor{background}{rgb}{0.96,0.97,0.98}
 \definecolor{gray}{rgb}{0.6,0.6,0.6}
+\definecolor{green}{rgb}{0.2,0.4,0.2}
 \definecolor{darkgray}{rgb}{0.4,0.4,0.4}
 \lstdefinelanguage{elaine}{
-    morekeywords={fn,let,handle,handler,elab,elaboration,true,false,effect,type,pub,mod,if,then,else,return}
+    morekeywords={fn,use,let,handle,handler,elab,elaboration,true,false,effect,type,pub,mod,if,then,else},
+    morecomment=[l]{\#},
+    morestring=[b]",
 }
 \lstset{
-    mathescape,,
+    mathescape,
     basicstyle=\ttfamily,
     keywordstyle=\bfseries\upshape,
+    commentstyle=\color{darkgray},
+    stringstyle=\color{green},
     columns=fullflexible,
-    literate={
-        {lambda}{\textbackslash}{1}
-    },
-    language=elaine
+    language=elaine,
+    showstringspaces=false,
 }
 \lstdefinestyle{fancy}{
     backgroundcolor=\color{background},
@@ -233,7 +230,7 @@
 \newcommand\handle{\kw{handle}}
 \newcommand\elab{\kw{elab}}
 
-\newcommand\cond[3]{\kw{if}\;#1\;\kw{then}\;#2\;\kw{else}\;#3}
+\newcommand\cond[3]{\kw{if}\;#1\;\{#2\}\;\kw{else}\;\{#3\}\;}
 \newcommand\lam[2]{\lambda #1\;.\;#2}
 
 \newcommand\step{\rightsquigarrow}
@@ -242,3 +239,5 @@
 \let\oldinfer\infer
 \renewcommand\infer[2]{\oldinfer{#1}{\begin{gathered}#2\end{gathered}}}
 \allowdisplaybreaks[1]
+
+\newcommand\el[1]{\lstinline[language=elaine]{#1}}

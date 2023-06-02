@@ -1,3 +1,4 @@
+\documentclass[twoside,a4paper,11pt]{memoir}
 % Fix: From https://tex.stackexchange.com/a/508995/108670
 \RequirePackage{snapshot}
 \makeatletter
@@ -12,17 +13,13 @@
 }
 \makeatother
 
-\documentclass[twoside,a4paper,11pt]{memoir}
 \usepackage{document}
 
 \addbibresource{bibliography.bib}
 
-% \input{preamble.tex}
 \input{chapters/metadata.tex}
 
 \begin{document}
-
-
 \frontmatter
 \thispagestyle{empty}
 \maketitle
@@ -35,13 +32,27 @@
 \cleardoublepage\mainmatter{}
 
 \include{chapters/introduction.tex}
-\chapter{Algebraic Effects}\label{chap:alg}
-\todo[inline]{Introduce algebraic effects, effect rows, and handlers.}
-\chapter{Higher-Order Effects}
-\chapter{Hefty Algebras}\label{chap:elab}
-\todo[inline]{Introduce higher-order effects, the composability problem, scoped effects, hefty algebras etc.}
+\include{chapters/background.tex}
+\include{chapters/related_work.tex}
+\include{chapters/basics.tex}
+
 \chapter{Elaboration Resolution}
-\chapter{Compiling Elaborations}
+
+\begin{itemize}
+\item How it works
+\item Why it works
+\end{itemize}
+
+\chapter{Compiling Elaborations to Handlers}
+
+\begin{itemize}
+\item How it works
+\item Why it works
+\item Preserves well-typedness
+\item Why syntactic substitution of elaborations with implementations does not work.
+\item Consequences for research on higher-order effects in general.
+\end{itemize}
+
 \chapter{Conclusion}
 
 \printbibliography

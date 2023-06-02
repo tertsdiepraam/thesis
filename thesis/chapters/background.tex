@@ -1,0 +1,36 @@
+\chapter{Background}\label{chap:background}
+
+While algebraic effects are a relatively new concept, the analysis of effectful computation and the representation of effects in programming language has a rich history. This history is relevant to this thesis because the various approaches to modelling effects proposed over time can be found in many popular programming languages. A comparison between these languages and languages with algebraic and higher-order effects hence requires comparison between theories. This chapter details this history.
+
+First, let us pose a simple question: why study effects? As \textcite{moggi_computational_1989} notes, analyzing only pure computation leaves out many aspects of programs, such as side-effects, non-determinism and non-termination. Proving either the presence or absence of these properties is very valuable. For example, a deterministic, side-effect-less computation can be reliably cached. Without side-effects, computation can also be executed out of order without any observable change in out. Hence, many sophisticated compilers rely on effect tracking to inform the optimizations they perform.\citationneeded A theory of effectful computation can therefore help compiler engineers prove the correctness of their transformations.\citationneeded Hence, a language with a strong formal model for effects is easier to compile or optimize than one without.
+
+In addition, support for effects in the type system of a programming language could allow programmers to write stricter and safer APIs. These fall into two categories: documenting\reword{} presence and requiring absence. Documenting presence gives library authors the ability to communicate via the type system what effects their functions require. This informs users of libraries about what those functions can do (e.g. accessing the network or being able to run without terminating). A library author might also want to communicate that a function should not contain certain effects. For example, a hash function is generally understood to be deterministic and effectless, however, this is often not guaranteed and prone to misuse.
+
+\section{Monads and Monad Transformers}
+
+The study of effects starts right at the two foundational theories of computation: $\lambda$-calculus and Turing machines. Their respective treatment of effects could not be more different. The former is only concered with pure computation, while the latter consists solely of effectful operations.
+
+In the $\lambda$-calculus, there is no model for effects of the computation, only of the result. \autocite{moggi_computational_1989} Hence, many observable properties of actual programs are ignored, such as non-determinism and side-effects. In their seminal paper, \textcite{moggi_computational_1989} unified monads with computational effects, which they initially called notions of computation. They introduced the $\lambda_c$-calculus, which provides a category theoretical framework for analysis of effectful programs.
+
+\todo[inline]{Good summary from Plotkin and Power 2001: Moggi introduced the idea of a general account of computational effects, proposing encapsulating them via monads $T : C \to C$; the main idea is that $T(x)$ is the type of computations of elements of $x$.}
+
+Monads are a common model for effectful computation in functional programming languages. Haskell, for example, has a rich ecosystem of monads. For side-effects, it features special monads such as the \el{IO} monad for printing output and reading input. The computation is then kept pure and impure operations (like reading and printing) are delegated to the system.
+
+A limitation of treating effects as monads is that monads do not compose well; the composition of two monads is not itself a monad. A solution to this are \emph{monad transformers} \autocite{moggi_abstract_1989}, which are functors over monads that add operations to a monad. A simple monad can then be obtained by applying a monad transformer to the \el{Identity} monad. The representation of a monad then becomes much like that of a list of monad transformers, with the \el{Identity} monad as \el{Nil} value. This ``list" of transformers is ordered. For example, using the terminology from Haskell's \el{mtl} library, the monad \el{StateT a (ReaderT b Identity)} is distinct from \el{ReaderT b (StateT a Identity)}. The order of the monad transformers also determines the order in which they must be handled: the outermost monad transformer must be handled first.
+
+In practice, this model has turned out to work quite well, especially in combination with \el{do}-notation, which makes working with monads easier.
+
+\section{Algebraic Effects}\label{sec:alg}
+\todo[inline]{Introduce algebraic effects, effect rows, and handlers.}
+
+\textcite{goos_adequacy_2001} showed that effects can be represented as equational theories. The effects that can be represented in this framework are called algebraic effects. The \el{State} and the \el{Maybe} monads can for example be expressed in this framework.
+
+Continuing their work, \textcite{castagna_handlers_2009} then introduced effect handlers, allowing the programmer to destruct effects by placing handlers around effectful expressions. This provides a way to treat exception handling using effects. However, the scope in which an effect is handled can only be changed by adding handlers. Effect operations cannot define their own scope. To support this, a system for higher-order effects is required, which are effects that take effectful operations as parameters.
+
+\section{Higher-Order Effects}\label{sec:elab}
+\todo[inline]{Introduce higher-order effects, the composability problem, scoped effects, hefty algebras etc.}
+
+A solution to this were scoped effects \autocite{wu_effect_2014}. However, scoped effects require a significant increase in complexity and cannot express effects that are neither algebraic nor scoped, such as lambda abstractions \autocite{oh_latent_2021}. Latent effects \autocite{oh_latent_2021} were subsequently introduced as an alternative that encapsulates a larger set of effects.
+
+As an alternative approach, \textcite{bach_poulsen_hefty_2023} introduced hefty algebras. With hefty algebras, higher-order effects are treated separately from algebraic effects. Higher-order effects are not handled, but elaborated into algebraic effects, which can then be handled. The advantage is that the treatment of algebraic effects remains intact and that the process of elaboration is relatively simple.
+
