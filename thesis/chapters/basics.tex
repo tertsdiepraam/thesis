@@ -35,7 +35,7 @@ let main = {
 };
 \end{lstlisting}
     
-A module is declared with \lstinline{mod}, which takes a name and a block of declarations. Each declaration prefixed with \lstinline{pub} will be imported to other modules that reference this module. Modules cannot be nested. The built-in \lstinline{std} module defines a few basic functions for boolean, integer and string manipulation (e.g. \lstinline{mul}, \lstinline{lt} and \lstinline{minus}). Functions are defined anonymously with \lstinline{fn}, followed by a list of argument, a return type and a function body. Functions are called with parentheses.
+A module is declared with \el{mod}, which takes a name and a block of declarations. Each declaration prefixed with \el{pub} will be imported to other modules that reference this module. Modules cannot be nested. The built-in \el{std} module defines a few basic functions for boolean, integer and string manipulation (e.g. \el{mul}, \el{lt} and \el{sub}). Functions are defined anonymously with \el{fn}, followed by a list of argument, a return type and a function body. Functions are called with parentheses.
 
 The design of Elaine is similar to Koka, with syntactical elements inspired by Rust. Apart from the elaborations and handlers, none of the language constructs should be particularly surprising: it has let bindings, if-else expressions, first-class functions, booleans, integers and strings. Below is a small sample program that prints whether the square of 4 is even or odd. For the full specification, we refer to \todo{add ref}.
 
@@ -102,6 +102,8 @@ effect State {
 \end{lstlisting}
 
 \subsection{Effect Rows}
+
+\todo[inline]{Contextual vs parametric effect rows (see effects as capabilities paper). The paper fails to really connect the two: contextual is just parametric with implicit variables. However, it might be more convenient. The main difference is in the interpretation of purity (real vs contextual). In general, I'd like to have a full section on effect row semantics. In the capabilities paper effect rows are sets, which makes it possible to do stuff like \autocite{leijen_extensible_2005}.}
 
 In Elaine, each type has an \emph{effect row}. In the previous examples, this effect row has been elided, but it is still inferred by the type checker. Effect rows specify the effects that need be handled to within the expression. For simple values, that effect row is empty, denoted \el{<>}. For example, an integer has type \el{<> Int}. Without row elision, the \el{square} function in the previous section could therefore have been written as
 
@@ -212,6 +214,8 @@ let hAbort = handler Abort {
 \section{Specification of Elaine}
 \subsection{Type Checker}\label{sec:typechecker}
 \subsubsection{Unification of Effect Rows}
+
+\todo[inline]{Talk about \autocite{leijen_extensible_2005}.}
 
 During type checking effect rows are represented as a pair consisting of a multiset of effects and an optional extension variable. In this section we will use a more explicit notation than the syntax of the language by using the multiset representation directly. Hence, a row $\row{A_1,\dots,A_n|e_A}$ is represented as the multiset $\{A_1,\dots,A_n\} + e_A$.
 

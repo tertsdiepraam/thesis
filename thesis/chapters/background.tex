@@ -2,28 +2,137 @@
 
 While algebraic effects are a relatively new concept, the analysis of effectful computation and the representation of effects in programming language has a rich history. This history is relevant to this thesis because the various approaches to modelling effects proposed over time can be found in many popular programming languages. A comparison between these languages and languages with algebraic and higher-order effects hence requires comparison between theories. This chapter details this history.
 
-First, let us pose a simple question: why study effects? As \textcite{moggi_computational_1989} notes, analyzing only pure computation leaves out many aspects of programs, such as side-effects, non-determinism and non-termination. Proving either the presence or absence of these properties is very valuable. For example, a deterministic, side-effect-less computation can be reliably cached. Without side-effects, computation can also be executed out of order without any observable change in out. Hence, many sophisticated compilers rely on effect tracking to inform the optimizations they perform.\citationneeded A theory of effectful computation can therefore help compiler engineers prove the correctness of their transformations.\citationneeded Hence, a language with a strong formal model for effects is easier to compile or optimize than one without.
+\todo[inline]{Give definitions of effects, pure/impure, effectless/effectful}
 
-In addition, support for effects in the type system of a programming language could allow programmers to write stricter and safer APIs. These fall into two categories: documenting\reword{} presence and requiring absence. Documenting presence gives library authors the ability to communicate via the type system what effects their functions require. This informs users of libraries about what those functions can do (e.g. accessing the network or being able to run without terminating). A library author might also want to communicate that a function should not contain certain effects. For example, a hash function is generally understood to be deterministic and effectless, however, this is often not guaranteed and prone to misuse.
+\section{Motivation for Effects}
+
+First, let us pose a simple question: why study effects? As \textcite{moggi_computational_1989} notes, analyzing only pure computation leaves out many aspects of programs, such as side-effects, non-determinism and non-termination. Reasoning about the behaviour of a program then necessarily needs to include an analysis of effects.
+
+Proving either the presence or absence of these properties is very valuable. For example, a deterministic, side-effect-less computation can be reliably cached. Without side-effects, computation can also be executed out of order without any observable difference. Hence, many sophisticated compilers rely on effect tracking to inform the optimizations they perform.\citationneeded A theory of effectful computation can therefore help compiler engineers prove the correctness of their transformations.\citationneeded Hence, a language with a strong formal model for effects is easier to compile or optimize than one without.
+
+In addition, support for effects in the type system of a programming language could allow programmers to write stricter and safer APIs. In a language where the type system can reason about effects, the compiler can make certain guarantees beyond type checking only the input and output types of a function.
+
+These guarantees fall into two categories: communicating presence and requiring absence. Communicating presence gives library authors the ability to tell the type system what effects their functions require. This informs users of libraries about what those functions can do (e.g. accessing the network or being able to run without terminating). This is often most useful when the effects are interaction with the environment,in which case effects can function as capabilities \autocite{brachthauser_effects_2020}.
+
+A library author might also want to communicate that a function should not contain certain effects. For example, a hash function is generally understood to be deterministic and effectless, because it needs to be reproducible. However, this is often not guaranteed by the type system of mainstream programming languages.\citationneeded{}
 
 \section{Monads and Monad Transformers}
 
 The study of effects starts right at the two foundational theories of computation: $\lambda$-calculus and Turing machines. Their respective treatment of effects could not be more different. The former is only concered with pure computation, while the latter consists solely of effectful operations.
 
-In the $\lambda$-calculus, there is no model for effects of the computation, only of the result. \autocite{moggi_computational_1989} Hence, many observable properties of actual programs are ignored, such as non-determinism and side-effects. In their seminal paper, \textcite{moggi_computational_1989} unified monads with computational effects, which they initially called notions of computation. They introduced the $\lambda_c$-calculus, which provides a category theoretical framework for analysis of effectful programs.
+In $\lambda$-calculus, effects are not modelled; every function is a function in the mathematical sense, that is, a pure computation \autocite{moggi_computational_1989}. Hence, many observable properties of programs are ignored, such as non-determinism and side-effects. In their seminal paper, \textcite{moggi_computational_1989} unified \emph{monads} with computational effects, which they initially called notions of computation. \citeauthor{moggi_computational_1989} identified that for any monad $T: C \to C$ and a type of values $A$, the type $T A$ is the type of a computation of values of type $A$.
 
-\todo[inline]{Good summary from Plotkin and Power 2001: Moggi introduced the idea of a general account of computational effects, proposing encapsulating them via monads $T : C \to C$; the main idea is that $T(x)$ is the type of computations of elements of $x$.}
-
-Monads are a common model for effectful computation in functional programming languages. Haskell, for example, has a rich ecosystem of monads. For side-effects, it features special monads such as the \el{IO} monad for printing output and reading input. The computation is then kept pure and impure operations (like reading and printing) are delegated to the system.
+Since many programming languages have the ability to express monads from within the language, monads became a popular way to model effectful computation in functional programming languages. In particular, \textcite{peyton_jones_imperative_1993} introduced a technique to model effects via monads in Haskell. This technique keeps the computation pure, while not requiring any extensions to the type system.
 
 A limitation of treating effects as monads is that monads do not compose well; the composition of two monads is not itself a monad. A solution to this are \emph{monad transformers} \autocite{moggi_abstract_1989}, which are functors over monads that add operations to a monad. A simple monad can then be obtained by applying a monad transformer to the \el{Identity} monad. The representation of a monad then becomes much like that of a list of monad transformers, with the \el{Identity} monad as \el{Nil} value. This ``list" of transformers is ordered. For example, using the terminology from Haskell's \el{mtl} library, the monad \el{StateT a (ReaderT b Identity)} is distinct from \el{ReaderT b (StateT a Identity)}. The order of the monad transformers also determines the order in which they must be handled: the outermost monad transformer must be handled first.
 
-In practice, this model has turned out to work quite well, especially in combination with \el{do}-notation, which makes working with monads easier.
+In practice, this model has turned out to work quite well, especially in combination with \el{do}-notation, which allowed for easier sequential execution of effectful computations.
 
 \section{Algebraic Effects}\label{sec:alg}
+
 \todo[inline]{Introduce algebraic effects, effect rows, and handlers.}
 
-\textcite{goos_adequacy_2001} showed that effects can be represented as equational theories. The effects that can be represented in this framework are called algebraic effects. The \el{State} and the \el{Maybe} monads can for example be expressed in this framework.
+\subsection{Algebraic Theories}
+
+This section introduces algebraic theories. In particular, we will discuss algebraic theories with parametrized operations and general arities. This will form a foundation on which we can define algebraic effects. The definitions in this section follow \textcite{bauer_what_2018}.
+
+\begin{definition}[Signature]
+    A \emph{signature} $\Sig = \S{(op_i, P_i, A_i)}$ is a collection of operation symbols $op_i$ with corresponding parameter sets $P_i$ and arity sets $A_i$. We will write operations symbols as follows:
+    \[ op_i : P_i \step A_i. \]
+    The arities are arbitrary sets. However, using the von Neumann ordinals, we can use natural numbers as arities. Hence we can call operation symbols with arities 1, 2 and 3 \emph{unary}, \emph{binary} and \emph{ternary} respectively. An operation symbol with arity $0$ is then called \emph{constant} or \emph{nullary}. Two other common arities are $\emptyset = \S{}$ and $\mathbf{1} = \S{()}$. We will refer to $()$ as the unit.
+\end{definition}
+
+We can build terms with any given signature by composing the operations. Given some set $X$, we can build a set $\Tree_\Sig(X)$ of \emph{well-founded trees} over \Sig generated by $X$. This set is defined inductively:
+\begin{itemize}
+    \item for every $x\in X$ we have a tree $\return x$,
+    \item and if $p\in P_i$ and $\kappa : A_i \to \Tree_\Sig(X)$ then $op_i(p,k)$ is a tree, where $op_i$ is the label for the root and the subtrees are given by $\kappa$.
+\end{itemize}
+
+A \Sig-term is a pair of a context $X$ and a tree $t \in \Tree_\Sig(X)$. We write a \Sig-term as
+\[ X \vbar t. \]
+
+While the notation for these trees is intentionally evocative of functions in many programming languages, it is important to note that the terms are only a representation of a tree and should be thought of as such.
+
+\begin{definition}[\Sig-equation]
+    A \Sig-equation is a pair of \Sig-terms and a context $X$. We denote the equation
+    \[ X \vbar l = r. \]
+\end{definition}
+
+Here, the $=$ symbol is just notation and its meaning is left unspecified. Note that we can only create equations with the $=$ symbol. We cannot, for instance, create an equation $X \vbar l \neq r$.
+
+When the relevant signature \Sig is unambiguous, we will omit the \Sig from the definitions above and simply speak of terms and equations. We can now build terms and equations with any signature we define. Hence, we can give a signature along with some associated laws that we intend to hold for that signature; this is the idea of an algebraic theory.
+
+\begin{definition}[Algebraic theory]
+    An \emph{algebraic theory} (or \emph{equational theory}) is a pair $\T = (\Sig_\T, \mathcal{E}_\T)$ consisting of a signature $\Sig_\T$ and a collection $\mathcal{E}_\T$ of $\Sig_\T$-equations.
+\end{definition}
+
+An algebraic theory is still hollow; it is only a specification, not an implementation. The implementation or meaning of the operations that we apply to the operation symbols needs to be given via an interpretation.
+
+\begin{definition}[Interpretation]
+    An \emph{interpretation} $I$ of a signature \Sig is a
+    \begin{enumerate}
+    \item a \emph{carrier set} $|I|$
+    \item and for each operation $op_i$ a map
+        \[ \inter{op_i}_I : P_i \times |I|^A_i \to |I|, \]
+        called an \emph{operation}.
+    \end{enumerate}
+    Additionally, we can define the interpretation of a tree, and by extension of a term, as a map
+    \[ \inter{t}_I : |I|^X \to |I|. \]
+    This map is defined as
+    \[
+        \inter{\return x}_I : \eta \mapsto \eta(x)
+        \qquad
+        \inter{op_i(p,\kappa)}_I : \eta \mapsto \inter{op_i}_I(p, \lambda a. \inter{\kappa(a)}_I(\eta)).
+    \]
+\end{definition}
+
+If the choice of $I$ is obvious from the context, we will omit the subscript.
+
+The \emph{semantic bracket} $\inter{}_I$ is used to indicate that syntactic constructs are mapped to some (mathematical) interpretation of those symbols. In other words, an interpretation gives denotational semantics to a signature\question{this true?}.
+
+\begin{definition}[Model]
+    We say that an \Sig-equation $X \vbar l = r$ is \emph{valid}, if the interpretations of $l$ and $r$ evaluate to the same map, that is,
+    \[ \inter{l} = \inter{r}. \]
+
+    A \T-\emph{model} $M$ of an algebraic theory $\T$ is an interpretation of $\Sig_\T$ for which all the equations in $\mathcal{E}_T$ valid.
+\end{definition}
+
+We can relate models to each other with morhisms between their carrier sets. Given models $L$ and $M$ for \T, we call such a morphism $\phi : |L| \to |M|$, a \T-homomorphism if the following condition holds for all $op_i$ in $\Sig_\T$:
+\[ \phi \circ \inter{op_i}_L(p, \kappa) = \inter{op_i}_M(k, \phi \circ k). \]
+That is, if $\phi$ commutes with operations.
+
+\todo[inline]{Free models}
+
+\todo[inline]{Composing algebraic theories}
+
+\subsection{Effects as Algebraic Theories}
+
+\textcite{goos_adequacy_2001} have shown that many effects can be represented as algebraic theories. For that to make sense, we first need to represent computation is in the context of an algebraic theory. A computation can either be pure or effectful. A pure computation only returns a value, while an effectful computation performs some operation and then continues. We then write
+\begin{itemize}
+    \item $\return x$ for a pure computation,
+    \item and $op(p, \kappa)$ for an effectful operation, where $\kappa$ is the \emph{continuation}.
+\end{itemize}
+
+As an example, take the \el{State} effect. To use the this effect, we need two operations: \el{put} and \el{get}. The computation
+\[ \oput(a, \lambda \_. \oget((), \lambda x. \return x)), \]
+then first performs the \oput and then the \oget, returning the result of the \oget. Recall, that the $()$ symbol here represents the unit.
+
+Naturally, this representation of computation matches the definition of trees given above. Hence, we can connect the dots. We can represent computations as terms, so what are the signatures and equations? We start with the signature for \el{State}:
+\[ \oput : S \step \mathbf{1} \quad\text{and}\quad \oget : \mathbf{1} \step S. \]
+This signature indicates that \oput takes an $S$ as parameter and resumes with $()$ and that \oget takes $()$ and resumes with $S$. Now we can define the equations that we want \el{State} to follow:
+\begin{align*}
+    \oget((), \lambda s. \oget((), \lambda t. \kappa(s,t))) &= \oget((), \lambda s. \kappa(s, s)) \\
+    \oget((), \lambda s. \oput(s, \kappa)) &= \kappa () \\
+    \oput(s, \lambda\_. \oget((), \kappa)) &= \oput(s, \lambda\_. \kappa(s)) \\
+    \oput(s, \lambda\_. \oput(t, \kappa)) &= \oput(t, \kappa)
+\end{align*}
+This gives us an algebraic theory corresponding to the \el{State} monad. \textcite{goos_adequacy_2001} have shown that this theory gives rise to the canonical \el{State} monad. Many other effects can also be represented as algebraic theories, including but not limited to, non-determinism, non-termination, iteration, cooperative asynchronicity, traversal, input and output \citationneeded{}. These effects are called \emph{algebraic effects}.
+
+\todo[inline]{Somewhere: algebraic theories to the free model to the free monad.}
+
+However, not all effects fit, for example, the \el{Exception} monad. The distinction has been described as the difference between effect \emph{constructors} and effect \emph{destructors} \autocite{plotkin_algebraic_2003}.
+
+\todo[inline]{Why higher-order effects don't fit.}
 
 Continuing their work, \textcite{castagna_handlers_2009} then introduced effect handlers, allowing the programmer to destruct effects by placing handlers around effectful expressions. This provides a way to treat exception handling using effects. However, the scope in which an effect is handled can only be changed by adding handlers. Effect operations cannot define their own scope. To support this, a system for higher-order effects is required, which are effects that take effectful operations as parameters.
 
