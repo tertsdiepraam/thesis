@@ -34,7 +34,7 @@ let main = {
     abs(doubled)
 };
 \end{lstlisting}
-    
+
 A module is declared with \el{mod}, which takes a name and a block of declarations. Each declaration prefixed with \el{pub} will be imported to other modules that reference this module. Modules cannot be nested. The built-in \el{std} module defines a few basic functions for boolean, integer and string manipulation (e.g. \el{mul}, \el{lt} and \el{sub}). Functions are defined anonymously with \el{fn}, followed by a list of argument, a return type and a function body. Functions are called with parentheses.
 
 The design of Elaine is similar to Koka, with syntactical elements inspired by Rust. Apart from the elaborations and handlers, none of the language constructs should be particularly surprising: it has let bindings, if-else expressions, first-class functions, booleans, integers and strings. Below is a small sample program that prints whether the square of 4 is even or odd. For the full specification, we refer to \todo{add ref}.

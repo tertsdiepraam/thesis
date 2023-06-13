@@ -36,6 +36,8 @@ In practice, this model has turned out to work quite well, especially in combina
 
 This section introduces algebraic theories. In particular, we will discuss algebraic theories with parametrized operations and general arities. This will form a foundation on which we can define algebraic effects. The definitions in this section follow \textcite{bauer_what_2018}.
 
+\todo[inline]{This section is \emph{probably} too long and goes too much into the theory of algebraic theories}
+
 \begin{definition}[Signature]
     A \emph{signature} $\Sig = \S{(op_i, P_i, A_i)}$ is a collection of operation symbols $op_i$ with corresponding parameter sets $P_i$ and arity sets $A_i$. We will write operations symbols as follows:
     \[ op_i : P_i \step A_i. \]
@@ -99,47 +101,110 @@ The \emph{semantic bracket} $\inter{}_I$ is used to indicate that syntactic cons
 
 We can relate models to each other with morhisms between their carrier sets. Given models $L$ and $M$ for \T, we call such a morphism $\phi : |L| \to |M|$, a \T-homomorphism if the following condition holds for all $op_i$ in $\Sig_\T$:
 \[ \phi \circ \inter{op_i}_L(p, \kappa) = \inter{op_i}_M(k, \phi \circ k). \]
-That is, if $\phi$ commutes with operations.
+That is, if $\phi$ commutes with operations. The models and the \T-homomorphisms for a category $\mathbf{Mod}(\T)$ acting as the objects and morphisms, respectively.
 
-\todo[inline]{Free models}
+Crucially, we can create a \emph{free model} for each algebraic theory, which is an initial object in $\mathbf{Mod}(\T)$. The free model consists of the trees and equivalence relations between the trees.
 
-\todo[inline]{Composing algebraic theories}
+\subsection{Notation for Computations}
+
+To reason about computations, we need to introduce some notation.
+
+A computation can either be pure or effectful. A pure computation only returns a value, while an effectful computation performs some operation and then continues. We write $op(p_1, \dots, p_n)$ for some (effectful) operation $op$, with parameters $p_1,\dots,p_n$.
+
+We can sequence operations with a syntax reminiscent of do-notation:
+\begin{align*}
+    \S{x \gets op(p_1,\dots,p_n)\seq \kappa'}.
+\end{align*}
+We will add $\S{}$ around sequences when the notation is otherwise ambiguous. When a value from an operation in a sequence is discarded, we will omit the variable assignment and write 
+\[ \S{op(p_1,\dots,p_n); \kappa}. \]
+Additionally, we will define a \emph{bind} operation \bind as follows, where $x$ is some fresh variable:
+\[ 
+    \kappa \bind \kappa' \quad\defeq\quad \S{x \gets \kappa\seq \kappa'(x)}.
+\]
+As an example, take the \el{State} effect. To use the this effect, we need two operations: \el{put} and \el{get}. The computation
+\[ \S{\oput(a)\seq \oget()} \]
+then first performs the \oput and then the \oget, returning the result of the \oget.
 
 \subsection{Effects as Algebraic Theories}
 
-\textcite{goos_adequacy_2001} have shown that many effects can be represented as algebraic theories. For that to make sense, we first need to represent computation is in the context of an algebraic theory. A computation can either be pure or effectful. A pure computation only returns a value, while an effectful computation performs some operation and then continues. We then write
-\begin{itemize}
-    \item $\return x$ for a pure computation,
-    \item and $op(p, \kappa)$ for an effectful operation, where $\kappa$ is the \emph{continuation}.
-\end{itemize}
-
-As an example, take the \el{State} effect. To use the this effect, we need two operations: \el{put} and \el{get}. The computation
-\[ \oput(a, \lambda \_. \oget((), \lambda x. \return x)), \]
-then first performs the \oput and then the \oget, returning the result of the \oget. Recall, that the $()$ symbol here represents the unit.
-
+\textcite{goos_adequacy_2001} have shown that many effects can be represented as algebraic theories.
 Naturally, this representation of computation matches the definition of trees given above. Hence, we can connect the dots. We can represent computations as terms, so what are the signatures and equations? We start with the signature for \el{State}:
-\[ \oput : S \step \mathbf{1} \quad\text{and}\quad \oget : \mathbf{1} \step S. \]
+\[
+    \oput : S \step \mathbf{1}
+    \quad\text{and}\quad
+    \oget : \mathbf{1} \step S.
+\]
 This signature indicates that \oput takes an $S$ as parameter and resumes with $()$ and that \oget takes $()$ and resumes with $S$. Now we can define the equations that we want \el{State} to follow:
 \begin{align*}
-    \oget((), \lambda s. \oget((), \lambda t. \kappa(s,t))) &= \oget((), \lambda s. \kappa(s, s)) \\
-    \oget((), \lambda s. \oput(s, \kappa)) &= \kappa () \\
-    \oput(s, \lambda\_. \oget((), \kappa)) &= \oput(s, \lambda\_. \kappa(s)) \\
-    \oput(s, \lambda\_. \oput(t, \kappa)) &= \oput(t, \kappa)
+    s \gets \oget() \seq t \gets \oget() \seq \kappa(s,t)
+        &\quad=\quad s \gets \oget()\seq \kappa(s, s) \\
+    \oget()\bind \oput\seq \kappa() &\quad=\quad \kappa () \\
+    \oput(s)\seq \oget()\bind \kappa &\quad=\quad \oput(s)\seq \kappa(s) \\
+    \oput(s)\seq \oput(t)\seq \kappa() &\quad=\quad \oput(t)\seq \kappa()
 \end{align*}
 This gives us an algebraic theory corresponding to the \el{State} monad. \textcite{goos_adequacy_2001} have shown that this theory gives rise to the canonical \el{State} monad. Many other effects can also be represented as algebraic theories, including but not limited to, non-determinism, non-termination, iteration, cooperative asynchronicity, traversal, input and output \citationneeded{}. These effects are called \emph{algebraic effects}.
 
-\todo[inline]{Somewhere: algebraic theories to the free model to the free monad.}
+As shown by\textcite{plotkin_algebraic_2003},  an effect is algebraic if and only if it satisfies the \emph{algebraicity property}, which can be expressed as follows:
+\[
+    op(m_1, \dots, m_n) \bind \kappa \quad=\quad op(p, m_1\bind \kappa, \dots, m_n\bind\kappa).
+\]
+In other words, all computation parameters must be \emph{continuation-like}, that is, they are some computation followed by the continuation \autocite{bach_poulsen_hefty_2023}. This property is called the \emph{algebraicity property} \autocite{plotkin_algebraic_2003}.
 
-However, not all effects fit, for example, the \el{Exception} monad. The distinction has been described as the difference between effect \emph{constructors} and effect \emph{destructors} \autocite{plotkin_algebraic_2003}.
+A simple effect for which the algebraicity property does not hold is the \el{Reader} monad with the \olocal and \oask operations. The intended effect is that \olocal applies some transformation $f$ to the value retrieved with \oask within the computation $m$, but not outside $m$. Therefore, we have
+\[
+    \olocal(f, m) \bind \oask() \quad\neq\quad \olocal(f, m \bind \oask()),
+\]
+and have to conclude that we cannot represent the \el{Reader} monad as an algebraic theory and the effect is not algebraic.
 
-\todo[inline]{Why higher-order effects don't fit.}
+A similar argument goes for the \el{Exception} effect. The \ocatch operation takes two computation parameters, it executes the first and jumps to the second on \othrow. The problem arises when we bind with an \othrow operation:
+\[
+    \ocatch(m_1, m_2) \bind \othrow() \quad\neq\quad \ocatch(m_1\bind\othrow(), m_2\bind\othrow()).
+\]
+On the left hand side, $m_2$ will not be executed if $m_1$ does not throw, while on the right hand side, $m_2$ will always get executed. This does not match the semantics we expect from the \ocatch operation.
 
-Continuing their work, \textcite{castagna_handlers_2009} then introduced effect handlers, allowing the programmer to destruct effects by placing handlers around effectful expressions. This provides a way to treat exception handling using effects. However, the scope in which an effect is handled can only be changed by adding handlers. Effect operations cannot define their own scope. To support this, a system for higher-order effects is required, which are effects that take effectful operations as parameters.
+\subsection{Effect handlers}
 
-\section{Higher-Order Effects}\label{sec:elab}
-\todo[inline]{Introduce higher-order effects, the composability problem, scoped effects, hefty algebras etc.}
+The distinction between effects which are and which are not algebraic has been described as the difference between \emph{effect constructors} and \emph{effect deconstructors} \autocite{plotkin_algebraic_2003}. The \olocal and \ocatch operations have to act on effectful computations and change the meaning of the effects in that computation. So, they have to deconstruct the effects in their computations.
 
-A solution to this were scoped effects \autocite{wu_effect_2014}. However, scoped effects require a significant increase in complexity and cannot express effects that are neither algebraic nor scoped, such as lambda abstractions \autocite{oh_latent_2021}. Latent effects \autocite{oh_latent_2021} were subsequently introduced as an alternative that encapsulates a larger set of effects.
+\textcite{castagna_handlers_2009} introduced \emph{effect handlers} as a mechanism to allow for this deconstruction. Effect handlers are a generalization of exception handlers. They define the implementation for a set of algebraic operations in the subexpression.
 
-As an alternative approach, \textcite{bach_poulsen_hefty_2023} introduced hefty algebras. With hefty algebras, higher-order effects are treated separately from algebraic effects. Higher-order effects are not handled, but elaborated into algebraic effects, which can then be handled. The advantage is that the treatment of algebraic effects remains intact and that the process of elaboration is relatively simple.
+For example, we can define a handler for just the \oask operation, which is algebraic:
+\[
+    hAsk(x) = \handler \{
+        \begin{aligned}[t]
+            &\return(x) \mapsto x, \\
+            &\oask()\ \kappa \mapsto \kappa(x) \}.\\
+        \end{aligned}
+\]
+The \handle construct then applies a handler to an expression. For instance, the following computation with return with the value $5$:
+\[
+    \handle[hAsk(5)]\ \oask().
+\]
+With that handler we can give a definition of \olocal that has the intended behaviour:
+\[
+    \olocal(f, m) \quad\defeq\quad \S{x \gets \oask()\seq \handle[hAsk(f(x))]\ m}.
+\]
+However, \olocal cannot be defined as an algebraic operation, meaning that we cannot write a handler for it, it can only be defined as a handler. This is known as the \emph{modularity problem} with higher-order effects \autocite{bach_poulsen_hefty_2023}.
+
+\section{Elaborations}\label{sec:elab}
+
+Several solutions to the modularity have been proposed \autocite{wu_effect_2014, oh_latent_2021}. Most recently, \textcite{bach_poulsen_hefty_2023} introduced hefty algebras. The idea behind hefty algebras is that an additional layer of modularity is introduced, specifically for higher-order effects. The higher-order operations are not algebraic, but they can be \emph{elaborated} into algebraic operations. After the elaboration, we can then handle the algebraic effects like we would for any algebraic effect.
+
+Continuing the \olocal example, we can make an elaboration based on the definition above:
+\begin{align*}
+    eLocal \defeq\ 
+        &\elaboration\ \{ \\
+        &\quad\olocal(f, m) \mapsto \S{x \gets \oask()\seq \handle[hAsk(f(x))]\ m }\\
+        &\},
+\end{align*}
+which we can then apply to an expression with the \elab keyword, similarly to \handle:
+\begin{align*}
+    &\handle[hAsk(5)]\ \elab[eLocal]\ \{ \\
+    &\quad x \gets \oask();\\
+    &\quad y \gets \olocal(\lambda x.\ 2\cdot x, \S{ \oask() });\\
+    &\quad x + y \\
+    &\}
+\end{align*}
+
+This computation will evaluate to $15$. One way to think about elaboration operations is as modular macros, which perform a syntactic substitution, based on the given elaboration.
 

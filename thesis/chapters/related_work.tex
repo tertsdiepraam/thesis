@@ -7,8 +7,42 @@
 \item etc.
 \end{itemize}
 
-In parallel with the work to define theoretical frameworks for effects, several libraries and languages have been designed that include effects as first-class concepts, allowing the programmer to define their own effects and handlers. For example, there are some libraries available for Haskell, like \lib{fused-effects}{https://github.com/fused-effects/fused-effects}, \lib{polysemy}{https://github.com/polysemy-research/polysemy}, \lib{freer-simple}{https://github.com/lexi-lambda/freer-simple} and \lib{eff}{https://github.com/hasura/eff}, each encoding effects in a slightly different way.
+As the theoretical research around effects has progressed, new libraries and languages have emerged using the state of the art effect theories. These frameworks can be divided into two categories: effects encoded in existing type systems and effects as first-class features.
 
-Notable examples of languages with support for algebraic effects are Eff \autocite{bauer_programming_2015}, Koka \autocite{leijen_type_2017} and Frank \autocite{lindley_be_2017}. OCaml also gained support for effects \autocite{sivaramakrishnan_retrofitting_2021}. By building algebraic effects into the language, instead of delegating to a library, is advantageous because the language can provide more convenient syntax. In these languages, some concepts that were traditionally only available with explicit language support, can be expressed by the programmer via algebraic effects. This includes exception handling and asynchronous programming.
+\subsection{Effects as Monads}
+
+As explained in \ref{chap:background}, monads correspond with effectful computations. Any language in which monads can be expressed therefore has some support for effects. Languages that encourage a functional style of programming have embraced this framework in particular.
+
+Haskell currently features an \el{IO} monad \autocite{peyton_jones_imperative_1993} as well as a large collection of monads and monad transformers available via libraries, such as \lib{mtl}{https://github.com/haskell/mtl}. This is notable, because the connection between monad transformers and algebraic effects is very strong \autocite{schrijvers_monad_2019}.
+
+Algebraic effects have also been encoded in Haskell, Agda and other languages. The key to this encoding is the observation that the sum of two algebraic theories yields an algebraic theory. This theory then again corresponds to a monad. In particular, we can construct a \hs{Free} monad to model the theory.
+
+Most of these encodings create a polymorphic \hs{Free} monad as follows:
+\begin{lstlisting}[language=haskell]
+data Free f a
+    = Pure a
+    | Do (f (Free f a))
+\end{lstlisting}
+The parameter \el{f} here is a sum of effect operations.
+
+A library can then provide a set of data types that define operations which can then be composed. There are many examples of libraries like this for Haskell, including \lib{fused-effects}{https://github.com/fused-effects/fused-effects}, \lib{polysemy}{https://github.com/polysemy-research/polysemy}, \lib{freer-simple}{https://github.com/lexi-lambda/freer-simple} and \lib{eff}{https://github.com/hasura/eff}. Each of these libraries give the encoding of effects a slightly different spin in an effort to find the most ergonomic and performant representation.
+
+Using the \el{eff} library as an example, we get the following function signature for an effectful function that accesses the filesystem:
+\begin{lstlisting}[language=Haskell]
+readFile :: FileSystem :< effs => String -> Eff effs String
+\end{lstlisting}
+In this signature, \hs{FileSystem} is an effect and \hs{effs} is a polymorphic tail. What this means is that the \hs{readFile} function must be called in a context at least wrapped in a handler for the \hs{FileSystem} effect. The function is said to be \emph{row polymorphic}.
+
+Some of these libraries support \emph{scoped effects} \autocite{wu_effect_2014}, which is a limited but practical frameworks for higher-order effects. It can express the \olocal and \ocatch, but some higher-order effects are not supported.\question{any simple examples?}
+
+However, the ergonomics in this approach are heavily dependent on the capabilities of the type system of the language. For example, most Haskell libraries for algebraic effecs require many GHC language extensions to provide an ergonomic interface. Effect rows are often using the data types à la carte technique \autocite{swierstra_data_2008}, which requires a fairly robust typeclass system. Hence, many languages cannot encode effects within the language itself. Sometimes, it is possible to work around the limitations with macros, such as \lib{effin-mad}{https://github.com/rosefromthedead/effing-mad}, though the result does not integrate well with the rest of language and its use is discouraged by its own author.
+
+\subsection{First-class Effects}
+
+The motivation of building effects into a programming language is then twofold. First, we want to explore how to integrate effects into languages with type systems in which effects cannot be natively encoded. Second, built-in effects allow for more ergonomic and performant implementations. Naturally, the ergonomics of any given implementation are subjective, but we can still identify some generally desireable features, such as a lack of boilerplate code.
+
+Notable examples of languages with support for algebraic effects are Eff \autocite{bauer_programming_2015}, Koka \autocite{leijen_type_2017} and Frank \autocite{lindley_be_2017}, which are all specialized around effects. OCaml also gained support for effects \autocite{sivaramakrishnan_retrofitting_2021}. 
+
+By building algebraic effects into the language, instead of delegating to a library, is advantageous because the language can provide more convenient syntax. In these languages, some concepts that were traditionally only available with explicit language support, can be expressed by the programmer via algebraic effects. This includes exception handling and asynchronous programming.
 
 \todo[inline]{Recognize advancements in algebraic effects beyond what is used here. E.g. named effects.}

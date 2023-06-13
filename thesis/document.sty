@@ -113,7 +113,7 @@
 \newcommandx{\info}[2][1=]{\todo[linecolor=OliveGreen,backgroundcolor=OliveGreen!25,bordercolor=OliveGreen,#1]{#2}}
 \newcommandx{\reword}[1][1=]{\todo[linecolor=OliveGreen,backgroundcolor=OliveGreen!25,bordercolor=OliveGreen,#1]{reword}}
 \newcommandx{\improvement}[2][1=]{\todo[linecolor=Plum,backgroundcolor=Plum!25,bordercolor=Plum,#1]{#2}}
-\newcommandx{\citationneeded}[1][1=]{\scalebox{.5}{\todo[inline,linecolor=Plum,backgroundcolor=Plum!25,bordercolor=Plum,noinlinepar,inlinewidth=2.4cm,#1]{Citation needed}}}
+\newcommandx{\citationneeded}[1][1=]{\scalebox{.5}{\todo[inline,linecolor=Plum,backgroundcolor=Plum!25,bordercolor=Plum,noinlinepar,inlinewidth=2.4cm,#1]{Citation needed}}\xspace}
 \newcommandx{\thiswillnotshow}[2][1=]{\todo[disable,#1]{#2}}
 \newcommand\fixme[1]{\textcolor{red}{#1}}
 
@@ -122,12 +122,6 @@
 \setlrmarginsandblock{3cm}{2.5cm}{*}
 \setulmarginsandblock{2.5cm}{2.5cm}{*}
 \checkandfixthelayout{}
-
-
-% Words
-\newcommand{\Csharp}{C$^\sharp$}%
-\newcommand{\Cplusplus}{{C\nolinebreak[4]\hspace{-.05em}\raisebox{.4ex}{\tiny\textbf ++}}}%
-
 
 % Bibliography
 \usepackage[
@@ -234,11 +228,11 @@
 
 % url commands
 \newcommand\email[1]{
-    \href{mailto:#1}{\url{#1}}
+    \href{mailto:#1}{\url{#1}}%
 }
 
 \newcommand\lib[2]{
-    \href{#2}{\texttt{#1}}\footnote{\url{#2}}
+    \href{#2}{\texttt{#1}}\footnote{\url{#2}}%
 }
 
 \providecommand\given{}
@@ -296,7 +290,7 @@
 \newcommand\code[1]{\lstinline{#1}}
 \newcommand\mcode[1]{\text{\lstinline{#1}}}
 
-\newcommand\kw[1]{\ensuremath{\mathbf{\mathtt{#1}}}}
+\newcommand\kw[1]{\ensuremath{\mathbf{\mathtt{#1}}}\xspace}
 \newcommand\IS{\mathbin{\;::=\;}}
 \newcommand\OR{\mathbin{\;|\;}}
 
@@ -329,6 +323,8 @@
 \allowdisplaybreaks[1]
 
 \newcommand\el[1]{\lstinline[language=elaine]{#1}}
+\newcommand\hs[1]{\lstinline[language=Haskell]{#1}}
+% \newcommand\code[1]{\lstinline[language=plain]{#1}}
 
 \DeclarePairedDelimiter{\inter}{\llbracket}{\rrbracket}
 \DeclareMathOperator{\Tree}{Tree}
@@ -339,3 +335,14 @@
 
 \newcommand\oput[0]{\ensuremath{\mathtt{put}}\xspace}
 \newcommand\oget[0]{\ensuremath{\mathtt{get}}\xspace}
+\newcommand\olocal[0]{\ensuremath{\mathtt{local}}\xspace}
+\newcommand\oask[0]{\ensuremath{\mathtt{ask}}\xspace}
+\newcommand\ocatch[0]{\ensuremath{\mathtt{catch}}\xspace}
+\newcommand\othrow[0]{\ensuremath{\mathtt{throw}}\xspace}
+
+\newcommand\bind[0]{\ensuremath{\operatorname{\mathtt{\gg\!\!=}}}\xspace}
+
+\usepackage{relsize}
+\newcommand*{\defeq}{\stackrel{\mathsmaller{\mathsf{def}}}{=}}
+\newcommand{\seq}{;\ }
+

@@ -63,6 +63,9 @@ instance (Throw < f) => Elab Catch f
     elab (Catch m1 m2 k) = hup (handle hThrow) m1 >>= (maybe (m2 >>= k) k)
 ```
 
+- What's interesting in particular is how to simplify this whole thing to do
+  just what we need, but not be more general and even give us some nice things.
+
 ## Questions
 
 - How should the lambda resolve?
@@ -138,6 +141,7 @@ heffect Reader<a>
 ```
 
 ### Writer
+
 Just log values away and don't do much with them.
 
 ```
@@ -146,6 +150,7 @@ heffect Writer<a>
 ```
 
 ### Continuation
+
 Async bayyybe. Actually I don't know how to convert this
 
 Let's mark it TODO.
