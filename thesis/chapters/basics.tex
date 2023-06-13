@@ -1,4 +1,4 @@
-\chapter{Elaine: Language Design}
+\chapter{A Tour of Elaine}\label{chap:basics}
 
 \begin{itemize}
 \item Begin with examples
@@ -13,33 +13,23 @@
     \end{itemize}
 \end{itemize}
 
-The language designed for this thesis is called ``Elaine". The distinguishing feature of this language is its support for higher-order effects via elaborations. It is not the first language with support for elaborations, with the first being Heft \citationneeded.
+The language designed for this thesis is called ``Elaine". The distinguishing feature of this language is its support for higher-order effects via elaborations. As far as we know, it is the second language with support for elaborations, the first being Heft. Elaine adds two new features: implicit elaboration resulution and compilation of elaborations, which are explained in \cref{chap:elabres, chap:elabcomp}, respectively. Additionally, Elaine differs by not requiring monadic style programming for effectful computation. This makes Elaine a surprisingly expressive language given its simplicity.
 
-\todo{Put this somewhere}
-\begin{lstlisting}[style=fancy]
-mod math {
-    use std;
-    pub let double = fn(x) {
-        mul(2, x)
-    };
-    pub let abs = fn(x) {
-        if lt(x, 0) { sub(0, x) } else { x }
-    };
-}
+This chapter introduces Elaine with motivating examples for the design choices. The full specification is given in \cref{chap:spec}. More example programs are available online\footnote{\url{https://github.com/tertsdiepraam/thesis/tree/main/elaine/examples}}.
 
-use math;
-let main = {
-    let x = -10;
-    let y = double(x);
-    abs(doubled)
-};
-\end{lstlisting}
+\section{Basics}
 
-A module is declared with \el{mod}, which takes a name and a block of declarations. Each declaration prefixed with \el{pub} will be imported to other modules that reference this module. Modules cannot be nested. The built-in \el{std} module defines a few basic functions for boolean, integer and string manipulation (e.g. \el{mul}, \el{lt} and \el{sub}). Functions are defined anonymously with \el{fn}, followed by a list of argument, a return type and a function body. Functions are called with parentheses.
+The design of Elaine is similar to Koka, with syntactical elements inspired by Rust. Apart from the elaborations and handlers, the language should not be particularly surprising; it has let bindings, if-else expressions, first-class functions, booleans, integers and strings.
 
-The design of Elaine is similar to Koka, with syntactical elements inspired by Rust. Apart from the elaborations and handlers, none of the language constructs should be particularly surprising: it has let bindings, if-else expressions, first-class functions, booleans, integers and strings. Below is a small sample program that prints whether the square of 4 is even or odd. For the full specification, we refer to \todo{add ref}.
+An Elaine program consists of a tree of modules. Top level declarations are part of the root module. The result of the program will be the value assigned to the \el{main} variable in the root module. A module is declared with \el{mod}, which takes a name and a block of declarations. Declarations can be marked as public with the \el{pub} keyword. A module's public declarations can be imported into another module with \el{use}.
 
-For simplicity of analysis, the language does not support recursion or any other looping construct.
+The built-in primitives are \el{Int}, \el{Bool}, \el{String} and the unit \el{()}. The \el{std} module provides functions for basic manipulation of these primitives (e.g. \el{mul}, \el{lt} and \el{sub}). Functions are defined with \el{fn}, followed by a list of arguments and a function body. Functions are called with parentheses.
+
+The type system features Hindley-Milner style type inference. Let bindings, function arguments and function return types can be given explicit types. By convention, we will write variables and modules in lowercase and capitalize types.
+
+The language does not support recursion or any other looping construct.
+
+Below is a program that prints whether the square of 4 is even or odd. 
 
 \begin{lstlisting}[language=elaine, style=fancy]
 # The standard library contains basic functions for manipulation
@@ -59,11 +49,7 @@ let is_even = fn(x: Int) Bool {
 # Type annotations can be inferred:
 let square_is_even = fn(x) {
     let result = is_even(square(x));
-    if result {
-        "even"
-    } else {
-        "odd"
-    }
+    if result { "even" } else { "odd" }
 };
 
 let give_answer = fn(f, x) {
@@ -75,9 +61,9 @@ let give_answer = fn(f, x) {
 let main = give_answer(square_is_even, 4);
 \end{lstlisting}
 
-\section{Algebraic Effects in Elaine}
+\section{Algebraic Effects}
 
-The programs in the previous section are all pure and contain no effects and should be fairly standard. Following the lead of Koka\citationneeded, Elaine additionally has first class support for effects and effect handlers.
+The programs in the previous section are all pure and contain no effects. Like the languages discussed in \cref{chap:related_work}, Elaine additionally has first class support for effects and effect handlers.
 
 An effect is declared with the \el{effect} keyword. An effect needs a name and a set of operations. Operations are the functions that are associated with the effect. They can have an arbitrary number of arguments and a return type. Only the signature of operations can be given in an effect declaration, the implementation must be provided via handlers (see \cref{sec:alghandlers})
 
