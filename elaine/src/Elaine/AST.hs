@@ -101,3 +101,4 @@ data ASTValueType
   | TypeHandler Ident TypeVar ASTValueType
   | TypeElaboration Ident Row
   deriving (Show, Eq)
+

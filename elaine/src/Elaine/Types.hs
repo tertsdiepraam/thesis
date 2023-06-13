@@ -66,3 +66,4 @@ rowIsEmpty (Row a b) = MultiSet.null a && isNothing b
 
 rowMaybe :: [Effect] -> Maybe TypeVar -> Row
 rowMaybe effs = Row (MultiSet.fromList effs)
+

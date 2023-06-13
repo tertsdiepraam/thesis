@@ -6,6 +6,8 @@
 
 module Elaine.TypeCheck where
 
+import Data.Aeson (ToJSON)
+import GHC.Generics ( Generic )
 import Control.Lens (Lens', over, set, view, (^.))
 import Control.Lens.TH (makeLenses)
 import Control.Monad (forM_, when)
@@ -25,7 +27,7 @@ import Data.Maybe (fromJust)
 import qualified Data.MultiSet as MS
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Debug.Trace (trace, traceShowId)
+import Debug.Trace (trace)
 import Elaine.AST (ASTValueType)
 import Elaine.AST hiding (ASTValueType (..), Row)
 import qualified Elaine.AST as AST
@@ -67,13 +69,17 @@ addStackTrace s =
     )
 
 data Metadata = Metadata
-  { definitions :: [(Ident, Ident)],
+  { 
+    -- left: current span, right: definiton of that span
+    definitions :: [(Ident, Ident)],
     elabs :: Map Int [Ident]
     -- types :: [(Ident, TypeScheme)],
     -- handlers :: [(Ident, Ident)],
     -- elaborations :: [(Ident, Ident)]
   }
-  deriving (Show)
+  deriving (Show, Generic)
+
+instance ToJSON Metadata
 
 metaEmpty :: Metadata
 metaEmpty = Metadata [] Map.empty

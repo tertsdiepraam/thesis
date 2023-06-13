@@ -1,5 +1,7 @@
 module Elaine.Parse (parseProgram, parseExpr, ParseResult, Spans, Span) where
 
+import Data.Aeson (ToJSON)
+import GHC.Generics (Generic)
 import Control.Monad.State (State, evalState, get, put, runState)
 import Data.Either (partitionEithers)
 import Data.Maybe (fromMaybe)
@@ -30,7 +32,9 @@ import qualified Text.Megaparsec.Char.Lexer as L
 import Prelude hiding (span)
 
 data Span = Span Int Int String
-  deriving (Show)
+  deriving (Show, Generic)
+
+instance ToJSON Span
 
 type Spans = [(Span, String)]
 
