@@ -38,11 +38,11 @@ library
                     Elaine.Transform,
                     Elaine.Std
   hs-source-dirs:   src
-  build-depends:    base ^>=4.16.3.0,
+  build-depends:    base >= 4.0 && < 5,
                     mtl == 2.2.2,
                     containers == 0.6.5.1,
                     multiset == 0.3.4.3,
-                    megaparsec ^>=9.3.0,
+                    megaparsec == 9.3.0,
                     ghc-prim == 0.8.0,
                     text == 1.2.5.0,
                     lens == 5.2.2,
@@ -52,7 +52,9 @@ library
 executable elaine
   import:           warnings
   main-is:          Main.hs
-  build-depends:    base ^>=4.16.3.0, elaine, pretty-simple
+  build-depends:    base,
+                    elaine,
+                    pretty-simple
   hs-source-dirs:   app
   default-language: Haskell2010
 
