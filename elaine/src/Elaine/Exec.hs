@@ -2,6 +2,7 @@ module Elaine.Exec where
 
 import Data.Bifunctor (first)
 import Data.Text (Text, pack, unpack)
+import Data.Aeson (encode, ToJSON)
 import qualified Data.Text.Lazy as L
 import Elaine.AST (Program, Value)
 import Elaine.Transform (elabToHandle, makeElabExplicit)
@@ -90,6 +91,9 @@ show' = Right . show
 pShow' :: Show a => a -> Result String
 pShow' = Right . L.unpack . pShow
 
+json :: ToJSON a => a -> Result String
+json = Right . ("JSON METADATA:" ++) . show . encode
+
 execPretty :: (Text, Text) -> Either Error String
 execPretty = parseNoSpans >=> pretty'
 
@@ -123,11 +127,13 @@ cmd :: String -> (Text, Text) -> Either Error String
 cmd "parse" = execParse >=> show'
 cmd "pretty" = execPretty
 cmd "spans" = execSpans >=> pShow'
+cmd "spans-json" = execSpans >=> json
 cmd "check" = execCheck >=> show'
 cmd "run" = execRun >=> show'
 cmd "run-unchecked" = execRunUnchecked >=> show'
 cmd "explicit" = execExplicit
 cmd "metadata" = execCheckMetadata >=> pShow'
+cmd "metadata-json" = execCheckMetadata >=> json
 cmd _ = error "unrecognized command"
 
 pack' :: (String, String) -> (Text, Text)

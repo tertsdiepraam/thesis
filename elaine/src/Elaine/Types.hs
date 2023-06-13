@@ -1,10 +1,14 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Elaine.Types (Arrow (..), Row (..), TypeScheme (..), CompType (..), ValType (..), Effect (..), rowUpdate, rowInsert, rowVar, rowOpen, rowClosed, rowEmpty, rowIsEmpty, rowMaybe) where
 
-import Data.MultiSet (MultiSet)
+import Data.Aeson
+import GHC.Generics
+import qualified Data.MultiSet as S (MultiSet, toList)
 import qualified Data.MultiSet as MultiSet
 import Elaine.TypeVar
 import Elaine.Ident (Ident)
-import Data.Map (Map)
+import qualified Data.Map as M (Map, toList)
 import Data.Maybe (isNothing)
 
 type Path = [Ident]
@@ -14,16 +18,26 @@ data TypeScheme = TypeScheme
     effectVars :: [TypeVar],
     typ :: CompType
   }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance ToJSON TypeScheme
 
 data CompType = CompType Row ValType
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
 
-data Effect = Effect Path (Map Ident Arrow)
-  deriving (Show, Eq, Ord)
+instance ToJSON CompType
+
+data Effect = Effect Path (M.Map Ident Arrow)
+  deriving (Show, Eq, Ord, Generic)
+
+instance ToJSON Effect where
+    toJSON (Effect path signatures) = object ["path" .= toJSON path, "signatures" .= (toJSON.M.toList) signatures]
+  
 
 data Arrow = Arrow [CompType] CompType
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance ToJSON Arrow
 
 data ValType
   = TypeInt
@@ -35,13 +49,18 @@ data ValType
   | TypeArrow Arrow
   | TypeHandler Effect TypeVar ValType
   | TypeElaboration Effect Row
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance ToJSON ValType
 
 data Row = Row
-  { rowEffects :: MultiSet Effect,
+  { rowEffects :: S.MultiSet Effect,
     rowExtension :: Maybe TypeVar
   }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance ToJSON Row where
+    toJSON (Row reff rext) = object ["rowEffects" .= (toJSON . S.toList) reff, "rowExtension" .= toJSON rext]
 
 rowUpdate :: Row -> Row -> Row
 rowUpdate (Row effsA _) (Row effsB exB) = Row (MultiSet.union effsA effsB) exB

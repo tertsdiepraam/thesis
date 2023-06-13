@@ -3,9 +3,12 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Elaine.TypeCheck where
 
+import Data.Aeson (ToJSON)
+import GHC.Generics
 import Control.Lens (Lens', over, set, view, (^.))
 import Control.Lens.TH (makeLenses)
 import Control.Monad (forM_, when)
@@ -67,13 +70,17 @@ addStackTrace s =
     )
 
 data Metadata = Metadata
-  { definitions :: [(Ident, Ident)],
+  { 
+    -- left: current span, right: definiton of that span
+    definitions :: [(Ident, Ident)],
     elabs :: Map Int [Ident]
     -- types :: [(Ident, TypeScheme)],
     -- handlers :: [(Ident, Ident)],
     -- elaborations :: [(Ident, Ident)]
   }
-  deriving (Show)
+  deriving (Show, Generic)
+
+instance ToJSON Metadata
 
 metaEmpty :: Metadata
 metaEmpty = Metadata [] Map.empty
