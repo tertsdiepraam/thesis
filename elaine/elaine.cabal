@@ -19,7 +19,8 @@ common extensions
                       GADTs,
                       OverloadedStrings,
                       BlockArguments,
-                      PatternSynonyms
+                      PatternSynonyms,
+                      DeriveGeneric
 
 common warnings
   ghc-options: -Wall

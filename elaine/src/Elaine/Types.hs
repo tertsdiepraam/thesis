@@ -1,14 +1,10 @@
-{-# LANGUAGE DeriveGeneric #-}
-
 module Elaine.Types (Arrow (..), Row (..), TypeScheme (..), CompType (..), ValType (..), Effect (..), rowUpdate, rowInsert, rowVar, rowOpen, rowClosed, rowEmpty, rowIsEmpty, rowMaybe) where
 
-import Data.Aeson
-import GHC.Generics
-import qualified Data.MultiSet as S (MultiSet, toList)
+import Data.MultiSet (MultiSet)
 import qualified Data.MultiSet as MultiSet
 import Elaine.TypeVar
 import Elaine.Ident (Ident)
-import qualified Data.Map as M (Map, toList)
+import Data.Map (Map)
 import Data.Maybe (isNothing)
 
 type Path = [Ident]
@@ -18,26 +14,16 @@ data TypeScheme = TypeScheme
     effectVars :: [TypeVar],
     typ :: CompType
   }
-  deriving (Show, Eq, Ord, Generic)
-
-instance ToJSON TypeScheme
+  deriving (Show, Eq, Ord)
 
 data CompType = CompType Row ValType
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord)
 
-instance ToJSON CompType
-
-data Effect = Effect Path (M.Map Ident Arrow)
-  deriving (Show, Eq, Ord, Generic)
-
-instance ToJSON Effect where
-    toJSON (Effect path signatures) = object ["path" .= toJSON path, "signatures" .= (toJSON.M.toList) signatures]
-  
+data Effect = Effect Path (Map Ident Arrow)
+  deriving (Show, Eq, Ord)
 
 data Arrow = Arrow [CompType] CompType
-  deriving (Show, Eq, Ord, Generic)
-
-instance ToJSON Arrow
+  deriving (Show, Eq, Ord)
 
 data ValType
   = TypeInt
@@ -49,18 +35,13 @@ data ValType
   | TypeArrow Arrow
   | TypeHandler Effect TypeVar ValType
   | TypeElaboration Effect Row
-  deriving (Show, Eq, Ord, Generic)
-
-instance ToJSON ValType
+  deriving (Show, Eq, Ord)
 
 data Row = Row
-  { rowEffects :: S.MultiSet Effect,
+  { rowEffects :: MultiSet Effect,
     rowExtension :: Maybe TypeVar
   }
-  deriving (Show, Eq, Ord, Generic)
-
-instance ToJSON Row where
-    toJSON (Row reff rext) = object ["rowEffects" .= (toJSON . S.toList) reff, "rowExtension" .= toJSON rext]
+  deriving (Show, Eq, Ord)
 
 rowUpdate :: Row -> Row -> Row
 rowUpdate (Row effsA _) (Row effsB exB) = Row (MultiSet.union effsA effsB) exB
@@ -85,3 +66,4 @@ rowIsEmpty (Row a b) = MultiSet.null a && isNothing b
 
 rowMaybe :: [Effect] -> Maybe TypeVar -> Row
 rowMaybe effs = Row (MultiSet.fromList effs)
+

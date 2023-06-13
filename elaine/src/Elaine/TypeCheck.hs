@@ -3,12 +3,11 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DeriveGeneric #-}
 
 module Elaine.TypeCheck where
 
 import Data.Aeson (ToJSON)
-import GHC.Generics
+import GHC.Generics ( Generic )
 import Control.Lens (Lens', over, set, view, (^.))
 import Control.Lens.TH (makeLenses)
 import Control.Monad (forM_, when)
@@ -28,7 +27,7 @@ import Data.Maybe (fromJust)
 import qualified Data.MultiSet as MS
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Debug.Trace (trace, traceShowId)
+import Debug.Trace (trace)
 import Elaine.AST (ASTValueType)
 import Elaine.AST hiding (ASTValueType (..), Row)
 import qualified Elaine.AST as AST

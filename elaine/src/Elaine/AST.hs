@@ -1,23 +1,16 @@
-{-# LANGUAGE DeriveGeneric #-}
 module Elaine.AST where
 
 import Elaine.TypeVar
 import Elaine.Types (TypeScheme)
 import Elaine.Ident (Ident (Ident))
-import Data.Aeson hiding (Value)
-import GHC.Generics (Generic)
 
 type Program = [Declaration]
 
 data Visibility = Private | Public
-  deriving (Show, Eq, Generic)
-
-instance ToJSON Visibility
+  deriving (Show, Eq)
 
 data Declaration = Declaration Visibility DeclarationType
-  deriving (Show, Eq, Generic)
-
-instance ToJSON Declaration
+  deriving (Show, Eq)
 
 data DeclarationType
   = Use Ident
@@ -25,42 +18,28 @@ data DeclarationType
   | DecLet Ident (Maybe ASTComputationType) Expr
   | DecType Ident [Constructor]
   | DecEffect Ident [OperationSignature]
-  deriving (Show, Eq, Generic)
-
-instance ToJSON DeclarationType
+  deriving (Show, Eq)
 
 data OperationSignature = OperationSignature Ident [ASTComputationType] ASTComputationType
-  deriving (Show, Eq, Generic)
-
-instance ToJSON OperationSignature
+  deriving (Show, Eq)
 
 data Elaboration = Elaboration Ident Row [OperationClause]
-  deriving (Show, Eq, Generic)
-
-instance ToJSON Elaboration
+  deriving (Show, Eq)
 
 data Handler = Handler Function [OperationClause]
-  deriving (Show, Eq, Generic)
-
-instance ToJSON Handler
+  deriving (Show, Eq)
 
 data Function = Function [(Ident, Maybe ASTComputationType)] (Maybe ASTComputationType) Expr
-  deriving (Show, Eq, Generic)
-
-instance ToJSON Function
+  deriving (Show, Eq)
 
 lam :: [Ident] -> Expr -> Value
 lam a = Fn . Function (zip a (repeat Nothing)) Nothing
 
 data Constructor = Constructor Ident [ASTComputationType]
-  deriving (Show, Eq, Generic)
-
-instance ToJSON Constructor
+  deriving (Show, Eq)
 
 data OperationClause = OperationClause Ident [Ident] Expr
-  deriving (Show, Eq, Generic)
-
-instance ToJSON OperationClause
+  deriving (Show, Eq)
 
 clauseName :: OperationClause -> Ident
 clauseName (OperationClause name _ _) = name
@@ -76,9 +55,7 @@ data Expr
   | Var Ident
   | Let (Maybe Ident) (Maybe ASTComputationType) Expr Expr
   | Val Value
-  deriving (Show, Eq, Generic)
-
-instance ToJSON Expr
+  deriving (Show, Eq)
 
 data Value
   = Int Int
@@ -90,17 +67,9 @@ data Value
   | Constant BuiltIn
   | Data Ident Ident [Expr]
   | Unit
-  deriving (Show, Eq, Generic)
-
-
-instance ToJSON Value
+  deriving (Show, Eq)
 
 data BuiltIn = BuiltIn Ident TypeScheme ([Value] -> Value)
-  deriving (Generic)
-
-instance ToJSON BuiltIn where
-    toJSON (BuiltIn name scheme _) = object ["name" .= toJSON name, "scheme" .= toJSON scheme]
-
 
 instance Show BuiltIn where
   show (BuiltIn (Ident x _) _ _) = "<built-in " ++ x ++ ">"
@@ -112,27 +81,18 @@ instance Eq BuiltIn where
 --  - Only constructors can be matches
 --  - All constructors must be present
 data MatchArm = MatchArm Pattern Expr
-  deriving (Show, Eq, Generic)
-
-instance ToJSON MatchArm
+  deriving (Show, Eq)
 
 -- A pattern consisting of a constructor identifier and
 -- and a list of variables to bind.
 data Pattern = Pattern Ident [Ident]
-  deriving (Show, Eq, Generic)
-
-instance ToJSON Pattern
+  deriving (Show, Eq)
 
 data Row = Row [Ident] (Maybe Ident)
-  deriving (Show, Eq, Generic)
-
-instance ToJSON Row
+  deriving (Show, Eq)
 
 data ASTComputationType = ASTComputationType Row ASTValueType
-  deriving (Show, Eq, Generic)
-
-instance ToJSON ASTComputationType
-
+  deriving (Show, Eq)
 
 data ASTValueType
   = TypeName Ident
@@ -140,6 +100,5 @@ data ASTValueType
   | TypeArrow [ASTComputationType] ASTComputationType
   | TypeHandler Ident TypeVar ASTValueType
   | TypeElaboration Ident Row
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq)
 
-instance ToJSON ASTValueType

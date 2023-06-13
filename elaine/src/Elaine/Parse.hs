@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 module Elaine.Parse (parseProgram, parseExpr, ParseResult, Spans, Span) where
 
 import Data.Aeson (ToJSON)
