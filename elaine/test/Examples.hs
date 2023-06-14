@@ -17,6 +17,11 @@ import Test.Hspec
 
 expected :: String -> Value
 expected "state.elaine" = Int 6
+expected "id.elaine" = Int 5
+expected "abort.elaine" = Int 5
+expected "implicit.elaine" = String "The answer is: 23"
+expected "basics.elaine" = Int 8
+expected "structured_logging.elaine" = String "main: msg1\nmain:foo: msg2\nmain:bar: msg3\n"
 expected _ = error "Example does not have an expected value"
 
 testAllExamples :: SpecWith ()

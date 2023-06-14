@@ -420,17 +420,16 @@ instance Substitutable Row where
     Nothing -> row
 
 unify :: CompType -> CompType -> Infer ()
-unify a b = addStackTrace
-  ( "unifying "
-      ++ "\n    "
-      ++ pretty a
-      ++ "\n    "
-      ++ pretty b
-  )
-  do
+unify a b = do
     a' <- subM a
     b' <- subM b
-    unify' a' b'
+    addStackTrace (
+      "unifying "
+      ++ "\n    "
+      ++ pretty a'
+      ++ "\n    "
+      ++ pretty b'
+      ) $ unify' a' b'
   where
     unify' (CompType rowA typA) (CompType rowB typB) = do
       () <- unifyRows rowA rowB

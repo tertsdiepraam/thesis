@@ -1,7 +1,0 @@
-let id = fn(x) { x };
-
-let call = fn(f: fn() a) a {
-    f()
-};
-
-let main = call(id);

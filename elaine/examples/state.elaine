@@ -26,8 +26,7 @@ let hState = handler {
 };
 
 let body = handle[hState] {
-    let s = get();
-    put(add(s, 1));
+    put(add(get(), 1));
     get()
 };
 

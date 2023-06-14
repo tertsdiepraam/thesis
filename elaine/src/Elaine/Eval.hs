@@ -101,8 +101,12 @@ decompose ctx s = f (s, [])
 
 ctxCommon :: Ctx
 ctxCommon (If e1 e2 e3) = Just (e1, \x -> If x e2 e3)
-ctxCommon (App (Val v) args) = case span isVal args of
-  (vals, e : es) -> Just (e, \x -> App (Val v) (vals ++ [x] ++ es))
+
+-- The application ctx is a bit difficult, we need to accept both values and variables as
+-- function, because the variables might effect operations. We then enter the args if there
+-- any more args to evaluate.
+ctxCommon (App f args) | isValOrVar f && not (all isVal args) = case span isVal args of
+  (vals, e : es) -> Just (e, \x -> App f (vals ++ [x] ++ es))
   (_, []) -> Nothing
 ctxCommon (App e args) = Just (e, \x -> App x args)
 ctxCommon (Let var t e1 e2) = Just (e1, \x -> Let var t x e2)
@@ -110,6 +114,11 @@ ctxCommon (Match e arms) = case e of
   Val _ -> Nothing
   _ -> Just (e, \x -> Match x arms)
 ctxCommon _ = Nothing
+
+isValOrVar :: Expr -> Bool
+isValOrVar (Var _) = True
+isValOrVar (Val _) = True
+isValOrVar _ = False
 
 ctxE :: Ctx
 ctxE exp = ctxCommon exp <|> ctxE' exp

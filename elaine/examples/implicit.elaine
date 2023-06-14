@@ -9,7 +9,7 @@ effect Bar! {
 }
 
 let ef = elaboration Foo! -> <> {
-    foo!() { 5 }
+    foo!() { 23 }
 };
 
 let eb = elaboration Bar! -> <> {
