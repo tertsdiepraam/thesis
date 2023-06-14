@@ -6,7 +6,7 @@ module Elaine.Eval (eval, subst, evalExpr, newEnv) where
 
 import Control.Applicative ((<|>))
 import Data.Bifunctor (second)
-import Data.List (find)
+import Data.List (find, isSuffixOf)
 import Data.Map (Map, assocs, empty, fromList, lookup, singleton, union)
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Elaine.AST
@@ -105,7 +105,7 @@ ctxCommon (If e1 e2 e3) = Just (e1, \x -> If x e2 e3)
 -- The application ctx is a bit difficult, we need to accept both values and variables as
 -- function, because the variables might effect operations. We then enter the args if there
 -- any more args to evaluate.
-ctxCommon (App f args) | isValOrVar f && not (all isVal args) = case span isVal args of
+ctxCommon (App f args) | isApplicable f && not (all isVal args) = case span isVal args of
   (vals, e : es) -> Just (e, \x -> App f (vals ++ [x] ++ es))
   (_, []) -> Nothing
 ctxCommon (App e args) = Just (e, \x -> App x args)
@@ -115,10 +115,10 @@ ctxCommon (Match e arms) = case e of
   _ -> Just (e, \x -> Match x arms)
 ctxCommon _ = Nothing
 
-isValOrVar :: Expr -> Bool
-isValOrVar (Var _) = True
-isValOrVar (Val _) = True
-isValOrVar _ = False
+isApplicable :: Expr -> Bool
+isApplicable (Var x) = not $ "!" `isSuffixOf` (idText x)
+isApplicable (Val _) = True
+isApplicable _ = False
 
 ctxE :: Ctx
 ctxE exp = ctxCommon exp <|> ctxE' exp

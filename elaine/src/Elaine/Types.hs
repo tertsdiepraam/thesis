@@ -33,7 +33,7 @@ data ValType
   | TypeName Ident
   | TypeV TypeVar
   | TypeArrow Arrow
-  | TypeHandler Effect TypeVar ValType
+  | TypeHandler Effect ValType ValType
   | TypeElaboration Effect Row
   deriving (Show, Eq, Ord)
 

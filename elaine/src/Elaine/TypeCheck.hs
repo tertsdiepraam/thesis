@@ -209,7 +209,7 @@ freeTypeVars env t = allTypeVars t Set.\\ view bound env
 
     allTypeVarsV (TypeV v) = Set.singleton v
     allTypeVarsV (TypeArrow (Arrow args ret)) = Set.unions (map allTypeVars (args ++ [ret]))
-    allTypeVarsV (TypeHandler _ from to) = Set.delete from $ allTypeVarsV to
+    allTypeVarsV (TypeHandler _ from to) = Set.union (allTypeVarsV from) (allTypeVarsV to)
     allTypeVarsV _ = Set.empty
 
 freeEffectVars :: TypeEnv -> CompType -> Set TypeVar
@@ -397,7 +397,7 @@ class Substitutable a where
 instance Substitutable ValType where
   sub subs vt | Just vt' <- Map.lookup vt (subTypeVars subs) = vt'
   sub subs (TypeArrow arr) = TypeArrow (sub subs arr)
-  sub subs (TypeHandler name from to) = TypeHandler name from (sub subs to)
+  sub subs (TypeHandler name from to) = TypeHandler name (sub subs from) (sub subs to)
   sub _ vt = vt
 
 instance Substitutable Arrow where
@@ -450,7 +450,7 @@ unify a b = do
       unify ret1 ret2
     unifyV (TypeHandler name1 from1 to1) (TypeHandler name2 from2 to2) = do
       () <- when (name1 /= name2) $ throwError "failed to unify handlers for different effects"
-      () <- unifyV (TypeV from1) (TypeV from2)
+      () <- unifyV from1 from2
       () <- unifyV to1 to2
       return ()
     unifyV _ _ = throwError "Failed to unify: type error"
@@ -545,19 +545,29 @@ instance Inferable Expr where
           Just ident -> infer (insertVar ident t1' env) e2
           Nothing -> infer env e2
       Handle e1 e2 -> do
+        -- Type of the handler
         t1 <- infer env e1
+
+        -- The effect row of the handle is the merged effect row of e1 and e2
+        -- Hence we need a new variable for it.
         rVar <- fresh
         let restRow = rowVar rVar
+
+        -- Unify restRow with t1
         vt <- freshV
         () <- unify (CompType restRow vt) t1
 
+        -- Get the parameters from the handler type
         vt' <- subM vt
         (name, from, to) <- case vt' of
           TypeHandler name from to -> return (name, from, to)
           _ -> throwError "handle did not get a handler"
 
+        -- Make sure that the computation can be handled by unifying
+        -- from and t2. The effect row in the computation is the name of the effect
+        -- handled and the restRow.
         t2 <- infer env e2
-        () <- unify (CompType (rowOpen [name] rVar) (TypeV from)) t2
+        () <- unify (CompType (rowOpen [name] rVar) from) t2
 
         subM $ CompType restRow to
       Elab e1 e2 -> do
@@ -657,7 +667,7 @@ forceValue (TypeArrow (Arrow args1 ret1)) (TypeArrow (Arrow args2 ret2)) = do
   force ret1 ret2
 forceValue (TypeHandler name1 from1 to1) (TypeHandler name2 from2 to2) = do
   () <- when (name1 /= name2) $ throwError "failed to unify handlers for different effects"
-  () <- forceValue (TypeV from1) (TypeV from2)
+  () <- forceValue from1 from2
   () <- forceValue to1 to2
   return ()
 forceValue a b = throwError $ "Failed to force: " ++ pretty a ++ " to " ++ pretty b
@@ -721,10 +731,7 @@ instance Inferable Value where
           clauses
 
       fromV' <- subM fromV
-      let from' = case fromV' of
-            TypeV v -> v
-            _ -> error "handler must be generic"
-      pure $ TypeHandler eff from' to
+      pure $ TypeHandler eff fromV' to
       where
         clauseNames = map (\(OperationClause x _ _) -> x) clauses
         matchesClauses (Effect _ signatures) = Set.fromList clauseNames == Set.fromList (Map.keys signatures)

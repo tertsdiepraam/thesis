@@ -31,7 +31,7 @@ let hWrite = handler {
 
 let eLog = elaboration Log! -> <Read,Write> {
     context!(s, c) {
-        let new_context = concat(concat(ask(), ":"), s);
+        let new_context = concat(concat(ask(), s), ":");
         handle[hRead(new_context)] c
     }
     log!(m) {
@@ -39,9 +39,6 @@ let eLog = elaboration Log! -> <Read,Write> {
     }
 };
 
-# The intended effect is to create structured logging, where each line is
-# prefixed with a context.
-# So it might look like this:
 let main = handle[hRead("")] handle[hWrite] elab {
     context!("main", {
         log!("msg1");
