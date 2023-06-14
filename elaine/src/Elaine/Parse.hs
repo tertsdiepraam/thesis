@@ -160,6 +160,17 @@ ident = categorizeIdent $ lexeme $ do
   exc <- option "" (symbol "!")
   return $ Ident ([firstChar] ++ rest ++ ticks ++ unpack exc) location
 
+typeIdent :: Parser Ident
+typeIdent = span "storage.type.elaine" $ lexeme $ do
+  location <- LocOffset <$> getOffset
+  firstChar <- oneOf firstIdentChars
+  rest <- many (oneOf otherIdentChars)
+  ticks <- many (char '\'')
+  exc <- option "" (symbol "!")
+  return $ Ident ([firstChar] ++ rest ++ ticks ++ unpack exc) location
+
+
+
 -- PROGRAM
 -- A program is simply a sequence of modules, but the parser requires parsing
 -- the entire source code.
@@ -257,10 +268,10 @@ computationType = do
   ASTComputationType (fromMaybe (Row [] Nothing) effs) <$> valueType
 
 valueType :: Parser ASTValueType
-valueType =
+valueType = 
   try (parens $ pure TypeUnit)
     <|> functionType
-    <|> (TypeName <$> ident)
+    <|> (TypeName <$> typeIdent)
     <|> try (parens valueType)
 
 functionType :: Parser ASTValueType
