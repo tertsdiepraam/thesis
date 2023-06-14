@@ -1,26 +1,34 @@
-mod Main {
-    effect !State {
-        get(): Int
-        set(n: Int): () 
-    }
+use std;
 
-    handler state: a !State -> fn(Int): a {
-        return(x) {
-            fn(s: Int): a {
-                x
-            }
-        }
-        get(): fn(Int): a {
-            fn(s: Int): a {
-                f <- resume(s);
-                f(s)
-            }
-        }
-        set(n: Int): fn(Int): () {
-            fn(s: Int): a {
-                f <- resume(());
-                f(n)
-            }
+effect State {
+    get() Int
+    put(Int) () 
+}
+
+let hState = handler {
+    return(x) {
+        fn(s: Int) {
+            x
         }
     }
-}
+    get() {
+        fn(s: Int) {
+            let f = resume(s);
+            f(s)
+        }
+    }
+    put(n) {
+        fn(s: Int) {
+            let f = resume(());
+            f(n)
+        }
+    }
+};
+
+let body = handle[hState] {
+    let s = get();
+    put(add(s, 1));
+    get()
+};
+
+let main = body(5);
