@@ -3,12 +3,13 @@ module Elaine.Parse (parseProgram, parseExpr, ParseResult, Spans, Span) where
 import Data.Aeson (ToJSON)
 import GHC.Generics (Generic)
 import Control.Monad.State (State, evalState, get, put, runState)
+import Data.Char (isSpace)
 import Data.Either (partitionEithers)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text, pack, unpack)
 import Data.Void
 import Elaine.AST
-import Elaine.Ident (Ident(Ident), Location(LocOffset))
+import Elaine.Ident (Ident(Ident, idText), Location(LocOffset))
 import Text.Megaparsec
   ( MonadParsec (eof, notFollowedBy, try),
     ParseErrorBundle,
@@ -42,16 +43,31 @@ type Parser = ParsecT Void Text (State Spans)
 
 type ParseResult a = Either (ParseErrorBundle Text Void) a
 
-span :: String -> Parser a -> Parser a
-span c p = do
+trim :: String -> String
+trim = reverse . f . reverse. f
+   where f = dropWhile isSpace
+
+getSpan :: Parser a -> Parser (a, Span)
+getSpan p = do
   start <- getOffset
   input <- fmap unpack getInput
   x <- p
   end <- getOffset
   let length' = end - start
+  let span = Span start end (take length' input)
+
+  return (x, span)
+
+saveSpan :: String -> Span -> Parser ()
+saveSpan c s = do
   currentList <- get
-  () <- put (currentList ++ [(Span start end (take length' input), c)])
-  return x
+  put (currentList ++ [(s, c)])
+
+span :: String -> Parser a -> Parser a
+span c p = do 
+  (res, s) <- getSpan p
+  () <- saveSpan c s
+  return res
 
 parseProgram :: (Text, Text) -> Either String ([Declaration], Spans)
 parseProgram (name, s) =
@@ -122,8 +138,21 @@ firstIdentChars = ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['_']
 otherIdentChars :: [Char]
 otherIdentChars = firstIdentChars ++ ['0' .. '9']
 
+identCategory :: String -> String
+identCategory "resume" = "variable.language.elaine"
+identCategory a = "variable.elaine"
+
+categorizeIdent :: Parser Ident -> Parser Ident
+categorizeIdent p = do
+  (ident, s) <- getSpan p
+
+  () <- saveSpan (identCategory $ trim $ idText ident) s
+
+  return ident
+
+
 ident :: Parser Ident
-ident = span "identifier" $ lexeme $ do
+ident = categorizeIdent $ lexeme $ do
   location <- LocOffset <$> getOffset
   firstChar <- oneOf firstIdentChars
   rest <- many (oneOf otherIdentChars)
@@ -327,7 +356,7 @@ matchArm = do
 
 -- Literals
 intLiteral :: Parser Int
-intLiteral = do
+intLiteral = span "constant.numeric.elaine" $ do
   negative <- optional (symbol "-")
   let mul = case negative of
         Just _ -> negate
@@ -335,13 +364,13 @@ intLiteral = do
   mul <$> lexeme L.decimal
 
 stringLiteral :: Parser String
-stringLiteral = char '\"' *> manyTill L.charLiteral (char '\"') <* space
+stringLiteral = span "string.quoted.elaine" $ char '\"' *> manyTill L.charLiteral (char '\"') <* space
 
 boolLiteral :: Parser Bool
-boolLiteral = True <$ try (keyword "true") <|> False <$ try (keyword "false")
+boolLiteral = span "constant.language.boolean.elaine" $ True <$ try (keyword "true") <|> False <$ try (keyword "false")
 
 unitLiteral :: Parser ()
-unitLiteral = parens $ pure ()
+unitLiteral = span "constant.language.unit.elaine" $ parens $ pure ()
 
 functionLiteral :: Parser Function
 functionLiteral = try (keyword "fn") >> function
