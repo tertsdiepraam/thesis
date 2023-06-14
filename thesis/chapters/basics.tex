@@ -53,7 +53,8 @@ let square_is_even = fn(x) {
 };
 
 let give_answer = fn(f, x) {
-    let text = concat(show_int(x), " is ");
+	let prefix = concat(concat(s, " "), show_int(x));
+    let text = concat(prefix, " is ");
     let answer = f(x);
     concat(text, answer)
 };

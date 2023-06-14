@@ -43,7 +43,7 @@ allBuiltIns =
     bNeg,
     bMul,
     bDiv,
-    bMod,
+    bModulo,
     bPow,
     bEq,
     bNeq,
@@ -86,8 +86,8 @@ bMul = intBinOp "mul" (*)
 bDiv :: BuiltIn
 bDiv = intBinOp "div" div
 
-bMod :: BuiltIn
-bMod = intBinOp "mod" mod
+bModulo :: BuiltIn
+bModulo = intBinOp "modulo" mod
 
 bPow :: BuiltIn
 bPow = intBinOp "pow" (^)
