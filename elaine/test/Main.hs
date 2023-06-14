@@ -19,6 +19,7 @@ import Test.Hspec
   )
 import Text.RawString.QQ
 import TypeCheck (testTypeCheck)
+import Examples (testAllExamples)
 import Elaine.Ident (Ident(..), Location (..))
 
 tt :: Expr
@@ -54,6 +55,7 @@ main = hspec $ do
   testParseExpr
   testTypeCheck
   testEval
+  testAllExamples
 
 -- testExec
 
