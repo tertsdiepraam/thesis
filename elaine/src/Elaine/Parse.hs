@@ -88,7 +88,7 @@ space' :: Parser ()
 space' =
   L.space
     space1
-    (L.skipLineComment "#")
+    (span "comment.line.number-sign.elaine" $ L.skipLineComment "#")
     empty
 
 lexeme :: Parser a -> Parser a
