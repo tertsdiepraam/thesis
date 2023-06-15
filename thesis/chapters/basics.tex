@@ -1,18 +1,5 @@
 \chapter{A Tour of Elaine}\label{chap:basics}
 
-\begin{itemize}
-\item Begin with examples
-\item Especially elaborations from HA paper
-\item Explain relation between Elaine and Hefty Algebras
-\item Spec
-    \begin{itemize}
-    \item Syntax
-    \item Reduction semantics
-    \item Typing rules \& row equivalence
-    \item Type checker: unification rules mostly
-    \end{itemize}
-\end{itemize}
-
 The language designed for this thesis is called ``Elaine". The distinguishing feature of this language is its support for higher-order effects via elaborations. As far as we know, it is the second language with support for elaborations, the first being Heft. Elaine adds two new features: implicit elaboration resulution and compilation of elaborations, which are explained in \cref{chap:elabres, chap:elabcomp}, respectively. Additionally, Elaine differs by not requiring monadic style programming for effectful computation. This makes Elaine a surprisingly expressive language given its simplicity.
 
 This chapter introduces Elaine with motivating examples for the design choices. The full specification is given in \cref{chap:spec}. More example programs are available online\footnote{\url{https://github.com/tertsdiepraam/thesis/tree/main/elaine/examples}}.

@@ -2,13 +2,15 @@
 
 While algebraic effects are a relatively new concept, the analysis of effectful computation and the representation of effects in programming language has a rich history. This history is relevant to this thesis because the various approaches to modelling effects proposed over time can be found in many popular programming languages. A comparison between these languages and languages with algebraic and higher-order effects hence requires comparison between theories. This chapter details this history.
 
-\todo[inline]{Give definitions of effects, pure/impure, effectless/effectful}
-
 \section{Motivation for Effects}
 
-First, let us pose a simple question: why study effects? As \textcite{moggi_computational_1989} notes, analyzing only pure computation leaves out many aspects of programs, such as side-effects, non-determinism and non-termination. Reasoning about the behaviour of a program then necessarily needs to include an analysis of effects.
+In an heavily simplified perspective on computation, programs and their procedures are \emph{pure} functions. They take some input and for every set of inputs they return the same output, without interacting with other parts of the program or with the system. There is a certain elegance to this view: pure programs are simple to reason about and analyse.
 
-Proving either the presence or absence of these properties is very valuable. For example, a deterministic, side-effect-less computation can be reliably cached. Without side-effects, computation can also be executed out of order without any observable difference. Hence, many sophisticated compilers rely on effect tracking to inform the optimizations they perform.\citationneeded A theory of effectful computation can therefore help compiler engineers prove the correctness of their transformations.\citationneeded Hence, a language with a strong formal model for effects is easier to compile or optimize than one without.
+However, in practice, many programs are \emph{impure}. As \textcite{moggi_computational_1989} notes, analyzing only pure computation leaves out many aspects of programs, such as side-effects, non-determinism and non-termination. These capabilities outside pure computation are called \emph{effects} \autocite{moggi_computational_1989}. Reasoning about the behaviour of a program then necessarily needs to include an analysis of effects.
+
+Some programming languages, such as C, have opted to give the programmer virtually unrestriced access to effectful operations. Any part of of a C program can access memory, the filesystem and is even allowed to use \code{goto} to jump to other parts outside of regular control flow. \citationneeded This unrestricted use has famously been criticized by \textcite{dijkstra_letters_1968} and many others. A challenge in language design is then to design a language which allows for (limited) impure calculation, while retaining the attractive qualities of pure languages.
+
+First, let us pose a simple question: why study effects? Proving either the presence or absence of these properties is very valuable. For example, a deterministic, side-effect-less computation can be reliably cached. Without side-effects, computation can also be executed out of order without any observable difference. Hence, many sophisticated compilers rely on effect tracking to inform the optimizations they perform.\citationneeded A theory of effectful computation can therefore help compiler engineers prove the correctness of their transformations.\citationneeded Hence, a language with a strong formal model for effects is easier to compile or optimize than one without.
 
 In addition, support for effects in the type system of a programming language could allow programmers to write stricter and safer APIs. In a language where the type system can reason about effects, the compiler can make certain guarantees beyond type checking only the input and output types of a function.
 
