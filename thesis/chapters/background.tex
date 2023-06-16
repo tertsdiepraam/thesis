@@ -212,7 +212,7 @@ After the elaboration step, the computation will be elaborated into the program 
     &\quad x \gets \oask();\\
     &\quad y \gets \{\\
     &\quad\quad v \gets \oask();\\
-    &\quad\quad \handle[hAsk((\lambda x.\ 2\cdot x)(v)]\ \oask()\\
+    &\quad\quad \handle[hAsk((\lambda x.\ 2\cdot x)(v))]\ \oask()\\
     &\quad\};\\
     &\quad x + y \\
     &\}
@@ -221,4 +221,3 @@ After the elaboration step, the computation will be elaborated into the program 
 One way to think about elaboration operations is as scoped modular macros; a syntactic substitution is performed based on the given elaboration.
 
 Throughout this thesis we will write elaborated higher-order operations with a \code{!} suffix, to distinguish them from algebraic effects.
-

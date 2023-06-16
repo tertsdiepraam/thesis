@@ -22,7 +22,7 @@ data Free f a
 \end{lstlisting}
 The parameter \el{f} here can be a sum of effect operations, which forms the effect row. This yields some effect row polymorphism, but the effect row cannot usually be reordered. To compensate for this lack of reordering, many libraries define typeclass constraints that can be used to reason about effects in effect rows.
 
-Effect rows are often using the \emph{data types à la carte} technique \autocite{swierstra_data_2008}, which requires a fairly robust typeclass system. Hence, many languages cannot encode effects within the language itself. As a result, most Haskell libraries for algebraic effecs require many GHC language extensions to provide an ergonomic interface. In some languages, it is possible to work around the limitations with metaprogramming, such as the Rust library \lib{effin-mad}{https://github.com/rosefromthedead/effing-mad}, though the result does not integrate well with the rest of language and its use is discouraged by the author.
+Effect rows are often using the \emph{data types à la carte} technique \autocite{swierstra_data_2008}, which requires a fairly robust typeclass system. Hence, many languages cannot encode effects within the language itself. As a result, most Haskell libraries for algebraic effects require many GHC language extensions to provide an ergonomic interface. In some languages, it is possible to work around the limitations with metaprogramming, such as the Rust library \lib{effin-mad}{https://github.com/rosefromthedead/effing-mad}, though the result does not integrate well with the rest of language and its use is discouraged by the author.
 
 Using the \el{eff} library as an example, we get the following function signature for an effectful function that accesses the filesystem:
 \begin{lstlisting}[language=Haskell,style=fancy]
@@ -31,6 +31,7 @@ readfile :: FileSystem :< effs => String -> Eff effs String
 In this signature, \hs{FileSystem} is an effect and \hs{effs} is a polymorphic tail. The signature has a constraint stating that the \hs{FileSystem} effect should be in the effect row \hs{effs}. This means that the \hs{readfile} function must be called in a context at least wrapped in a handler for the \hs{FileSystem} effect.
 
 Contrast the signature above with a more conventional signature of \code{readfile} using the \hs{IO} monad:
+% spell-checker:ignore readfile firstline
 \begin{lstlisting}[language=Haskell,style=fancy]
 readfile :: String -> IO String
 \end{lstlisting}

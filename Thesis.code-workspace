@@ -9,6 +9,7 @@
 	],
 	"settings": {
 		"cSpell.words": [
+			"Agda",
 			"algebraicity",
 			"arities",
 			"arity",
@@ -19,6 +20,7 @@
 			"cond",
 			"Decomp",
 			"deconstructors",
+			"EEMCS",
 			"effectful",
 			"effectless",
 			"Eithers",
@@ -34,7 +36,9 @@
 			"HLINT",
 			"Hspec",
 			"idents",
+			"Idris",
 			"Koka",
+			"metaprogramming",
 			"Milner",
 			"moggi",
 			"monomorphization",

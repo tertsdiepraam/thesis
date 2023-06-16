@@ -69,7 +69,7 @@ addStackTrace s =
 
 data Metadata = Metadata
   { 
-    -- left: current span, right: definiton of that span
+    -- left: current span, right: definition of that span
     definitions :: [(Ident, Ident)],
     elabs :: Map Int [Ident]
     -- types :: [(Ident, TypeScheme)],
