@@ -20,6 +20,6 @@ let safe_div = fn(x, y) <Abort> Int {
 };
 
 let main = add(
-    handle[hAbort(0)] safe_div(3,0),
+    handle[hAbort(0)] safe_div(3, 0),
     handle[hAbort(0)] safe_div(10, 2),
 );
