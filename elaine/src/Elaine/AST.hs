@@ -1,8 +1,8 @@
 module Elaine.AST where
 
+import Elaine.Ident (Ident (Ident))
 import Elaine.TypeVar
 import Elaine.Types (TypeScheme)
-import Elaine.Ident (Ident (Ident))
 
 type Program = [Declaration]
 
@@ -49,8 +49,8 @@ data Expr
   | If Expr Expr Expr
   | Handle Expr Expr
   | Match Expr [MatchArm]
-  -- The integer is mapped to a unique identifier while type checking
-  | ImplicitElab Int Expr
+  | -- The integer is mapped to a unique identifier while type checking
+    ImplicitElab Int Expr
   | Elab Expr Expr
   | Var Ident
   | Let (Maybe Ident) (Maybe ASTComputationType) Expr Expr
@@ -75,7 +75,7 @@ instance Show BuiltIn where
   show (BuiltIn (Ident x _) _ _) = "<built-in " ++ x ++ ">"
 
 instance Eq BuiltIn where
-  (BuiltIn x _ _) == (BuiltIn y _  _) = x == y
+  (BuiltIn x _ _) == (BuiltIn y _ _) = x == y
 
 -- A match is as simple as possible:
 --  - Only constructors can be matches
@@ -101,4 +101,3 @@ data ASTValueType
   | TypeHandler Ident TypeVar ASTValueType
   | TypeElaboration Ident Row
   deriving (Show, Eq)
-

@@ -1,15 +1,15 @@
 module Elaine.Parse (parseProgram, parseExpr, ParseResult, Spans, Span) where
 
-import Data.Aeson (ToJSON)
-import GHC.Generics (Generic)
 import Control.Monad.State (State, evalState, get, put, runState)
+import Data.Aeson (ToJSON)
 import Data.Char (isSpace)
 import Data.Either (partitionEithers)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text, pack, unpack)
 import Data.Void
 import Elaine.AST
-import Elaine.Ident (Ident(Ident, idText), Location(LocOffset))
+import Elaine.Ident (Ident (Ident, idText), Location (LocOffset))
+import GHC.Generics (Generic)
 import Text.Megaparsec
   ( MonadParsec (eof, notFollowedBy, try),
     ParseErrorBundle,
@@ -28,7 +28,7 @@ import Text.Megaparsec
     sepEndBy,
     (<|>),
   )
-import Text.Megaparsec.Char ( char, space, space1, string )
+import Text.Megaparsec.Char (char, space, space1, string)
 import qualified Text.Megaparsec.Char.Lexer as L
 import Prelude hiding (span)
 
@@ -44,8 +44,9 @@ type Parser = ParsecT Void Text (State Spans)
 type ParseResult a = Either (ParseErrorBundle Text Void) a
 
 trim :: String -> String
-trim = reverse . f . reverse. f
-   where f = dropWhile isSpace
+trim = reverse . f . reverse . f
+  where
+    f = dropWhile isSpace
 
 getSpan :: Parser a -> Parser (a, Span)
 getSpan p = do
@@ -64,7 +65,7 @@ saveSpan c s = do
   put (currentList ++ [(s, c)])
 
 span :: String -> Parser a -> Parser a
-span c p = do 
+span c p = do
   (res, s) <- getSpan p
   () <- saveSpan c s
   return res
@@ -150,7 +151,6 @@ categorizeIdent p = do
 
   return ident'
 
-
 ident :: Parser Ident
 ident = categorizeIdent $ lexeme $ do
   location <- LocOffset <$> getOffset
@@ -168,8 +168,6 @@ typeIdent = span "storage.type.elaine" $ lexeme $ do
   ticks <- many (char '\'')
   exc <- option "" (symbol "!")
   return $ Ident ([firstChar] ++ rest ++ ticks ++ unpack exc) location
-
-
 
 -- PROGRAM
 -- A program is simply a sequence of modules, but the parser requires parsing
@@ -268,7 +266,7 @@ computationType = do
   ASTComputationType (fromMaybe (Row [] Nothing) effs) <$> valueType
 
 valueType :: Parser ASTValueType
-valueType = 
+valueType =
   try (parens $ pure TypeUnit)
     <|> functionType
     <|> (TypeName <$> typeIdent)

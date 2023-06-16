@@ -1,21 +1,21 @@
 module Elaine.Exec where
 
+import Control.Monad ((>=>))
+import Data.Aeson (ToJSON, encode)
 import Data.Bifunctor (first)
+import Data.Map (Map)
 import Data.Text (Text, pack, unpack)
-import Data.Aeson (encode, ToJSON)
 import qualified Data.Text.Lazy as L
 import Elaine.AST (Program, Value)
-import Elaine.Transform (elabToHandle, makeElabExplicit)
 import Elaine.Eval (eval)
-import Elaine.Parse (parseProgram, Spans)
-import Elaine.TypeCheck (typeCheck, getMain, Metadata (elabs), Metadata, CheckState (stateMetadata))
-import Prelude hiding (last, lookup)
-import Elaine.Pretty (pretty)
-import Control.Monad ((>=>))
-import Text.Pretty.Simple (pShow)
-import Elaine.Types (CompType, TypeScheme (TypeScheme))
-import Data.Map (Map)
 import Elaine.Ident (Ident)
+import Elaine.Parse (Spans, parseProgram)
+import Elaine.Pretty (pretty)
+import Elaine.Transform (elabToHandle, makeElabExplicit)
+import Elaine.TypeCheck (CheckState (stateMetadata), Metadata (elabs), getMain, typeCheck)
+import Elaine.Types (CompType, TypeScheme (TypeScheme))
+import Text.Pretty.Simple (pShow)
+import Prelude hiding (last, lookup)
 
 last :: [a] -> Maybe a
 last = foldl (\_ x -> Just x) Nothing
@@ -104,15 +104,17 @@ execSpans :: (Text, Text) -> Either Error Spans
 execSpans = parseSpans
 
 execCheck :: (Text, Text) -> Either Error CompType
-execCheck = parseNoSpans >=> \x -> case typeCheck x of
-  Left a -> Left $ TypeError a
-  Right (env, _) -> case getMain env of
-    TypeScheme _ _ t -> Right t
+execCheck =
+  parseNoSpans >=> \x -> case typeCheck x of
+    Left a -> Left $ TypeError a
+    Right (env, _) -> case getMain env of
+      TypeScheme _ _ t -> Right t
 
 execCheckMetadata :: (Text, Text) -> Either Error Metadata
-execCheckMetadata = parseNoSpans >=> \x -> case typeCheck x of
-  Left a -> Left $ TypeError a
-  Right (_, s) -> Right $ stateMetadata s
+execCheckMetadata =
+  parseNoSpans >=> \x -> case typeCheck x of
+    Left a -> Left $ TypeError a
+    Right (_, s) -> Right $ stateMetadata s
 
 execExplicit :: (Text, Text) -> Either Error String
 execExplicit = parseNoSpans >=> typeCheck' >=> makeElabExplicit' >=> pretty'

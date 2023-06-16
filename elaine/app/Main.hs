@@ -1,7 +1,7 @@
 module Main where
 
+import Elaine.Exec (exec)
 import System.Environment
-import Elaine.Exec ( exec )
 
 main :: IO ()
 main = do
@@ -10,4 +10,3 @@ main = do
     [file] -> exec "run" file
     [cmd, file] -> exec cmd file
     _ -> error "Invalid usage"
-

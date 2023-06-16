@@ -1,11 +1,11 @@
 module Elaine.Types (Arrow (..), Row (..), TypeScheme (..), CompType (..), ValType (..), Effect (..), rowUpdate, rowInsert, rowVar, rowOpen, rowClosed, rowEmpty, rowIsEmpty, rowMaybe) where
 
-import Data.MultiSet (MultiSet)
-import qualified Data.MultiSet as MultiSet
-import Elaine.TypeVar
-import Elaine.Ident (Ident)
 import Data.Map (Map)
 import Data.Maybe (isNothing)
+import Data.MultiSet (MultiSet)
+import qualified Data.MultiSet as MultiSet
+import Elaine.Ident (Ident)
+import Elaine.TypeVar
 
 type Path = [Ident]
 
@@ -66,4 +66,3 @@ rowIsEmpty (Row a b) = MultiSet.null a && isNothing b
 
 rowMaybe :: [Effect] -> Maybe TypeVar -> Row
 rowMaybe effs = Row (MultiSet.fromList effs)
-

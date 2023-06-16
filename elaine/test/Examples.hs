@@ -2,7 +2,7 @@ module Examples (testAllExamples) where
 
 import qualified Data.Map (fromList)
 import Elaine.AST (Value (..))
-import Elaine.Exec (execRun, pack', Result (..))
+import Elaine.Exec (Result (..), execRun, pack')
 import System.Directory (listDirectory)
 import Test.Hspec
   ( Expectation,
@@ -11,8 +11,9 @@ import Test.Hspec
     expectationFailure,
     hspec,
     it,
-    shouldBe, shouldSatisfy,
-    runIO
+    runIO,
+    shouldBe,
+    shouldSatisfy,
   )
 
 expected :: String -> Value

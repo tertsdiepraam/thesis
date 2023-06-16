@@ -4,10 +4,12 @@ module Main (main) where
 
 import Data.Text (pack)
 import Elaine.AST
-import Elaine.Transform (elabToHandle)
 import Elaine.Eval (evalExpr, newEnv)
 import Elaine.Exec (Command (..), Result (..), exec, execParse, execRun, pack')
+import Elaine.Ident (Ident (..), Location (..))
 import Elaine.Parse (parseExpr)
+import Elaine.Transform (elabToHandle)
+import Examples (testAllExamples)
 import Test.Hspec
   ( Expectation,
     SpecWith,
@@ -15,12 +17,11 @@ import Test.Hspec
     expectationFailure,
     hspec,
     it,
-    shouldBe, shouldSatisfy,
+    shouldBe,
+    shouldSatisfy,
   )
 import Text.RawString.QQ
 import TypeCheck (testTypeCheck)
-import Examples (testAllExamples)
-import Elaine.Ident (Ident(..), Location (..))
 
 tt :: Expr
 tt = Val $ Bool True
@@ -127,7 +128,8 @@ testRun = describe "run" $ do
     run "let main = 5;"
       `shouldBe` Right (Int 5)
 
-    run [r|
+    run
+      [r|
       let main = {
         let x = 5;
         let y = 6;
@@ -137,7 +139,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (Int 5)
 
   it "elaborates higher order effects into values" $ do
-    run [r|
+    run
+      [r|
       effect A! {
         a!() Int
       }
@@ -155,7 +158,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (Int 10)
 
   it "elaborates higher order effects into algebraic effects" $ do
-    run [r|
+    run
+      [r|
       effect A {
         a() Int
       }
@@ -189,46 +193,53 @@ testRun = describe "run" $ do
       `shouldBe` Right (Int 101)
 
   it "can access global values" $ do
-    run [r|
+    run
+      [r|
       let x = 5;
       let y = 6;
       let main = if true { x } else { y };
     |]
       `shouldBe` Right (Int 5)
-      
+
   it "can use functions from the standard library" $ do
-    run [r|
+    run
+      [r|
       use std;
       let main = add(6, 5);
     |]
       `shouldBe` Right (Int 11)
 
-    run [r|
+    run
+      [r|
       use std;
       let main = sub(6, 5);
     |]
       `shouldBe` Right (Int 1)
 
-    run [r|
+    run
+      [r|
       use std;
       let main = mul(6, 5);
     |]
       `shouldBe` Right (Int 30)
 
-    run [r|
+    run
+      [r|
       use std;
       let main = concat(concat("hello", " "), "world");
     |]
       `shouldBe` Right (String "hello world")
 
-    run [r|
+    run
+      [r|
       use std;
       let main = and(true, true);
     |]
       `shouldBe` Right (Bool True)
 
   it "a" $ do
-    run [r|
+    run
+      [r|
       use std;
       let main = {
         let x = add(5, 10);
@@ -239,7 +250,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (Int 34)
 
   it "handles the Out effect" $ do
-    run [r|
+    run
+      [r|
       use std;
 
       effect Out {
@@ -266,14 +278,16 @@ testRun = describe "run" $ do
       `shouldBe` Right (String "hello world")
 
   it "can turn values into strings" $ do
-    run [r|
+    run
+      [r|
       use std;
       let main = show_int(5);
     |]
       `shouldBe` Right (String "5")
 
   it "can construct data types" $ do
-    run [r|
+    run
+      [r|
       type Either {
         Left(<> a)
         Right(<> b)
@@ -286,7 +300,8 @@ testRun = describe "run" $ do
         _ -> False
 
   it "can represent a list" $ do
-    run [r|
+    run
+      [r|
       type List {
         Nil()
         Cons(a, List)
@@ -299,7 +314,8 @@ testRun = describe "run" $ do
         _ -> False
 
   it "can match on custom data types" $ do
-    run [r|
+    run
+      [r|
       type Bool {
         False()
         True()
@@ -313,7 +329,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (Int 5)
 
   it "can call a defined function" $ do
-    run [r|
+    run
+      [r|
       use std;
       let add3 = fn(a: Int, b: Int, c: Int) <> Int {
         add(a, add(b, c))
@@ -324,7 +341,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (Int 6)
 
   it "can call a function returning a custom datatype" $ do
-    run [r|
+    run
+      [r|
       use std;
 
       type Maybe {
@@ -347,7 +365,8 @@ testRun = describe "run" $ do
         _ -> False
 
   it "can handle the abort effect" $ do
-    run [r|
+    run
+      [r|
       use std;
       
       type Maybe {
@@ -383,7 +402,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (String "cannot divide by zero")
 
   it "can elaborate and handle exceptions" $ do
-    run [r|
+    run
+      [r|
       use std;
 
       type Maybe {
@@ -435,7 +455,8 @@ testRun = describe "run" $ do
         _ -> False
 
   it "can do a state effect" $ do
-    run [r|
+    run
+      [r|
       use std;
 
       effect State {
@@ -471,7 +492,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (Int 6)
 
   it "can do some funky stuff" $ do
-    run [r|
+    run
+      [r|
       use std;
       let hVal = handler {
         return(x) { x }
@@ -489,7 +511,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (Int 10)
 
   it "can do the reader effect" $ do
-    run [r|
+    run
+      [r|
       use std;
 
       effect Reader! {
@@ -542,7 +565,8 @@ testRun = describe "run" $ do
         _ -> False
 
   it "can do the log effect" $ do
-    run [r|
+    run
+      [r|
       use std;
 
       effect Log! {
@@ -598,7 +622,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (String "root: one\nroot:foo: two\nroot:foo:bar: three\n")
 
   it "does an use" $ do
-    run [r|
+    run
+      [r|
     mod math {
       use std;
       pub let double = fn(x) {
@@ -619,7 +644,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (Int 20)
 
   it "elaborates dynamically based on if" $ do
-    run [r|
+    run
+      [r|
       let x = true;
       # TODO should register the effects for type checking 
       let e1 = elaboration A! -> <> {
@@ -634,7 +660,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (Int 5)
 
   it "uses the right elaboration based on runtime values" $ do
-    run [r|
+    run
+      [r|
     use std;
 
     let f = fn(x) { a!() };
@@ -659,7 +686,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (Int 11)
 
   it "applies the inner handler" $ do
-    run [r|
+    run
+      [r|
       let e1 = elaboration A! -> <> {
         a!() { 5 }
       };
@@ -676,7 +704,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (Int 10)
 
   it "weird uses" $ do
-    run [r|
+    run
+      [r|
     mod A {
       pub mod B {
         pub mod C {
@@ -693,7 +722,8 @@ testRun = describe "run" $ do
       `shouldBe` Right (Int 5)
 
   it "weird use 2" $ do
-    run [r|
+    run
+      [r|
     mod A {
       mod B {
         pub let x = 5;

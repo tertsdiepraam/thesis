@@ -1,4 +1,4 @@
-module Elaine.Ident (Ident (Ident, idText), Location(LocOffset, LocBuiltIn, LocNone)) where
+module Elaine.Ident (Ident (Ident, idText), Location (LocOffset, LocBuiltIn, LocNone)) where
 
 import Data.Aeson (ToJSON)
 import GHC.Generics

@@ -2,16 +2,19 @@
 
 module TypeCheck (testTypeCheck) where
 
+import Data.Bifunctor (second)
 import Data.Either (isLeft)
-import Data.Text (pack)
 import qualified Data.Map as Map
-import Elaine.Types
-import Elaine.Transform (elabToHandle)
+import Data.Text (pack)
+import Data.Text.Internal.Read (IParser (P))
 import Elaine.Exec (Result, exec, execCheck, isTypeError, pack')
+import Elaine.Ident (Ident (..), Location (LocNone))
 import Elaine.Parse (ParseResult, parseExpr, parseProgram)
 import Elaine.Pretty (pretty)
+import Elaine.Transform (elabToHandle)
 import Elaine.TypeCheck (TypeEnv (TypeEnv), getMain, getVar, runInfer, typeCheck, unifyRows)
 import Elaine.TypeVar (TypeVar (ExplicitVar))
+import Elaine.Types
 import Test.Hspec
   ( Expectation,
     SpecWith,
@@ -25,9 +28,6 @@ import Test.Hspec
 import Test.Hspec.Runner (SpecResult (specResultSuccess))
 import Text.RawString.QQ (r)
 import Prelude hiding (pure)
-import Data.Text.Internal.Read (IParser(P))
-import Data.Bifunctor (second)
-import Elaine.Ident (Ident(..), Location (LocNone))
 
 check :: String -> Result CompType
 check = execCheck . pack' . (,) "test"
@@ -452,9 +452,10 @@ testTypeCheck = describe "typeCheck" $ do
       let main = handle[h] { f() };
     |]
       `shouldBe` Right (pure TypeString)
-  
+
   it "can call function with effect in signature" $ do
-    check [r|
+    check
+      [r|
       effect A {
         a() ()
       }
@@ -471,7 +472,8 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[hf] f(5);
-    |] `shouldBe` Right (pure TypeInt)
+    |]
+      `shouldBe` Right (pure TypeInt)
 
   it "type for resume must match return type of operation" $ do
     check
@@ -657,9 +659,10 @@ testTypeCheck = describe "typeCheck" $ do
       let main = handle[hf] applyTo2(addFoo);
     |]
       `shouldBe` Right (pure TypeInt)
-  
+
   it "can infer an elaboration" $ do
-    check [r|
+    check
+      [r|
       effect Foo! {
         foo!(Int) Int
       }
@@ -676,13 +679,13 @@ testTypeCheck = describe "typeCheck" $ do
 
       let main = ef;
     |]
-      `shouldSatisfy`
-        \case
+      `shouldSatisfy` \case
         Right (CompType _ (TypeElaboration (Effect [Ident "Foo!" _] _) row)) -> True
         _ -> False
-  
+
   it "can infer explicit elab with empty row" $ do
-    check [r|
+    check
+      [r|
       effect Foo! {
         foo!() Int
       }
@@ -692,10 +695,12 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = elab[ef] foo!();
-    |] `shouldBe` Right (pure TypeInt)
-  
+    |]
+      `shouldBe` Right (pure TypeInt)
+
   it "can infer explicit elab with another effect" $ do
-    check [r|
+    check
+      [r|
       effect Foo! {
         foo!() Int
       }
@@ -714,9 +719,11 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[hb] elab[ef] foo!();
-    |] `shouldBe` Right (pure TypeInt)
-    
-    check [r|
+    |]
+      `shouldBe` Right (pure TypeInt)
+
+    check
+      [r|
       effect Foo! {
         foo!() Int
       }
@@ -735,10 +742,12 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = elab[ef] foo!();
-    |] `shouldSatisfy` isTypeError
-  
+    |]
+      `shouldSatisfy` isTypeError
+
   it "elaborations must have the same type" $ do
-    check [r|
+    check
+      [r|
       effect Foo! {
         foo!() Int
       }
@@ -761,9 +770,11 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[hb] elab[if true { ef1 } else { ef2 }] foo!();
-    |] `shouldSatisfy` isTypeError
-    
-    check [r|
+    |]
+      `shouldSatisfy` isTypeError
+
+    check
+      [r|
       effect Foo! {
         foo!() Int
       }
@@ -786,10 +797,12 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[hb] elab[if true { ef1 } else { ef2 }] foo!();
-    |] `shouldBe` Right (pure TypeInt)
-  
+    |]
+      `shouldBe` Right (pure TypeInt)
+
   it "can do handle through elab" $ do
-    check [r|
+    check
+      [r|
       use std;
 
       effect Foo! {
@@ -810,10 +823,12 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = handle[hb] elab[ef] add(foo!(), bar());
-    |] `shouldBe` Right (pure TypeInt)
-  
+    |]
+      `shouldBe` Right (pure TypeInt)
+
   it "does not accept a handler for elab" $ do
-    check [r|
+    check
+      [r|
       effect Foo {
         foo() Int
       }
@@ -824,10 +839,12 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = elab[hf] foo();
-    |] `shouldSatisfy` isTypeError
+    |]
+      `shouldSatisfy` isTypeError
 
   it "does not get confused between effects from different modules" $ do
-    check [r|
+    check
+      [r|
       mod A {
         effect Foo {
           foo() String
@@ -844,10 +861,12 @@ testTypeCheck = describe "typeCheck" $ do
         foo() Int
       }
       let main = handle[hf] foo();
-    |] `shouldSatisfy` isTypeError
+    |]
+      `shouldSatisfy` isTypeError
 
   it "can figure out implicit elab for one elaboration" $ do
-    check [r|
+    check
+      [r|
       effect Foo! {
         foo!() Int
       }
@@ -857,10 +876,12 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = elab foo!();
-    |] `shouldBe` Right (pure TypeInt)
+    |]
+      `shouldBe` Right (pure TypeInt)
 
   it "number of function arguments should match" $ do
-    check [r|
+    check
+      [r|
       let id = fn(x) { x };
 
       let call = fn(f: fn() a) a {
@@ -868,7 +889,8 @@ testTypeCheck = describe "typeCheck" $ do
       };
 
       let main = call(id);
-    |] `shouldSatisfy` isTypeError
+    |]
+      `shouldSatisfy` isTypeError
 
 testUnifyRows :: SpecWith ()
 testUnifyRows = describe "unifyRows" $ do

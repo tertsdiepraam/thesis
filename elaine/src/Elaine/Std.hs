@@ -5,21 +5,20 @@ import Elaine.AST
   ( BuiltIn (..),
     Value (Bool, Constant, Int, String),
   )
-import Elaine.Ident (Ident (Ident), Location(LocBuiltIn))
-import Elaine.Types (TypeScheme (TypeScheme), CompType (CompType), ValType (TypeArrow, TypeBool, TypeInt, TypeString), rowVar, rowEmpty, Arrow (Arrow))
+import Elaine.Ident (Ident (Ident), Location (LocBuiltIn))
 import Elaine.TypeVar (TypeVar (ExplicitVar))
+import Elaine.Types (Arrow (Arrow), CompType (CompType), TypeScheme (TypeScheme), ValType (TypeArrow, TypeBool, TypeInt, TypeString), rowEmpty, rowVar)
 
 arrow :: [ValType] -> ValType -> TypeScheme
 arrow args ret =
-  let 
-    a = ExplicitVar (Ident "a" LocBuiltIn)
-    b = ExplicitVar (Ident "b" LocBuiltIn)
-  in
-    TypeScheme [] [a, b] $
-      CompType (rowVar a) $
-        TypeArrow $ Arrow
-          (map (CompType rowEmpty) args)
-          (CompType (rowVar b) ret)
+  let a = ExplicitVar (Ident "a" LocBuiltIn)
+      b = ExplicitVar (Ident "b" LocBuiltIn)
+   in TypeScheme [] [a, b] $
+        CompType (rowVar a) $
+          TypeArrow $
+            Arrow
+              (map (CompType rowEmpty) args)
+              (CompType (rowVar b) ret)
 
 newBuiltIn :: String -> TypeScheme -> ([Value] -> Maybe Value) -> BuiltIn
 newBuiltIn name t f = BuiltIn (Ident name LocBuiltIn) t $ \x -> case f x of

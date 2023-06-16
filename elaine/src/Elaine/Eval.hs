@@ -10,9 +10,9 @@ import Data.List (find, isSuffixOf)
 import Data.Map (Map, assocs, empty, fromList, lookup, singleton, union)
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Elaine.AST
+import Elaine.Ident (Ident (Ident, idText), Location (LocBuiltIn, LocNone))
 import Elaine.Pretty (pretty)
 import Elaine.Std (stdBindings)
-import Elaine.Ident (Ident (Ident, idText), Location (LocNone, LocBuiltIn))
 import Prelude hiding (exp, lookup)
 
 -- The decomposition is a list of functions that plug an expression into
@@ -101,7 +101,6 @@ decompose ctx s = f (s, [])
 
 ctxCommon :: Ctx
 ctxCommon (If e1 e2 e3) = Just (e1, \x -> If x e2 e3)
-
 -- The application ctx is a bit difficult, we need to accept both values and variables as
 -- function, because the variables might effect operations. We then enter the args if there
 -- any more args to evaluate.
@@ -301,12 +300,12 @@ reduceElab :: Elaboration -> Expr -> Maybe Expr
 reduceElab elab@(Elaboration _ _ clauses) e = applyOps clauses
   where
     applyOps [] = Nothing
-    applyOps (o:os) = case applyOp o of
+    applyOps (o : os) = case applyOp o of
       Just e' -> Just e'
       Nothing -> applyOps os
-    
+
     applyOp (OperationClause op params body) = case decompose (ctxElab op) e of
-      (Var x, c:cs) | x == op ->
+      (Var x, c : cs) | x == op ->
         case c (Var x) of
           App (Var _) args -> Just $ compose (subst (zip params (map (Elab (Val $ Elb elab)) args)) body, cs)
           _ -> Nothing

@@ -6,8 +6,6 @@
 
 module Elaine.TypeCheck where
 
-import Data.Aeson (ToJSON)
-import GHC.Generics ( Generic )
 import Control.Lens (Lens', over, set, view, (^.))
 import Control.Lens.TH (makeLenses)
 import Control.Monad (forM_, when)
@@ -18,6 +16,7 @@ import Control.Monad.State
     runState,
     (<=<),
   )
+import Data.Aeson (ToJSON)
 import Data.Char (isLower)
 import Data.Foldable (foldlM)
 import Data.List (find, intercalate, sortOn)
@@ -35,6 +34,7 @@ import Elaine.Pretty (Pretty, pretty)
 import Elaine.Std (stdTypes)
 import Elaine.TypeVar (TypeVar (ExplicitVar, ImplicitVar))
 import Elaine.Types (Arrow (Arrow), CompType (CompType), Effect (Effect), Row (..), TypeScheme (TypeScheme, effectVars, typ, typeVars), ValType (TypeArrow, TypeBool, TypeElaboration, TypeHandler, TypeInt, TypeName, TypeString, TypeUnit, TypeV), rowEmpty, rowIsEmpty, rowMaybe, rowOpen, rowUpdate, rowVar)
+import GHC.Generics (Generic)
 import Prelude hiding (pure)
 
 -- TypeVar to Type
@@ -68,8 +68,7 @@ addStackTrace s =
     )
 
 data Metadata = Metadata
-  { 
-    -- left: current span, right: definition of that span
+  { -- left: current span, right: definition of that span
     definitions :: [(Ident, Ident)],
     elabs :: Map Int [Ident]
     -- types :: [(Ident, TypeScheme)],
@@ -420,15 +419,16 @@ instance Substitutable Row where
 
 unify :: CompType -> CompType -> Infer ()
 unify a b = do
-    a' <- subM a
-    b' <- subM b
-    addStackTrace (
-      "unifying "
-      ++ "\n    "
-      ++ pretty a'
-      ++ "\n    "
-      ++ pretty b'
-      ) $ unify' a' b'
+  a' <- subM a
+  b' <- subM b
+  addStackTrace
+    ( "unifying "
+        ++ "\n    "
+        ++ pretty a'
+        ++ "\n    "
+        ++ pretty b'
+    )
+    $ unify' a' b'
   where
     unify' (CompType rowA typA) (CompType rowB typB) = do
       () <- unifyRows rowA rowB
@@ -530,7 +530,7 @@ instance Inferable Expr where
         tf <- infer env f
         tArgs <- inferMany env args
         tRet@(CompType row _) <- freshC
-        
+
         -- The effect rows for the function value, arguments and return type need
         -- to be unified.
         () <- mapM_ (unifyRows row . getRow <=< openRow) tArgs
