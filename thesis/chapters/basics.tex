@@ -123,7 +123,7 @@ let hAbort = handler Abort {
 };
 \end{lstlisting}
 
-For a more involved example, we can look at non-determinism and logic programming. \Cref{lst:sat} contains the full code for a (very naive) SAT solver in Elaine. We first define a \el{Yield} effect, so we can yield multiple values from the computation. We will use this to find all possible combinations of boolean inputs that satisfy our equation. The \el{Logic} effect has two operations. The \el{branch} operation will call the continuation twice; once with \el{false} and once \el{true}. With \el{fail}, we can indicate that a branch has failed. To find all solutions, we just \el{branch} on all inputs and \el{yield} when a correct solution has been found and \el{fail} when the equation is not satisfied. In \cref{lst:sat}, we check for solutions of the equation $\neg a \wedge b$.
+Just like we can ignore the continuation, we can also call it multiple times, which is useful for non-determinism and logic programming. \Cref{lst:sat} contains the full code for a (very naive) SAT solver in Elaine. We first define a \el{Yield} effect, so we can yield multiple values from the computation. We will use this to find all possible combinations of boolean inputs that satisfy our equation. The \el{Logic} effect has two operations. The \el{branch} operation will call the continuation twice; once with \el{false} and once \el{true}. With \el{fail}, we can indicate that a branch has failed. To find all solutions, we just \el{branch} on all inputs and \el{yield} when a correct solution has been found and \el{fail} when the equation is not satisfied. In \cref{lst:sat}, we check for solutions of the equation $\neg a \wedge b$.
 
 \lstinputlisting[
     language=elaine,
@@ -136,27 +136,4 @@ For a more involved example, we can look at non-determinism and logic programmin
 
 \section{Higher-Order Effects in Elaine}
 
-\section{Specification of Elaine}
-\subsection{Type Checker}\label{sec:typechecker}
-\subsubsection{Unification of Effect Rows}
-
-\TODO{Talk about \autocite{leijen_extensible_2005,leijen_koka_2014}.}
-
-During type checking effect rows are represented as a pair consisting of a multiset of effects and an optional extension variable. In this section we will use a more explicit notation than the syntax of Elaine by using the multiset representation directly. Hence, a row $\row{A_1,\dots,A_n|e_A}$ is represented as the multiset $\{A_1,\dots,A_n\} + e_A$.
-
-Like with regular Hindley-Milner type inference, two rows can be unified if we can find a substitution of effect row variables that make the rows equal. For effect rows, this yields 3 distinct cases.
-
-If both rows are closed (i.e. have no extension variable) there are no variables to be substituted and we just employ multiset equality. That is, to unify rows $A$ and $B$ we check that $A = B$. If that is true, we do not need to unify further and unification has succeeded. Otherwise, we cannot make any substitutions to make them equal and unification has failed.
-
-If one of the rows is open, then the set of effects in that row need to be a subset of the effects in the other row. To unify the rows
-\[ A + e_A \quad\text{and}\quad B \]
-we assert that $A \subseteq B$. If that is true, we can substitute $e_n$ for the effects in $B - A$.
-
-Finally, there is the case where both rows are open:
-\[ A + e_A \quad\text{and}\quad B + e_B. \]
-In this case, unification is always possible, because both rows can be extended with the effects of the other. We create a fresh effect row variable $e_C$ with the following substitutions:
-\begin{align*}
-    e_A &\to (B - A) + e_C \\
-    e_B &\to (A - B) + e_C.
-\end{align*}
-In other words, $A$ is extended with the effects that are in $B$ but not in $A$ and similarly, $B$ is extended with the effects in $A$ but not in $A$.
+\TODO{}
