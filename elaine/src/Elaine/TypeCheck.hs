@@ -27,7 +27,6 @@ import Data.Maybe (fromJust)
 import qualified Data.MultiSet as MS
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Debug.Trace (trace)
 import Elaine.AST (ASTValueType)
 import Elaine.AST hiding (ASTValueType (..), Row)
 import qualified Elaine.AST as AST
@@ -527,10 +526,14 @@ instance Inferable Expr where
         () <- unify t3 (CompType row vt)
         subM (CompType row vt)
       App f args -> do
+        -- First we find the function type, the argument types and the return type
         tf <- infer env f
         tArgs <- inferMany env args
         tRet@(CompType row _) <- freshC
-        () <- mapM_ (unifyRows row . getRow) tArgs
+        
+        -- The effect rows for the function value, arguments and return type need
+        -- to be unified.
+        () <- mapM_ (unifyRows row . getRow <=< openRow) tArgs
         row' <- subM row
         () <- unify tf (CompType row' (TypeArrow $ Arrow (map emptyEff tArgs) tRet))
         openRow <=< subM $ tRet
@@ -715,7 +718,6 @@ instance Inferable Value where
 
       () <- forceRow toRow rowEmpty
       let toC' = CompType rowEmpty to
-      let !_ = trace ("from " ++ pretty from ++ ", " ++ "to " ++ pretty to) ()
 
       () <-
         mapM_
