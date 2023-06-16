@@ -54,9 +54,9 @@ getSpan p = do
   x <- p
   end <- getOffset
   let length' = end - start
-  let span = Span start end (take length' input)
+  let span' = Span start end (take length' input)
 
-  return (x, span)
+  return (x, span')
 
 saveSpan :: String -> Span -> Parser ()
 saveSpan c s = do
@@ -140,15 +140,15 @@ otherIdentChars = firstIdentChars ++ ['0' .. '9']
 
 identCategory :: String -> String
 identCategory "resume" = "variable.language.elaine"
-identCategory a = "variable.elaine"
+identCategory _ = "variable.elaine"
 
 categorizeIdent :: Parser Ident -> Parser Ident
 categorizeIdent p = do
-  (ident, s) <- getSpan p
+  (ident', s) <- getSpan p
 
-  () <- saveSpan (identCategory $ trim $ idText ident) s
+  () <- saveSpan (identCategory $ trim $ idText ident') s
 
-  return ident
+  return ident'
 
 
 ident :: Parser Ident
