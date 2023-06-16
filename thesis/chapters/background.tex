@@ -26,13 +26,13 @@ In practice, this model has turned out to work quite well, especially in combina
 
 \section{Algebraic Effects}\label{sec:alg}
 
-\todo[inline]{Introduce algebraic effects, effect rows, and handlers.}
+\TODO{Introduce algebraic effects, effect rows, and handlers.}
 
 \subsection{Algebraic Theories}
 
 This section introduces algebraic theories. In particular, we will discuss algebraic theories with parametrized operations and general arities. This will form a foundation on which we can define algebraic effects. The definitions in this section follow \textcite{bauer_what_2018}.
 
-\todo[inline]{This section is \emph{probably} too long and goes too much into the theory of algebraic theories}
+\TODO{This section is \emph{probably} too long and goes too much into the theory of algebraic theories}
 
 \begin{definition}[Signature]
     A \emph{signature} $\Sig = \S{(op_i, P_i, A_i)}$ is a collection of operation symbols $op_i$ with corresponding parameter sets $P_i$ and arity sets $A_i$. We will write operations symbols as follows:
@@ -158,7 +158,7 @@ A similar argument goes for the \el{Exception} effect. The \ocatch operation tak
 \]
 On the left hand side, $m_2$ will not be executed if $m_1$ does not throw, while on the right hand side, $m_2$ will always get executed. This does not match the semantics we expect from the \ocatch operation.
 
-\subsection{Effect handlers}
+\subsection{Effect Handlers}
 
 The distinction between effects which are and which are not algebraic has been described as the difference between \emph{effect constructors} and \emph{effect deconstructors} \autocite{plotkin_algebraic_2003}. The \olocal and \ocatch operations have to act on effectful computations and change the meaning of the effects in that computation. So, they have to deconstruct the effects in their computations.
 

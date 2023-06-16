@@ -53,31 +53,11 @@ let main = give_answer(square_is_even, 4);
 
 The programs in the previous section are all pure and contain no effects. Like the languages discussed in \cref{chap:related_work}, Elaine additionally has first class support for effects and effect handlers.
 
-An effect is declared with the \el{effect} keyword. An effect needs a name and a set of operations. Operations are the functions that are associated with the effect. They can have an arbitrary number of arguments and a return type. Only the signature of operations can be given in an effect declaration, the implementation must be provided via handlers (see \cref{sec:alghandlers})
-
-We will be using the following effects throughout this section.
-\todo{Add corresponding monads?}
-\begin{lstlisting}[language=elaine, style=fancy]
-# Defines a single operation to get an implicit variable
-effect Val {
-    val() Int
-}
-
-# Exits the current handle
-effect Abort {
-    abort() ()
-}
-
-# Allows for a mutable state via a get and a set operation
-effect State {
-    get() Int
-    set(Int) ()
-}
-\end{lstlisting}
+An effect is declared with the \el{effect} keyword. An effect needs a name and a set of operations. Operations are the functions that are associated with the effect. They can have an arbitrary number of arguments and a return type. Only the signature of operations can be given in an effect declaration, the implementation must be provided via handlers (see \cref{sec:alghandlers}).
 
 \subsection{Effect Rows}
 
-\todo[inline]{Contextual vs parametric effect rows (see effects as capabilities paper). The paper fails to really connect the two: contextual is just parametric with implicit variables. However, it might be more convenient. The main difference is in the interpretation of purity (real vs contextual). In general, I'd like to have a full section on effect row semantics. In the capabilities paper effect rows are sets, which makes it possible to do stuff like \autocite{leijen_extensible_2005}.}
+\TODO{Contextual vs parametric effect rows (see effects as capabilities paper). The paper fails to really connect the two: contextual is just parametric with implicit variables. However, it might be more convenient. The main difference is in the interpretation of purity (real vs contextual). In general, I'd like to have a full section on effect row semantics. In the capabilities paper effect rows are sets, which makes it possible to do stuff like \autocite{leijen_extensible_2005}.}
 
 In Elaine, each type has an \emph{effect row}. In the previous examples, this effect row has been elided, but it is still inferred by the type checker. Effect rows specify the effects that need be handled to within the expression. For simple values, that effect row is empty, denoted \el{<>}. For example, an integer has type \el{<> Int}. Without row elision, the \el{square} function in the previous section could therefore have been written as
 
@@ -107,66 +87,26 @@ To define the implementation of an effect, one has to create a handler for said 
 
 For example, if we want to use an effect to provide an implicit value, we can make an effect \el{Val} and a corresponding handler, which \el{resume}s execution with some values. The \el{resume} function represents the continuation of the program after the operation. Since handlers are first-class values, we can return the handler from a function to simplify the code. This pattern is quite common to create dynamic handlers with small variations.
 
-\begin{lstlisting}[language=elaine, style=fancy]
-let hVal = fn(x) {
-    handler Val {
-        return(x) { x }
-        val() { resume(x) }
-    }
-};
-
-let main = {
-    let a = handle[hVal(6)] add(val(), val());
-    let b = handle[hVal(10)] add(val(), val());
-    add(a, b)
-};
-\end{lstlisting}
+\lstinputlisting[
+    language=elaine,
+    style=fancy,
+]{../../elaine/examples/val.elaine}
 
 The handlers we have introduced for \el{Val} all call the \el{resume} function, but that is not required. Conceptually, all effect operations are executed by the \el{handle}, hence, if we return from the operation, we return from the \el{handle}. A handler therefore has great control over control flow.
 
 The \el{Abort} effect uses this mechanism. It defines a single operation \el{abort}, which returns from the handler without resuming. To show the flexibility that the framework of algebraic effect handlers, provide we will demonstrate several possible handlers for \el{Abort}. The first ignores the result of the computation, but still halts execution.
 
-\begin{lstlisting}[language=elaine, style=fancy]
-let hAbort = handler Abort {
-    return(x) { () }
-    abort() { () }
-};
-
-let main = {
-    handle[hAbort] {
-        abort();
-        f()
-    };
-    g()
-};
-\end{lstlisting}
+\lstinputlisting[language=elaine, style=fancy, firstline=6]{../../elaine/examples/abort.elaine}
 
 In the program above, \el{f} will not get called because \el{hAbort} does not call the continuation, but \el{g} will be called, because it is used outside of the \el{handle}.
 
-Alternatively, we can define a handler that defines a default value for failing expressions.
+Alternatively, we can define a handler that defines a default value for failing expressions. In this example, the handler acts much like an exception handler.
 
-\begin{lstlisting}[language=elaine, style=fancy]
-let hAbort = fn(default) {
-    handler Abort {
-        return(x) { x }
-        abort() { default }
-    }
-};
+\lstinputlisting[language=elaine, style=fancy, firstline=7]{../../elaine/examples/safe_division.elaine}
 
-let safe_div = fn(x: Int, y: Int) <Abort> Int {
-    if eq(y, 0) {
-        abort()
-    } else {
-        div(x, y)
-    }
-};
+We can also map the \el{Abort} effect to the \el{Maybe} monad, which is the canonical implementation.
 
-let main = handle[hAbort] safe_div(5, 0);
-\end{lstlisting}
-
-We can also map the \el{Abort} effect to the \el{Maybe} monad, which is the most common implementation.
-
-\todo[inline]{Even for small handlers I need custom data types}
+\TODO{Even for small handlers I need custom data types}
 \begin{lstlisting}[language=elaine, style=fancy]
 let hAbort = handler Abort {
     return(x) { Just(x) }
@@ -183,15 +123,26 @@ let hAbort = handler Abort {
 };
 \end{lstlisting}
 
+For a more involved example, we can look at non-determinism and logic programming. \Cref{lst:sat} contains the full code for a (very naive) SAT solver in Elaine. We first define a \el{Yield} effect, so we can yield multiple values from the computation. We will use this to find all possible combinations of boolean inputs that satisfy our equation. The \el{Logic} effect has two operations. The \el{branch} operation will call the continuation twice; once with \el{false} and once \el{true}. With \el{fail}, we can indicate that a branch has failed. To find all solutions, we just \el{branch} on all inputs and \el{yield} when a correct solution has been found and \el{fail} when the equation is not satisfied. In \cref{lst:sat}, we check for solutions of the equation $\neg a \wedge b$.
+
+\lstinputlisting[
+    language=elaine,
+    style=fancy,
+    caption={A naive SAT solver in Elaine.},
+    captionpos=b,
+    float=p,
+    label={lst:sat}
+]{../../elaine/examples/logic.elaine}
+
 \section{Higher-Order Effects in Elaine}
 
 \section{Specification of Elaine}
 \subsection{Type Checker}\label{sec:typechecker}
 \subsubsection{Unification of Effect Rows}
 
-\todo[inline]{Talk about \autocite{leijen_extensible_2005}.}
+\TODO{Talk about \autocite{leijen_extensible_2005,leijen_koka_2014}.}
 
-During type checking effect rows are represented as a pair consisting of a multiset of effects and an optional extension variable. In this section we will use a more explicit notation than the syntax of the language by using the multiset representation directly. Hence, a row $\row{A_1,\dots,A_n|e_A}$ is represented as the multiset $\{A_1,\dots,A_n\} + e_A$.
+During type checking effect rows are represented as a pair consisting of a multiset of effects and an optional extension variable. In this section we will use a more explicit notation than the syntax of Elaine by using the multiset representation directly. Hence, a row $\row{A_1,\dots,A_n|e_A}$ is represented as the multiset $\{A_1,\dots,A_n\} + e_A$.
 
 Like with regular Hindley-Milner type inference, two rows can be unified if we can find a substitution of effect row variables that make the rows equal. For effect rows, this yields 3 distinct cases.
 

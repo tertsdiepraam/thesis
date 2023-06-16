@@ -15,6 +15,7 @@
 			"arity",
 			"asgn",
 			"behaviour",
+			"bools",
 			"castagna",
 			"concat",
 			"cond",

@@ -1,26 +1,21 @@
-# This is an abort effect without a Maybe type
-# instead it provides a default value
+let f = fn() { () };
+let g = fn() { () };
+
 use std;
+# ----
 effect Abort {
     abort() a
 }
 
-let hAbort = fn(default) {
-    handler {
-        return(x) { x }
-        abort() { default }
-    }
+let hAbort = handler {
+    return(x) { () }
+    abort() { () }
 };
 
-let safe_div = fn(x, y) <Abort> Int {
-    if eq(y, 0) {
-        abort()
-    } else {
-        div(x, y)
-    }
+let main = {
+    handle[hAbort] {
+        abort();
+        f()
+    };
+    g()
 };
-
-let main = add(
-    handle[hAbort(0)] safe_div(3,0),
-    handle[hAbort(0)] safe_div(10, 2),
-);

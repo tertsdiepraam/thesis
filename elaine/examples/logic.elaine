@@ -39,5 +39,7 @@ let assert = fn(f, a, b, c) <Logic,Yield> () {
     }
 };
 
-let main = handle[hYield] handle[hLogic] assert(f, branch(), branch(), branch());
+let main = handle[hYield] handle[hLogic] {
+    assert(f, branch(), branch(), branch());
+};
 
