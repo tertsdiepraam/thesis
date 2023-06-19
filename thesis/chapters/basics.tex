@@ -136,4 +136,82 @@ Just like we can ignore the continuation, we can also call it multiple times, wh
 
 \section{Higher-Order Effects in Elaine}
 
-\TODO{}
+Higher-order effects in Elaine are supported via elaborations, as proposed by \textcite{bach_poulsen_hefty_2023}. To distinguish higher-order effects from algebraic effects, we write them with a \el{!} suffix. This syntax was chosen to be reminiscent of macros in Rust, since elaborations are syntactic substitutions and hence behave much like macros. However, it should be noted that they do not behave exactly the same.
+
+Just like algebraic effects have the \el{handler} and \el{handle} keywords, to create and apply handlers, higher-order effects have the \el{elaboration} and \el{elab} keyword.
+
+Elaborations do not get access to the \el{resume} function, because they always resume exactly once. Consider the effect \el{Val} and its elaborated counterpart \el{Val!}, which calls the continuation with a constant value. With a handler, we have to call \el{resume}, but we do not need to do that in an elaboration.
+
+\begin{minipage}[b]{0.5\textwidth}
+\begin{lstlisting}[language=elaine,style=fancy]
+handler {
+    val() { resume(5) }
+}
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}[b]{0.5\textwidth}
+\begin{lstlisting}[language=elaine,style=fancy]
+elaboration Val! -> <> {
+    val() { 5 }
+}
+\end{lstlisting}
+\end{minipage}
+
+Of course, the goal of elaborations is not to write handlers in a different way, but to encode higher-order effects. Since elaborations elaborate into algebraic effects, a row of algebraic effects must be specified. As a silly example, we can elaborate the higher-order \el{Val!} into \el{Val}, simply replacing occurrences of \el{val!()} with \el{val()};
+
+\begin{lstlisting}[language=elaine,style=fancy]
+effect Val!{
+    val!(): Int
+}
+
+effect Val {
+    val(): Int
+}
+
+let hVal = fn(x) { 
+    handler {
+        val() { resume(x) }
+    }
+};
+
+let eVal = elaboration Val! -> <Val> {
+    val!() { val() }
+};
+
+let main = handle[hVal] elab[eVal] val!();
+\end{lstlisting}
+
+The higher-order operations differ from other functions and algebraic operations because they have call-by-name semantics; the arguments are not evaluated before they are passed to the elaboration. Hence, the arguments can be computations, even effectful computations.
+
+This allows us to manipulate computations directly. For example, it is possible to wrap the computation in a handler within an elaboration.
+
+\begin{lstlisting}[langauge=elaine,style=fancy]
+use std;
+
+effect Ask {
+    ask(): Int
+}
+
+effect Local! {
+    local!(fn(Int) Int, c) : c
+}
+
+let eLocal = elaboration Local! -> <Ask> {
+    local!(f, c) {
+        handle[hAsk(f(ask()))] c
+    }
+};
+
+let hAsk = fn(x) {
+    handler {
+        ask() { resume(5) }
+    }
+};
+
+let main = handle[hAsk(5)] elab[eLocal] local!(
+    fn(x) { mul(2, x) },
+    add(ask(), ask())
+);
+\end{lstlisting}
+
+This is how higher-order operations such as \el{local} and \el{catch} are supported in Elaine.
