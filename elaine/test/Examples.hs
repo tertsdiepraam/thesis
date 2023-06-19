@@ -28,6 +28,7 @@ expected "square_is_even.elaine" = String "The square of 4 is even"
 expected "local_reader.elaine" = Int 4
 expected "logic.elaine" = String "False, True, True\nFalse, True, False\n"
 expected "val.elaine" = Int 32
+expected "logic_once.elaine" = String "False, True, True\n"
 expected _ = error "Example does not have an expected value"
 
 testAllExamples :: SpecWith ()

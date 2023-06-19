@@ -878,6 +878,25 @@ testTypeCheck = describe "typeCheck" $ do
       let main = elab foo!();
     |]
       `shouldBe` Right (pure TypeInt)
+  
+  it "cannot figure out implicit elab for two elaborations" $ do
+    check
+      [r|
+      effect Val! {
+        val!() Int
+      }
+
+      let eVal1 = elaboration Val! -> <> {
+        val!() { 1 }
+      };
+      
+      let eVal2 = elaboration Val! -> <> {
+        val!() { 2 }
+      };
+
+      let main = elab val!();
+    |]
+      `shouldSatisfy` isTypeError 
 
   it "number of function arguments should match" $ do
     check

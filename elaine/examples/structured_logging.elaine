@@ -39,7 +39,7 @@ let eLog = elaboration Log! -> <Read,Write> {
     }
 };
 
-let main = handle[hRead("")] handle[hWrite] elab {
+let main = handle[hRead("")] handle[hWrite] elab[eLog] {
     context!("main", {
         log!("msg1");
         context!("foo", {
