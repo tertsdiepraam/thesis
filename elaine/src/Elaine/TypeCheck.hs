@@ -386,7 +386,10 @@ resolveRow env (AST.Row effs maybeExtend) = do
 
 resolveEffect :: TypeEnv -> Ident -> Infer Effect
 resolveEffect env eff = case Map.lookup eff (view effects env) of
-  Just e' -> return e'
+  Just e' -> do
+    let (Effect p _) = e'
+    recordMetaDefinition eff (last p)
+    return e'
   Nothing -> throwError $ "Could not find effect " ++ pretty eff
 
 class Substitutable a where

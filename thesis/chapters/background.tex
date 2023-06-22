@@ -1,6 +1,6 @@
 \chapter{Background}\label{chap:background}
 
-While hefty algebras are relatively new concepts, the analysis of effectful computation and the representation of effects in programming language has a rich history. This history is relevant to this thesis because the various approaches to modelling effects proposed over time can be found in many popular programming languages. A comparison between these languages and languages with algebraic and higher-order effects hence requires comparison between theories. This chapter details the parts of this history that are relevant to Elaine.
+While hefty algebras are a relatively new concept, the analysis of effectful computation and the representation of effects in programming language has a rich history. This history is relevant to this thesis because the various approaches to modelling effects proposed over time can be found in many popular programming languages. A comparison between these languages and languages with algebraic and higher-order effects hence requires comparison between theories. This chapter details the parts of this history that are relevant to Elaine.
 
 \section{Motivation for Effects}
 
@@ -35,7 +35,7 @@ This section introduces algebraic theories. In particular, we will discuss algeb
 \TODO{This section is \emph{probably} too long and goes too much into the theory of algebraic theories}
 
 \begin{definition}[Signature]
-    A \emph{signature} $\Sig = \S{(op_i, P_i, A_i)}$ is a collection of operation symbols $op_i$ with corresponding parameter sets $P_i$ and arity sets $A_i$. We will write operations symbols as follows:
+    A \emph{signature} $\Sig = \S{(op_i, P_i, A_i)}$ is a collection of operation symbols $op_i$ with corresponding parameter sets $P_i$ and arity sets $A_i$. We will write operation symbols as follows:
     \[ op_i : P_i \step A_i. \]
     The arities are arbitrary sets. However, using the von Neumann ordinals, we can use natural numbers as arities. Hence we can call operation symbols with arities 1, 2 and 3 \emph{unary}, \emph{binary} and \emph{ternary} respectively. An operation symbol with arity $0$ is then called \emph{constant} or \emph{nullary}. Two other common arities are $\emptyset = \S{}$ and $\mathbf{1} = \S{()}$. We will refer to $()$ as the unit.
 \end{definition}
