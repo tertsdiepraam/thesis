@@ -1,0 +1,8 @@
+{"rule":"KIND_OF_A","sentence":"^\\Q\\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q identified that for any monad \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q and a type of values \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q, the type \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q is the type of a computation of values of type \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q.\\E$"}
+{"rule":"EN_A_VS_AN","sentence":"^\\QA -equation is a pair of -terms and a context \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q.\\E$"}
+{"rule":"A_RB_NN","sentence":"^\\QThe signature of \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q would then be \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q, where \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q is the never type and then \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q could not be called.\\E$"}
+{"rule":"A_RB_NN","sentence":"^\\QWith a never type, an alternative definition of \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q is possible where this handler is not permitted by the type system.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_GB","sentence":"^\\QEf, Faculty EEMCS, TU Delft\\E$"}
+{"rule":"EN_A_VS_AN","sentence":"^\\QA clear hurdle is that we might have a complex expression for the elaboration, such as an \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q expression: In this example, the elaboration might depend on a run-time value, making compile-time substitution difficult.\\E$"}
+{"rule":"EN_A_VS_AN","sentence":"^\\QAny function with higher-order effects then takes the elaboration to apply as an argument and the operation is wrapped in an \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q.\\E$"}
+{"rule":"EN_A_VS_AN","sentence":"^\\QHaskell currently features an \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q monad \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q as well as a large collection of monads and monad transformers available via libraries, such as mtl https://github.com/haskell/mtl.\\E$"}
