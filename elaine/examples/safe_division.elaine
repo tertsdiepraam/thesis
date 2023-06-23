@@ -3,7 +3,7 @@ use std;
 effect Abort {
     abort() a
 }
-# ----
+
 let hAbort = fn(default) {
     handler {
         return(x) { x }

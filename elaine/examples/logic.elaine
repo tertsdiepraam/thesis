@@ -11,7 +11,9 @@ effect Logic {
 
 let hYield = handler {
     return(x) { "" }
-    yield(m) { concat(concat(m, "\n"), resume(())) }
+    yield(m) {
+        concat(concat(m, "\n"), resume(()))
+    }
 };
 
 let hLogic = handler {
