@@ -1,0 +1,2 @@
+main:
+	latexmk -xelatex
