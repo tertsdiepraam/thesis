@@ -9,11 +9,6 @@ The Elaine syntax was designed to be relatively easy to parse. The grammar is wh
 
 Based on the previous chapters, the \tok{elab} without an elaboration might be surprising. The use of that syntax is explained in \cref{chap:elabres}.
 
-\newcommand\tok[1]{\text{\texttt{#1}}}
-\newcommand\opt[1]{[#1]}
-\newcommand\rep[1]{#1 \dots #1}
-\newcommand\csep[1]{#1\tok{,} \dots \tok{,}\ #1}
-
 The full syntax definition is given in \cref{fig:syntax}. For convenience, we define and use several extensions to BNF:
 \begin{itemize}
     \item tokens are written in \tok{monospace font}, this includes the tokens \tok{[]}, \tok{<>}, \tok{|} and \tok{!}, which might be confused with the syntax of BNF,

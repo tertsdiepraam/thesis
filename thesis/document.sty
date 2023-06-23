@@ -9,6 +9,7 @@
 \usepackage[dvips]{graphicx}
 \usepackage[dvips]{color}
 \usepackage[dvipsnames]{xcolor}
+\usepackage{float}
 
 \usepackage{xspace}
 
@@ -341,6 +342,9 @@
 \newcommand\oask[0]{\ensuremath{\mathtt{ask}}\xspace}
 \newcommand\ocatch[0]{\ensuremath{\mathtt{catch}}\xspace}
 \newcommand\othrow[0]{\ensuremath{\mathtt{throw}}\xspace}
+\newcommand\oadd[0]{\ensuremath{\mathtt{add}}\xspace}
+\newcommand\oinv[0]{\ensuremath{\mathtt{inv}}\xspace}
+\newcommand\ozero[0]{\ensuremath{\mathtt{zero}}\xspace}
 
 \newcommand\bind[0]{\ensuremath{\operatorname{\mathtt{\gg\!\!=}}}\xspace}
 
@@ -348,3 +352,7 @@
 \newcommand*{\defeq}{\stackrel{\mathsmaller{\mathsf{def}}}{=}}
 \newcommand{\seq}{;\ }
 
+\newcommand\tok[1]{\text{\texttt{#1}}}
+\newcommand\opt[1]{[#1]}
+\newcommand\rep[1]{#1 \dots #1}
+\newcommand\csep[1]{#1\tok{,} \dots \tok{,}\ #1}

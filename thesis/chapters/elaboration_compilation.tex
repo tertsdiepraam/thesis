@@ -132,11 +132,15 @@ handle[hElab(eOne)] {
 
 Combining the ideas above, we obtain a surprisingly simple transformation. Each elaboration is transformed into a handler, which resumes with a function containing the original expression, where argument occurrences force the thunked values. Since elaborations are now handlers, we need to change the \el{elab} constructs to \el{handle} constructs accordingly. Finally, the arguments to operation calls are thunked and the function that is resumed is called, that is, there is an additional \el{()} at the end of the operation call.
 
-\begin{figure}[h]
+\begin{figure}[H]
 \begin{tabular}{rcl}
-\lstinline{elab[$e_1$] \{$e_2$\}}
+\begin{lstlisting}
+elab[$e_1$] {$e_2$}
+\end{lstlisting}
 & $\implies$
-& \lstinline{handle[$e_1$] \{$e_2$\}}
+& \begin{lstlisting}
+handle[$e_1$] {$e_2$}
+\end{lstlisting}
 \\\\
 \begin{lstlisting}
 elaboration {
@@ -158,9 +162,13 @@ handler {
 }
 \end{lstlisting}
 \\\\
-\lstinline|$op_j$!($e_1,...,e_k$)|
+\begin{lstlisting}
+$op_j$!($e_1,...,e_k$)
+\end{lstlisting}
 & $\implies$
-& \lstinline{$op_j$(fn() \{$e_1$\}, ..., fn() \{$e_k$\})()}
+& \begin{lstlisting}
+$op_j$(fn() \{$e_1$\}, ..., fn() \{$e_k$\})()
+\end{lstlisting}
 \end{tabular}
 \end{figure}
 

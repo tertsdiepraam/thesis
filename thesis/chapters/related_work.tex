@@ -8,7 +8,7 @@ These implementations provide ways to define, use and handle effectful operation
 
 There are many examples of libraries like this for Haskell, including \lib{fused-effects}{https://github.com/fused-effects/fused-effects}, \lib{polysemy}{https://github.com/polysemy-research/polysemy}, \lib{freer-simple}{https://github.com/lexi-lambda/freer-simple} and \lib{eff}{https://github.com/hasura/eff}. Each of these libraries give the encoding of effects a slightly different spin in an effort to find the most ergonomic and performant representation.
 
-As explained in \cref{chap:background}, monads correspond with effectful computations. Any language in which monads can be expressed therefore has some support for effects. Languages that encourage a functional style of programming have embraced this framework in particular.
+As explained in \cref{chap:preliminaries}, monads correspond with effectful computations. Any language in which monads can be expressed therefore has some support for effects. Languages that encourage a functional style of programming have embraced this framework in particular.
 
 Haskell currently features an \el{IO} monad \autocite{peyton_jones_imperative_1993} as well as a large collection of monads and monad transformers available via libraries, such as \lib{mtl}{https://github.com/haskell/mtl}. This is notable, because there is a strong connection between monad transformers and algebraic effects \autocite{schrijvers_monad_2019}.
 
