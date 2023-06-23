@@ -538,7 +538,16 @@ instance Inferable Expr where
         -- to be unified.
         () <- mapM_ (unifyRows row . getRow <=< openRow) tArgs
         row' <- subM row
-        () <- unify tf (CompType row' (TypeArrow $ Arrow (map emptyEff tArgs) tRet))
+
+        -- We might need to open up the return type of a function
+        -- to ensure it can be unified.
+        tf' <- case tf of
+          CompType fRow (TypeArrow (Arrow fArgs fRet)) -> do
+            fRet' <- openRow fRet
+            return $ CompType fRow (TypeArrow (Arrow fArgs fRet'))
+          tf' -> return tf'
+
+        () <- unify tf' (CompType row' (TypeArrow $ Arrow (map emptyEff tArgs) tRet))
         openRow <=< subM $ tRet
         where
           getRow (CompType r _) = r
@@ -588,16 +597,22 @@ instance Inferable Expr where
           TypeElaboration name row -> return (name, row)
           _ -> throwError "elab did not get an elaboration"
 
-        CompType row2 vt2 <- infer env e2
-        () <- unifyRows (rowOpen [name] rVar) row2
-
         let Row expandEffs ex = row
 
         () <- case ex of
           Just _ -> throwError "Cannot elaborate into an open effect row"
           Nothing -> return ()
 
-        subM $ CompType (Row expandEffs (Just rVar)) vt2
+        -- Assume that the elaboration is from A! to <B,C,D>
+        -- then the inner computation should have row <A!,B,C,D|e>
+        let expandEffs' = MS.toList expandEffs
+        let innerRow = rowOpen (name : expandEffs') rVar
+
+        CompType row2 vt2 <- infer env e2
+        () <- unifyRows innerRow row2
+
+        -- The outer computation should then have <B,C,D|e>
+        subM $ CompType (rowOpen expandEffs' rVar) vt2
       ImplicitElab i e1 -> do
         CompType row vt1 <- infer env e1
         let Row effs extend = row

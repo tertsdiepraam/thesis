@@ -18,3 +18,6 @@ Agda
 typeclass
 metaprogramming
 effin-mad
+annotatable
+overapproximation
+Desugaring

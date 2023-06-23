@@ -6,3 +6,5 @@
 {"rule":"EN_A_VS_AN","sentence":"^\\QA clear hurdle is that we might have a complex expression for the elaboration, such as an \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q expression: In this example, the elaboration might depend on a run-time value, making compile-time substitution difficult.\\E$"}
 {"rule":"EN_A_VS_AN","sentence":"^\\QAny function with higher-order effects then takes the elaboration to apply as an argument and the operation is wrapped in an \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q.\\E$"}
 {"rule":"EN_A_VS_AN","sentence":"^\\QHaskell currently features an \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q monad \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q as well as a large collection of monads and monad transformers available via libraries, such as mtl https://github.com/haskell/mtl.\\E$"}
+{"rule":"EN_A_VS_AN","sentence":"^\\QThe function \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q “removes” an \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q effect from the effect row.\\E$"}
+{"rule":"IF_IS","sentence":"^\\Q\\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q if \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q if \\E(?:Dummy|Ina|Jimmy-)[0-9]+$"}

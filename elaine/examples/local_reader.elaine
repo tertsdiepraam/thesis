@@ -26,5 +26,5 @@ let eLocal = elaboration Reader! -> <Ask> {
 let f = fn(x) { mul(2, x) };
 
 let main = handle[hAsk(2)] elab {
-    local!(f, ask());
+    local!(f, ask!());
 };
