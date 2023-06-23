@@ -75,7 +75,11 @@ instance Pretty Value where
   pretty (Fn function) = "fn" ++ pretty function
   pretty (Hdl (Handler ret functions)) =
     "handler "
-      ++ pBlock (unlines (("return" ++ pretty ret) : map pretty functions))
+      ++ pBlock (pRet ++ unlines (map pretty functions))
+    where 
+      pRet = case ret of
+        Just r -> "return" ++ pretty r ++ "\n"
+        Nothing -> ""
   pretty (Elb (Elaboration from to clauses)) =
     "elaboration " ++ pretty from ++ " -> " ++ pretty to ++ " " ++ pBlock (unlines (map pretty clauses))
   pretty (Data type' variant args) = pretty type' ++ "::" ++ pretty variant ++ "(" ++ concatMap pretty args ++ ")"

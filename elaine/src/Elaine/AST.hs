@@ -26,7 +26,7 @@ data OperationSignature = OperationSignature Ident [ASTComputationType] ASTCompu
 data Elaboration = Elaboration Ident Row [OperationClause]
   deriving (Show, Eq)
 
-data Handler = Handler Function [OperationClause]
+data Handler = Handler (Maybe Function) [OperationClause]
   deriving (Show, Eq)
 
 data Function = Function [(Ident, Maybe ASTComputationType)] (Maybe ASTComputationType) Expr

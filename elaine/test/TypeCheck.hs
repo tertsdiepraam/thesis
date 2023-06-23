@@ -910,6 +910,21 @@ testTypeCheck = describe "typeCheck" $ do
       let main = call(id);
     |]
       `shouldSatisfy` isTypeError
+  
+  it "accepts an implicit return case" $ do
+    check
+      [r|
+      effect Val {
+        val() Int
+      }
+
+      let hVal = handler {
+        val() { resume(3) }
+      };
+
+      let main = handle[hVal] val();
+    |]
+     `shouldBe` Right (pure TypeInt)
 
 testUnifyRows :: SpecWith ()
 testUnifyRows = describe "unifyRows" $ do

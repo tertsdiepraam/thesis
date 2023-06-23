@@ -219,8 +219,8 @@ handler = do
   arms <- try (keyword "handler") >> braces (many handlerArm)
   let (rets, functions) = partitionEithers arms
       ret = case rets of
-        [r] -> r
-        [] -> error "Handler must have a return arm"
+        [r] -> Just r
+        [] -> Nothing
         _ -> error "Handler cannot have multiple return arms"
   return $ Val $ Hdl $ Handler ret functions
 

@@ -17,21 +17,20 @@ elabToHandle' = \case
         App (App (Var x) (map (Val . lam []) args)) []
   Val (Elb (Elaboration _ _ clauses)) ->
     let mapping params = zip params (map (\p -> App (Var p) []) params)
-        x = Ident "x" LocNone
         resume = Ident "resume" LocNone
         f' (OperationClause x' params e) = OperationClause x' params (App (Var resume) [Val $ lam [] (subst (mapping params) e)])
         clauses' = map f' clauses
      in Val $
           Hdl $
             Handler
-              (Function [(x, Nothing)] Nothing (Var x))
+              Nothing
               clauses'
   e -> e
 
 makeElabExplicit :: Map Int [Ident] -> Program -> Program
 makeElabExplicit m = foldProgram (makeElabExplicit' m)
 
-makeElabExplicit' :: (Map Int [Ident]) -> Expr -> Expr
+makeElabExplicit' :: Map Int [Ident] -> Expr -> Expr
 makeElabExplicit' elabIdents = \case
   ImplicitElab i e -> foldr (\f x -> f x) e (map (Elab . Var) $ elabIdents ! i)
   e -> e
@@ -63,12 +62,12 @@ foldExpr f' e = f' (foldInner e)
 
 foldVal :: (Expr -> Expr) -> Value -> Value
 foldVal f = \case
-  Fn (Function params ret body) ->
-    Fn $ Function params ret (foldExpr f body)
-  Hdl (Handler (Function params ret body) clauses) ->
+  Fn fun ->
+    Fn $ foldFun f fun
+  Hdl (Handler fun clauses) ->
     Hdl $
       Handler
-        (Function params ret (foldExpr f body))
+        (fmap (foldFun f) fun)
         (foldClauses clauses)
   Elb (Elaboration from to clauses) ->
     Elb $
@@ -76,6 +75,9 @@ foldVal f = \case
   x -> x
   where
     foldClauses = map (\(OperationClause x params e) -> OperationClause x params (foldExpr f e))
+
+foldFun :: (Expr -> Expr) -> Function -> Function
+foldFun f (Function params ret body) = Function params ret (foldExpr f body)
 
 isAlgebraic :: Ident -> Bool
 isAlgebraic = not . isHigherOrder

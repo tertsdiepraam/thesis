@@ -224,7 +224,7 @@ subst1 (x, new) = \case
       mapArms (MatchArm (Pattern y params) exp) = MatchArm (Pattern y params) (if x `elem` params then exp else f exp)
   Val (Fn function) -> Val $ Fn $ subFun function
   Val (Hdl (Handler ret hClauses)) ->
-    let ret' = subFun ret
+    let ret' = fmap subFun ret
         clauses' =
           map
             ( \c@(OperationClause name params body) ->
@@ -271,7 +271,8 @@ reduceHandler h e = case e of
   Val v' -> Just $ reduceRet h v'
   _ -> applyOps (ops h)
   where
-    reduceRet (Handler (Function params _ body) _) v = case params of
+    reduceRet (Handler Nothing _ ) v = Val v
+    reduceRet (Handler (Just (Function params _ body)) _) v = case params of
       [(x, _)] -> subst [(x, Val v)] body
       _ -> error "A return case of a handler must have exactly one parameter"
 

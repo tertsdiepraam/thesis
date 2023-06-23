@@ -724,11 +724,14 @@ instance Inferable Value where
       from <- fresh
       let fromV = TypeV from
 
-      (x, body) <- case ret of
-        Function [(x, Nothing)] Nothing body -> return (x, body)
-        _ -> throwError "return case cannot have type annotations"
-
-      CompType toRow to <- infer (insertVar x (TypeScheme [] [] $ CompType rowEmpty fromV) env) body
+      CompType toRow to <- case ret of
+        Just f -> case f of 
+          Function [(x, Nothing)] Nothing body -> 
+            infer (insertVar x (TypeScheme [] [] $ CompType rowEmpty fromV) env) body
+          _ -> throwError "return case cannot have type annotations"
+        Nothing -> do
+          r <- freshR
+          return $ CompType r fromV
 
       () <- forceRow toRow rowEmpty
       let toC' = CompType rowEmpty to
