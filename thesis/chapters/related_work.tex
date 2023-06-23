@@ -1,8 +1,8 @@
 \chapter{Related Work}\label{chap:related_work}
 
-As the theoretical research around effects has progressed, new libraries and languages have emerged using the state of the art effect theories. These frameworks can be divided into two categories: effects encoded in existing type systems and effects as first-class features.
+As the theoretical research around effects has progressed, new libraries and languages have emerged using the state-of-the-art effect theories. These frameworks can be divided into two categories: effects encoded in existing type systems and effects as first-class features.
 
-These implementations provide ways to define, use and handle effectful operations. Additionally, many implementation provide type level information about effects via \emph{effect rows}. These are extensible lists of effects that are equivalent up to reordering. The rows might contain variables, which allows for \emph{effect row polymorphism}.
+These implementations provide ways to define, use and handle effectful operations. Additionally, many implementations provide type level information about effects via \emph{effect rows}. These are extensible lists of effects that are equivalent up to reordering. The rows might contain variables, which allows for \emph{effect row polymorphism}.
 
 \subsection{Effects as Monads}
 
@@ -44,7 +44,7 @@ firstline filename = do
     return $ head $ lines $ res    
 \end{lstlisting}
 
-Some of these libraries support \emph{scoped effects} \autocite{wu_effect_2014}, which is a limited but practical frameworks for higher-order effects. It can express the \olocal and \ocatch, but some higher-order effects are not supported.\question{any simple examples?}
+Some of these libraries support \emph{scoped effects} \autocite{wu_effect_2014}, which is a limited but practical frameworks for higher-order effects. It can express the \olocal and \ocatch operations, but some higher-order effects are not supported.\question{any simple examples?}
 
 \subsection{First-class Effects}
 
@@ -59,7 +59,7 @@ fun readfile( s : string ) : <filesystem>  string
 fun firstline( s: string ) : <filesystem> maybe<string>
     head(lines(readfile(s)))
 \end{lstlisting}
-From this example, we can see that the syntactic overhead of the effect rows is much smaller than what is provided by the Haskell libraries. Furthermore, the monadic style of programming is not longer necessary in Koka.
+From this example, we can see that the syntactic overhead of the effect rows is much smaller than what is provided by the Haskell libraries. Furthermore, the monadic style of programming is no longer necessary in Koka.
 
 The tail can be used to ensure the same effects across multiple functions. This is especially useful for higher-order functions. For example, we can ensure that \code{map} has the same effect row as its argument:
 \begin{lstlisting}[language={},style=fancy]

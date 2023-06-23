@@ -40,7 +40,7 @@ let main = elab { val!() }; # Type error here!
 
 The elaboration resolution consists of two parts: inference and transformation. The inference is done by the type checker and is hence type-directed, which records the inferred elaboration. After type checking the program is then transformed such that all implicit elaborations have been replaced by explicit elaborations.
 
-To infer the elaborations, the type checker first analyzes the subexpression. This will yield some computation type with an effect row containing both higher-order and algebraic effects: $\row{H!_1, \dots, H!_n, A_1, \dots, A_m}$. It then checks the type environment to look for elaborations $E_1, \dots, E_n$ which elaborate $H!_1, \dots, H!_n$, respectively. Only elaborations that are directly in scope are considered, so if an elaboration resides in another module, it needs be imported first. For each higher-order effect, there must be exactly one elaboration.
+To infer the elaborations, the type checker first analyses the sub-expression. This will yield some computation type with an effect row containing both higher-order and algebraic effects: $\row{H!_1, \dots, H!_n, A_1, \dots, A_m}$. It then checks the type environment to look for elaborations $E_1, \dots, E_n$ which elaborate $H!_1, \dots, H!_n$, respectively. Only elaborations that are directly in scope are considered, so if an elaboration resides in another module, it needs be imported first. For each higher-order effect, there must be exactly one elaboration.
 
 The \el{elab} is finally transformed into one explicit \el{elab} per higher-order effect. Recall that the order of elaborations does not matter for the semantics of the program, meaning that we safely apply them any order.
 
@@ -54,6 +54,6 @@ A nice property of this feature is that the transformation results in very reada
 
 The same inference could trivially be added for handlers. However, this would yield to unpredictable results, because the semantics of the program depend on the order in which handlers are applied. If we then have an expression with two algebraic effects, how do we determine the order in which they should be applied?
 
-There are some solutions for this. For example, we could require that the subexpression can only use a single algebraic effect, but that would make the feature much less useful. Another possibility is to assign some standard precedence to effects. We think that this would become quite confusing in the end.
+There are some solutions for this. For example, we could require that the sub-expression can only use a single algebraic effect, but that would make the feature much less useful. Another possibility is to assign some standard precedence to effects. We think that this would become quite confusing in the end.
 
 Another difficulty with using inference for handlers is that handlers are often parametrized and that there is then not just a handler in scope, but only a function returning a handler. This makes inference impossible in most cases.

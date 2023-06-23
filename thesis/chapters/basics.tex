@@ -1,6 +1,6 @@
 \chapter{A Tour of Elaine}\label{chap:basics}
 
-The language designed for this thesis is called ``Elaine". The distinguishing feature of this language is its support for higher-order effects via elaborations. As far as we know, it is the second language with support for elaborations, the first being Heft. Elaine adds two new features: implicit elaboration resolution and compilation of elaborations, which are explained in \cref{chap:elabres,chap:elabcomp}, respectively. Additionally, Elaine differs by not requiring monadic style programming for effectful computation. This makes Elaine a surprisingly expressive language given its simplicity.
+The language designed for this thesis is called ``Elaine''. The distinguishing feature of this language is its support for higher-order effects via elaborations. As far as we know, it is the second language with support for elaborations, the first being Heft. Elaine adds two new features: implicit elaboration resolution and compilation of elaborations, which are explained in \cref{chap:elabres,chap:elabcomp}, respectively. Additionally, Elaine differs by not requiring monadic style programming for effectful computation. This makes Elaine a surprisingly expressive language given its simplicity.
 
 This chapter introduces Elaine with motivating examples for the design choices. The full specification is given in \cref{chap:spec}. More example programs are available online\footnote{\url{https://github.com/tertsdiepraam/thesis/tree/main/elaine/examples}}.
 
@@ -69,7 +69,7 @@ let square = fn(x: <> Int) <> Int {
 
 Simple effect rows consist of a list of effect names separated by commas. The return type of a function that returns an integer and uses effects "A" and "B" has type \el{<A,B> Int}. Important here is that this type is equivalent to \el{<B,A> Int}: the order of effects in effect rows is irrelevant. However, the multiplicity is important, that is,  the effect rows \el{<A,A>} and \el{<A>} are not equivalent. To capture the equivalence between effect rows, we therefore model them as multisets.
 
-Additionally, we can extend effect rows with other effect rows. In the syntax of the language, this is specified with the \el{|} at the end of the effect row: \el{<A,B|e>} means that the effect row contains \el{A}, \el{B} and some (possibly empty) other set of effects.
+Additionally, we can extend effect rows with other effect rows. In the syntax of the language, this is specified with the \el{|} at the end of the effect row: \el{<A,B|e>} means that the effect row contains \el{A}, \el{B} and some (possibly empty) set of remaining effects.
 
 We can use extensions to ensure equivalence between effect rows without specifying the full rows (which might depend on context). For example, the following function uses the \el{Abort} effect if the called function returns false, while retaining the effects of the wrapped function.
 
@@ -79,7 +79,7 @@ let abort_on_false = fn(f: fn() <|e> Bool) <Abort|e> () {
 }
 \end{lstlisting}
 
-Effect rows need special treatment in the unification algorithm of the type checker, which is detailed in \cref{sec:typechecker}.
+Effect rows need special treatment in the unification algorithm of the type checker, which is detailed in \cref{ssec:effectrows}.
 
 \subsection{Effect Handlers}\label{sec:alghandlers}
 
@@ -98,7 +98,7 @@ The \el{Abort} effect uses this mechanism. It defines a single operation \el{abo
 
 \lstinputlisting[language=elaine, style=fancy, firstline=6]{../../elaine/examples/abort.elaine}
 
-In the program above, \el{f} will not get called because \el{hAbort} does not call the continuation, but \el{g} will be called, because it is used outside of the \el{handle}.
+In the program above, \el{f} will not get called because \el{hAbort} does not call the continuation, but \el{g} will be called, because it is used outside the \el{handle} construct.
 
 Alternatively, we can define a handler that defines a default value for failing expressions. In this example, the handler acts much like an exception handler.
 
@@ -157,7 +157,7 @@ elaboration Val! -> <> {
 \end{lstlisting}
 \end{minipage}
 
-Of course, the goal of elaborations is not to write handlers in a different way, but to encode higher-order effects. Since elaborations elaborate into algebraic effects, a row of algebraic effects must be specified. As a silly example, we can elaborate the higher-order \el{Val!} into \el{Val}, simply replacing occurrences of \el{val!()} with \el{val()};
+Of course, the goal of elaborations is not to write handlers differently, but to encode higher-order effects. Since elaborations elaborate into algebraic effects, a row of algebraic effects must be specified. As a silly example, we can elaborate the higher-order \el{Val!} into \el{Val}, simply replacing occurrences of \el{val!()} with \el{val()};
 
 \begin{lstlisting}[language=elaine,style=fancy]
 effect Val!{

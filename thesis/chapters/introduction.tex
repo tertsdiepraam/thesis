@@ -1,16 +1,38 @@
 \chapter{Introduction}\label{chap:introduction}
 
-As a program runs, it usually interacts with its environment. A function might, for example, allocate some memory, open a file or throw an exception. Apart from producing a value, such a procedure therefore also has some other observable \emph{effects}.
+As a program runs, it usually interacts with its environment. A function might, for example, allocate some memory, open a file or throw an exception. Apart from producing a value, such a procedure therefore also has some other observable \emph{effects} \autocite{moggi_computational_1989}.
 
-Programming languages often have special features for some of these effects, such as exceptions, coroutines and capabilities. While these features might seem very different on the surface, they have an important common property: they give away control to some other procedure and are handed back control later. This procedure could be a memory allocator, a scheduler, the kernel, an exception handler or something else that implements the necessary operations to perform the effect.
+The classical $\lambda$-calculus does not take these effects into account and models only \emph{pure} computations \autocite{moggi_computational_1989}. That is, computations which take some input and for every set of inputs they return the same output, without interacting with their environment. There is an elegance to this view, since pure programs are simple to reason about and analyse.
+
+However, in practice, many programs are \emph{impure} or \emph{effectful}. As \textcite{moggi_computational_1989} notes, analysing only pure computation leaves out many aspects of programs, such as side effects, non-determinism and non-termination. Reasoning about the full behaviour of a program then necessarily needs to include an analysis of effects.
+
+Some programming languages, such as C, give the programmer virtually unrestricted access to effectful operations. Any part of a C program can access memory and the filesystem and is even allowed to use \code{goto} to jump to any location in the code outside the structured control flow constructs. This unrestricted use has famously been criticized by \textcite{dijkstra_letters_1968}. In C (and similar languages), effects are also largely ignored in the type system. Programmers therefore have to rely on documentation and the source code to determine the side effects of any given function.
+
+A challenge in language design is then to design a language which allows for (limited) impure calculation, while retaining the attractive qualities of pure languages. As a result, programming languages often have dedicated features for some effects, such as exceptions, coroutines and generators. While these features might seem very different on the surface, they have an important common property: they give away control to some other procedure and are handed back control later. This procedure could be a memory allocator, a scheduler, the kernel, an exception handler or something else that implements the necessary operations to perform the effect.
 
 % spell-checker:ignore effekt
-The theory of \emph{algebraic effects} unifies many effects into a single concept \autocite{goos_adequacy_2001, castagna_handlers_2009}. Here, effectful computations can only be used within \emph{effect handlers}, which the computation yields control to. A handler can then in turn call the continuation of the computation. In recent years, some languages (e.g. Koka \autocite{leijen_koka_2014}, Eff \autocite{bauer_programming_2015}, Frank \autocite{lindley_be_2017}, and Effekt \autocite{brachthauser_effects_2020}) have been created with support for algebraic effects. These languages allow the programmer to define new effects without needing a whole new language feature. Moreover, these languages often feature type systems that can reason about the effects in each function.
+This insight is at the code of the theory of \emph{algebraic effects}, which unifies many effects into a single concept \autocite{goos_adequacy_2001,castagna_handlers_2009}. Here, effectful computations can only be used within \emph{effect handlers}, which the computation yields control to. A handler can then in turn call the continuation of the computation.
 
-However, there are some common patterns of effects that cannot be represented as algebraic effects, namely \emph{higher-order effects}. That is, effects whose operations that take effectful computations as arguments. To overcome this limitation, \textcite{bach_poulsen_hefty_2023} have extended algebraic effects with \emph{hefty algebras}. To support higher-order effects, they introduced \emph{effect elaborations} in addition to handlers.
+In recent years, some languages (e.g. Koka \autocite{leijen_koka_2014}, Eff \autocite{bauer_programming_2015}, Frank \autocite{lindley_be_2017}, and Effekt \autocite{brachthauser_effects_2020}) have been created with support for algebraic effects. These languages allow the programmer to define new effects without needing a dedicated language feature.
 
-In this thesis, we introduce a novel programming language called \emph{Elaine}. Like Koka and other languages with support for algebraic effects, Elaine supports effect rows and handlers. Unlike those languages, Elaine additionally also supports elaborations and higher-order effects. We define the syntax, reduction semantics and type system of Elaine and provide a full implementation of the language in Haskell\footnote{available at \url{https://github.com/tertsdiepraam/thesis/tree/main/elaine}}. This implementation includes a parser, type checker, pretty printer and type checker. Additionally, we introduce a novel feature that allows elaborations to be inferred to reduce the syntactic overhead of elaborations.
+Moreover, these languages often feature type systems that can reason about the effects in each function. The programmer can therefore see from the signature what a function can do, such that effects act as capabilities \autocite{brachthauser_effects_2020}. Conversely, a library author might choose to only disallow (some) effects in some functions. For example, a hash function is generally understood to be deterministic and effectless, because it needs to be reproducible.
 
-Finally, we give a transformation from higher-order effects to algebraic effects. This transformation shows that elaborations can be added to existing languages and libraries for effects with relative ease.\todo{Maybe even more implications?}
+However, there are some commonly used effects that are not algebraic, namely \emph{higher-order effects}. That is, effects whose operations that take effectful computations as arguments that do not behave as continuations. To overcome this limitation, \textcite{bach_poulsen_hefty_2023} have extended algebraic effects with \emph{hefty algebras}. To support higher-order effects, they introduced \emph{effect elaborations} in addition to handlers.
+
+In this thesis, we introduce a novel programming language called \emph{Elaine}. Like Koka and other languages with support for algebraic effects, Elaine supports effect rows and handlers. Unlike those languages, Elaine additionally also supports elaborations and higher-order effects. We define the syntax, reduction semantics and type system of Elaine and provide a full implementation of the language in Haskell\footnote{Available at \url{https://github.com/tertsdiepraam/thesis/tree/main/elaine}}. This implementation includes a parser, type checker, pretty printer and type checker. Additionally, we introduce a novel feature that allows elaborations to be inferred to reduce the syntactic overhead of elaborations.
+
+Finally, we give a transformation from higher-order effects to algebraic effects. \fixme{This transformation shows that elaborations can be added to existing languages and libraries for effects with relative ease.}
 
 With Elaine, we argue that elaborations are a natural and easy representation of higher-order effects with a set of example programs.
+
+\section{Contributions}
+
+The main contribution of this thesis is the specification and implementation of Elaine. This consists of several parts.
+
+\begin{itemize}
+    \item We define a syntax suitable for a language with both handlers and elaboration.
+    \item We introduce a type inference system for a language with higher-order effects and elaborations.
+    \item We present a novel representation of effect rows as multiset which, though semantically equivalent to earlier representations, allows for a simple definition of effect row unification.
+    \item We propose that elaborations should be inferred in most cases and provide a type-directed scheme for this inference in \cref{chap:elabres}.
+    \item We define 2 procedures for transforming programs with elaborations and higher-order effects to programs with only handlers and algebraic effects.
+\end{itemize}

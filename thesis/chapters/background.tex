@@ -2,25 +2,15 @@
 
 While hefty algebras are a relatively new concept, the analysis of effectful computation and the representation of effects in programming language has a rich history. This history is relevant to this thesis because the various approaches to modelling effects proposed over time can be found in many popular programming languages. A comparison between these languages and languages with algebraic and higher-order effects hence requires comparison between theories. This chapter details the parts of this history that are relevant to Elaine.
 
-\section{Motivation for Effects}
-
-In an heavily simplified perspective on computation, programs and their procedures are \emph{pure} functions. They take some input and for every set of inputs they return the same output, without interacting with other parts of the program or with the system. There is a certain elegance to this view: pure programs are simple to reason about and analyze.
-
-However, in practice, many programs are \emph{impure}. As \textcite{moggi_computational_1989} notes, analyzing only pure computation leaves out many aspects of programs, such as side-effects, non-determinism and non-termination. These capabilities outside pure computation are called \emph{effects} \autocite{moggi_computational_1989}. Reasoning about the full behaviour of a program then necessarily needs to include an analysis of effects.
-
-Some programming languages, such as C, have opted to give the programmer virtually unrestricted access to effectful operations. Any part of of a C program can access memory and the filesystem and is even allowed to use \code{goto} to jump to other parts outside of regular control flow. This unrestricted use has famously been criticized by \textcite{dijkstra_letters_1968} and many others. A challenge in language design is then to design a language which allows for (limited) impure calculation, while retaining the attractive qualities of pure languages.
-
-Support for effects in the type system of a programming language also allows programmers to write stricter APIs. For example, if all functions in a library are required to declare the effects they require, the user will be able to see from the signature what a function can do \autocite{brachthauser_effects_2020}. Conversely, a library author might choose to only disallow (some) effects in some functions. A library author might also want to communicate that a function should not contain certain effects. For example, a hash function is generally understood to be deterministic and effectless, because it needs to be reproducible.
-
 \section{Monads and Monad Transformers}
 
 The study of effects starts right at the two foundational theories of computation: $\lambda$-calculus and Turing machines. Their respective treatment of effects could not be more different. The former is only concerned with pure computation, while the latter consists solely of effectful operations.
 
-In $\lambda$-calculus, effects are not modelled; every function is a function in the mathematical sense, that is, a pure computation \autocite{moggi_computational_1989}. Hence, many observable properties of programs are ignored, such as non-determinism and side-effects. In their seminal paper, \textcite{moggi_computational_1989} unified \emph{monads} with computational effects, which they initially called notions of computation. \citeauthor{moggi_computational_1989} identified that for any monad $T: C \to C$ and a type of values $A$, the type $T A$ is the type of a computation of values of type $A$.
+In $\lambda$-calculus, effects are not modelled; every function is a function in the mathematical sense, that is, a pure computation \autocite{moggi_computational_1989}. Hence, many observable properties of programs are ignored, such as non-determinism and side effects. In their seminal paper, \textcite{moggi_computational_1989} unified \emph{monads} with computational effects, which they initially called notions of computation. \citeauthor{moggi_computational_1989} identified that for any monad $T: C \to C$ and a type of values $A$, the type $T A$ is the type of a computation of values of type $A$.
 
 Since many programming languages have the ability to express monads from within the language, monads became a popular way to model effectful computation in functional programming languages. In particular, \textcite{peyton_jones_imperative_1993} introduced a technique to model effects via monads in Haskell. This technique keeps the computation pure, while not requiring any extensions to the type system.
 
-A limitation of treating effects as monads is that they do not compose well; the composition of two monads is not itself a monad. A solution to this are \emph{monad transformers}, which are functors over monads that add operations to a monad \autocite{moggi_abstract_1989}. A regular monad can then be obtained by applying a monad transformer to the \el{Identity} monad. The representation of a monad then becomes much like that of a list of monad transformers, with the \el{Identity} monad as \el{Nil} value. This ``list" of transformers is ordered. For example, using the terminology from Haskell's \el{mtl} library, the monad \el{StateT a (ReaderT b Identity)} is distinct from \el{ReaderT b (StateT a Identity)}. The order of the monad transformers also determines the order in which they must be handled: the outermost monad transformer must be handled first.
+A limitation of treating effects as monads is that they do not compose well; the composition of two monads is not itself a monad. A solution to this are \emph{monad transformers}, which are functors over monads that add operations to a monad \autocite{moggi_abstract_1989}. A regular monad can then be obtained by applying a monad transformer to the \el{Identity} monad. The representation of a monad then becomes much like that of a list of monad transformers, with the \el{Identity} monad as \el{Nil} value. This ``list'' of transformers is ordered. For example, using the terminology from Haskell's \el{mtl} library, the monad \el{StateT a (ReaderT b Identity)} is distinct from \el{ReaderT b (StateT a Identity)}. The order of the monad transformers also determines the order in which they must be handled: the outermost monad transformer must be handled first.
 
 In practice, this model has turned out to work quite well, especially in combination with \el{do}-notation, which allowed for easier sequential execution of effectful computations.
 
@@ -37,7 +27,7 @@ This section introduces algebraic theories. In particular, we will discuss algeb
 \begin{definition}[Signature]
     A \emph{signature} $\Sig = \S{(op_i, P_i, A_i)}$ is a collection of operation symbols $op_i$ with corresponding parameter sets $P_i$ and arity sets $A_i$. We will write operation symbols as follows:
     \[ op_i : P_i \step A_i. \]
-    The arities are arbitrary sets. However, using the von Neumann ordinals, we can use natural numbers as arities. Hence we can call operation symbols with arities 1, 2 and 3 \emph{unary}, \emph{binary} and \emph{ternary} respectively. An operation symbol with arity $0$ is then called \emph{constant} or \emph{nullary}. Two other common arities are $\emptyset = \S{}$ and $\mathbf{1} = \S{()}$. We will refer to $()$ as the unit.
+    The arities are arbitrary sets. However, using the von Neumann ordinals, we can use natural numbers as arities. Hence, we can call operation symbols with arities 1, 2 and 3 \emph{unary}, \emph{binary} and \emph{ternary} respectively. An operation symbol with arity $0$ is then called \emph{constant} or \emph{nullary}. Two other common arities are $\emptyset = \S{}$ and $\mathbf{1} = \S{()}$. We will refer to $()$ as the unit.
 \end{definition}
 
 We can build terms with any given signature by composing the operations. Given some set $X$, we can build a set $\Tree_\Sig(X)$ of \emph{well-founded trees} over \Sig generated by $X$. This set is defined inductively:
@@ -67,7 +57,7 @@ When the relevant signature \Sig is unambiguous, we will omit the \Sig from the 
 An algebraic theory is still hollow; it is only a specification, not an implementation. The implementation or meaning of the operations that we apply to the operation symbols needs to be given via an interpretation.
 
 \begin{definition}[Interpretation]
-    An \emph{interpretation} $I$ of a signature \Sig is a
+    An \emph{interpretation} $I$ of a signature \Sig is
     \begin{enumerate}
     \item a \emph{carrier set} $|I|$
     \item and for each operation $op_i$ a map
@@ -89,7 +79,7 @@ If the choice of $I$ is obvious from the context, we will omit the subscript.
 The \emph{semantic bracket} $\inter{}_I$ is used to indicate that syntactic constructs are mapped to some (mathematical) interpretation of those symbols. In other words, an interpretation gives denotational semantics to a signature\question{this true?}.
 
 \begin{definition}[Model]
-    We say that an \Sig-equation $X \vbar l = r$ is \emph{valid}, if the interpretations of $l$ and $r$ evaluate to the same map, that is,
+    We say that a \Sig-equation $X \vbar l = r$ is \emph{valid}, if the interpretations of $l$ and $r$ evaluate to the same map, that is,
     \[ \inter{l} = \inter{r}. \]
 
     A \T-\emph{model} $M$ of an algebraic theory $\T$ is an interpretation of $\Sig_\T$ for which all the equations in $\mathcal{E}_T$ valid.
@@ -111,15 +101,15 @@ We can sequence operations with a syntax reminiscent of do-notation:
 \begin{align*}
     \S{x \gets op(p_1,\dots,p_n)\seq \kappa'}.
 \end{align*}
-We will add $\S{}$ around sequences when the notation is otherwise ambiguous. When a value from an operation in a sequence is discarded, we will omit the variable assignment and write 
+A sequence will be surrounded by $\S{}$ when the notation is otherwise ambiguous. When a value from an operation in a sequence is discarded, we will omit the variable assignment and write 
 \[ \S{op(p_1,\dots,p_n); \kappa}. \]
 Additionally, we will define a \emph{bind} operation \bind as follows, where $x$ is some fresh variable:
 \[ 
     \kappa \bind \kappa' \quad\defeq\quad \S{x \gets \kappa\seq \kappa'(x)}.
 \]
-As an example, take the \el{State} effect. To use the this effect, we need two operations: \el{put} and \el{get}. The computation
+As an example, take the \el{State} effect. To use this effect, we need two operations: \el{put} and \el{get}. The computation
 \[ \S{\oput(a)\seq \oget()} \]
-then first performs the \oput and then the \oget, returning the result of the \oget.
+then first performs the \oput and then the \oget operation, returning the result of the \oget operation.
 
 \subsection{Effects as Algebraic Theories}
 
@@ -138,7 +128,7 @@ This signature indicates that \oput takes an $S$ as parameter and resumes with $
     \oput(s)\seq \oget()\bind \kappa &\quad=\quad \oput(s)\seq \kappa(s) \\
     \oput(s)\seq \oput(t)\seq \kappa() &\quad=\quad \oput(t)\seq \kappa()
 \end{align*}
-This gives us an algebraic theory corresponding to the \el{State} monad. \textcite{goos_adequacy_2001} have shown that this theory gives rise to the canonical \el{State} monad. Many other effects can also be represented as algebraic theories, including but not limited to, non-determinism, non-termination, iteration, cooperative asynchronicity, traversal, input and output \citationneeded{}. These effects are called \emph{algebraic effects}.
+This gives us an algebraic theory corresponding to the \el{State} monad. \textcite{goos_adequacy_2001} have shown that this theory gives rise to the canonical \el{State} monad. Many other effects can also be represented as algebraic theories, including but not limited to, non-determinism, non-termination, iteration, cooperative asynchronicity, traversal, input and output\citationneeded. These effects are called \emph{algebraic effects}.
 
 As shown by\textcite{plotkin_algebraic_2003},  an effect is algebraic if and only if it satisfies the \emph{algebraicity property}, which can be expressed as follows:
 \[
@@ -152,17 +142,17 @@ A simple effect for which the algebraicity property does not hold is the \el{Rea
 \]
 and have to conclude that we cannot represent the \el{Reader} monad as an algebraic theory and the effect is not algebraic.
 
-A similar argument goes for the \el{Exception} effect. The \ocatch operation takes two computation parameters, it executes the first and jumps to the second on \othrow. The problem arises when we bind with an \othrow operation:
+A similar argument goes for the \el{Exception} effect. The \ocatch operation takes two computation parameters, it executes the first and jumps to the second on encountering the \othrow operation. The problem arises when we bind with an \othrow operation:
 \[
     \ocatch(m_1, m_2) \bind \othrow() \quad\neq\quad \ocatch(m_1\bind\othrow(), m_2\bind\othrow()).
 \]
-On the left hand side, $m_2$ will not be executed if $m_1$ does not throw, while on the right hand side, $m_2$ will always get executed. This does not match the semantics we expect from the \ocatch operation.
+On the left-hand side, $m_2$ will not be executed if $m_1$ does not throw, while on the right-hand side, $m_2$ will always get executed. This does not match the semantics we expect from the \ocatch operation.
 
 \subsection{Effect Handlers}
 
 The distinction between effects which are and which are not algebraic has been described as the difference between \emph{effect constructors} and \emph{effect deconstructors} \autocite{plotkin_algebraic_2003}. The \olocal and \ocatch operations have to act on effectful computations and change the meaning of the effects in that computation. So, they have to deconstruct the effects in their computations.
 
-\textcite{castagna_handlers_2009} introduced \emph{effect handlers} as a mechanism to allow for this deconstruction. Effect handlers are a generalization of exception handlers. They define the implementation for a set of algebraic operations in the subexpression.
+\textcite{castagna_handlers_2009} introduced \emph{effect handlers} as a mechanism to allow for this deconstruction. Effect handlers are a generalization of exception handlers. They define the implementation for a set of algebraic operations in the sub-expression.
 
 For example, we can define a handler for just the \oask operation, which is algebraic:
 \[

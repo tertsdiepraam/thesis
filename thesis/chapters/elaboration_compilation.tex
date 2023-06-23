@@ -2,7 +2,7 @@
 
 Since Elaine has novel semantics for elaborations, it is worth examining its relation to well-studied constructs from programming language theory. We therefore defined a transformation from elaborations into handlers, translating higher-order effects into algebraic effects, while preserving their semantics.
 
-The goal of this transformation is twofold. First, it further connect hefty algebras and Elaine to existing literature. For example, by compiling to a representation with only algebraic effects, we can then further compile the program using existing techniques, such as the compilation procedures defined for Koka \autocite{leijen_type_2017}. Second, the transformation allows us to encode elaborations in existing libraries and languages for algebraic effects.
+The goal of this transformation is twofold. First, it further connects hefty algebras and Elaine to existing literature. For example, by compiling to a representation with only algebraic effects, we can then further compile the program using existing techniques, such as the compilation procedures defined for Koka \autocite{leijen_type_2017}. Second, the transformation allows us to encode elaborations in existing libraries and languages for algebraic effects.
 
 In this thesis and the accompanying implementation, we only provide the first step: transforming elaborations into handlers.
 
@@ -102,7 +102,7 @@ For any operation call \el{op!(e1, ..., eN)}, we wrap the arguments into functio
 
 \section{Handlers as Dictionary Passing}
 
-We now have two pieces of the puzzle: we know how to translate the semantics for higher-order operations into regular functions and we have determined that we need something like dictionary passing to determine what elaboration should be applied. The problem is that our language -- as currently defined -- does not support dictionaries. Even if dictionaries were defined, the type safety of the transformed program would be difficult to check without a sub-structural type system.
+We now have two pieces of the puzzle: we know how to translate the semantics for higher-order operations into regular functions, and we have determined that we need something like dictionary passing to determine what elaboration should be applied. The problem is that our language -- as currently defined -- does not support dictionaries. Even if dictionaries were defined, the type safety of the transformed program would be difficult to check without a sub-structural type system.
 
 This leads to the final observation: effect handlers can be used as our dictionary passing construct. Conceptually, both \el{elab} and \el{handle} work similarly: they define a scope in which a given elaboration or handler is used. This scope is the same for both. We start by defining a handler that returns an elaboration for higher-order effect \el{A!}, much like the \el{Ask} effect from \cref{chap:basics}.
 
@@ -134,9 +134,9 @@ Combining the ideas above, we obtain a surprisingly simple transformation. Each 
 
 \begin{figure}[h]
 \begin{tabular}{rcl}
-\lstinline|elab[$e_1$] {$e_2$}|
+\lstinline{elab[$e_1$] \{$e_2$\}}
 & $\implies$
-& \lstinline|handle[$e_1$] {$e_2$}|
+& \lstinline{handle[$e_1$] \{$e_2$\}}
 \\\\
 \begin{lstlisting}
 elaboration {
@@ -160,7 +160,7 @@ handler {
 \\\\
 \lstinline|$op_j$!($e_1,...,e_k$)|
 & $\implies$
-& \lstinline|$op_j$(fn() {$e_1$}, ..., fn() {$e_k$})()|
+& \lstinline{$op_j$(fn() \{$e_1$\}, ..., fn() \{$e_k$\})()}
 \end{tabular}
 \end{figure}
 
