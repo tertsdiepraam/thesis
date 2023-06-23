@@ -625,17 +625,13 @@ instance Inferable Expr where
         let row' = rowUpdate elabRow (Row aEffs extend)
         return $ CompType row' vt1
         where
-          findElab (Effect path _) = case findMaybe (f path) (Map.toList (view vars env)) of
-            Just (x, e) -> return (x, e)
-            Nothing -> throwError $ "Could not find elaboration for: " ++ intercalate "::" (map pretty path)
+          findElab (Effect path _) = case concatMap (f path) (Map.toList (view vars env)) of
+            [(x, e)] -> return (x, e)
+            [] -> throwError $ "Could not find elaboration for: " ++ intercalate "::" (map pretty path)
+            _ -> throwError $ "Multiple elaborations found for: " ++ intercalate "::" (map pretty path)
 
-          f path1 (x, TypeScheme _ _ (CompType _ (TypeElaboration (Effect path2 _) row))) | path1 == path2 = Just (x, row)
-          f _ _ = Nothing
-
-          findMaybe _ [] = Nothing
-          findMaybe g (x : xs) = case g x of
-            Just a -> Just a
-            Nothing -> findMaybe g xs
+          f path1 (x, TypeScheme _ _ (CompType _ (TypeElaboration (Effect path2 _) row))) | path1 == path2 = [(x, row)]
+          f _ _ = []
       x -> error $ "Not implemented: " ++ show x
 
 extractVal :: CompType -> ValType
