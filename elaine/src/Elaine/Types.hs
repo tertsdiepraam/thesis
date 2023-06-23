@@ -1,4 +1,4 @@
-module Elaine.Types (Arrow (..), Row (..), TypeScheme (..), CompType (..), ValType (..), Effect (..), rowUpdate, rowInsert, rowVar, rowOpen, rowClosed, rowEmpty, rowIsEmpty, rowMaybe) where
+module Elaine.Types (Arrow (..), Row (..), TypeScheme (..), CompType (..), ValType (..), Effect (..), rowUpdate, rowMerge, rowInsert, rowVar, rowOpen, rowClosed, rowEmpty, rowIsEmpty, rowMaybe) where
 
 import Data.Map (Map)
 import Data.Maybe (isNothing)
@@ -45,6 +45,10 @@ data Row = Row
 
 rowUpdate :: Row -> Row -> Row
 rowUpdate (Row effsA _) (Row effsB exB) = Row (MultiSet.union effsA effsB) exB
+
+rowMerge :: Row -> Row -> Row
+rowMerge (Row effsA _) (Row effsB exB) = Row new exB
+  where new = MultiSet.union effsA effsB MultiSet.\\ MultiSet.intersection effsA effsB
 
 rowInsert :: Effect -> Row -> Row
 rowInsert eff (Row effs ex) = Row (MultiSet.insert eff effs) ex

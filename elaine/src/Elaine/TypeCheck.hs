@@ -33,7 +33,7 @@ import Elaine.Ident (Ident (Ident, idText), Location (LocBuiltIn, LocNone))
 import Elaine.Pretty (Pretty, pretty)
 import Elaine.Std (stdTypes)
 import Elaine.TypeVar (TypeVar (ExplicitVar, ImplicitVar))
-import Elaine.Types (Arrow (Arrow), CompType (CompType), Effect (Effect), Row (..), TypeScheme (TypeScheme, effectVars, typ, typeVars), ValType (TypeArrow, TypeBool, TypeElaboration, TypeHandler, TypeInt, TypeName, TypeString, TypeUnit, TypeV), rowEmpty, rowIsEmpty, rowMaybe, rowOpen, rowUpdate, rowVar)
+import Elaine.Types (Arrow (Arrow), CompType (CompType), Effect (Effect), Row (..), TypeScheme (TypeScheme, effectVars, typ, typeVars), ValType (TypeArrow, TypeBool, TypeElaboration, TypeHandler, TypeInt, TypeName, TypeString, TypeUnit, TypeV), rowEmpty, rowIsEmpty, rowMaybe, rowOpen, rowUpdate, rowVar, rowMerge)
 import GHC.Generics (Generic)
 import Prelude hiding (pure)
 
@@ -620,9 +620,9 @@ instance Inferable Expr where
         elabs <- mapM findElab (MS.toList hEffs)
         let elabIdents = map fst elabs
         () <- recordMetaElab i elabIdents
-        let elabRow = foldr (rowUpdate . snd) rowEmpty elabs
+        let elabRow = foldr (rowMerge . snd) rowEmpty elabs
 
-        let row' = rowUpdate elabRow (Row aEffs extend)
+        let row' = rowMerge elabRow (Row aEffs extend)
         return $ CompType row' vt1
         where
           findElab (Effect path _) = case concatMap (f path) (Map.toList (view vars env)) of
