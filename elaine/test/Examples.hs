@@ -30,6 +30,7 @@ expected "logic.elaine" = String "False, True, True\nFalse, True, False\n"
 expected "val.elaine" = Int 32
 expected "logic_once.elaine" = String "False, True, True\n"
 expected "yield.elaine" = String "2\n4\n"
+expected "elab_transformed.elaine" = String "1\n2\n1\n2\n"
 expected _ = error "Example does not have an expected value"
 
 testAllExamples :: SpecWith ()

@@ -16,7 +16,7 @@ data DeclarationType
   = Use Ident
   | Module Ident [Declaration]
   | DecLet Ident (Maybe ASTComputationType) Expr
-  | DecType Ident [Constructor]
+  | DecType Ident [TypeVar] [Constructor]
   | DecEffect Ident [OperationSignature]
   deriving (Show, Eq)
 
@@ -54,6 +54,7 @@ data Expr
   | Elab Expr Expr
   | Var Ident
   | Let (Maybe Ident) (Maybe ASTComputationType) Expr Expr
+  | Tuple [Expr]
   | Val Value
   deriving (Show, Eq)
 
@@ -66,6 +67,7 @@ data Value
   | Elb Elaboration
   | Constant BuiltIn
   | Data Ident Ident [Expr]
+  | TupleV [Value]
   | Unit
   deriving (Show, Eq)
 
@@ -95,7 +97,8 @@ data ASTComputationType = ASTComputationType Row ASTValueType
   deriving (Show, Eq)
 
 data ASTValueType
-  = TypeName Ident
+  = TypeConstructor Ident [ASTValueType]
+  | TypeTuple [ASTValueType]
   | TypeUnit
   | TypeArrow [ASTComputationType] ASTComputationType
   | TypeHandler Ident TypeVar ASTValueType

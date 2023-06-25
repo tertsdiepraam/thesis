@@ -31,6 +31,7 @@ import Text.Megaparsec
 import Text.Megaparsec.Char (char, space, space1, string)
 import qualified Text.Megaparsec.Char.Lexer as L
 import Prelude hiding (span)
+import Elaine.TypeVar (TypeVar(ExplicitVar))
 
 data Span = Span Int Int String
   deriving (Show, Generic)
@@ -246,7 +247,9 @@ operationSignature = OperationSignature <$> ident <*> parens (computationType `s
 decType :: Parser DeclarationType
 decType = do
   name <- try (keyword "type") >> ident
-  DecType name <$> braces (many constructor)
+  params <- fromMaybe [] <$> optional (brackets (ident `sepEndBy` comma))
+  let params' = map ExplicitVar params
+  DecType name params' <$> braces (constructor `sepEndBy` comma)
 
 functionParams :: Parser [(Ident, Maybe ASTComputationType)]
 functionParams = parens (functionParam `sepEndBy` comma)
@@ -269,8 +272,20 @@ valueType :: Parser ASTValueType
 valueType =
   try (parens $ pure TypeUnit)
     <|> functionType
-    <|> (TypeName <$> typeIdent)
+    <|> typeConstructor
+    -- It's important to try parens valueType first, because
+    -- it is also a valid tuple type expression
     <|> try (parens valueType)
+    <|> tupleType
+
+tupleType :: Parser ASTValueType
+tupleType = TypeTuple <$> parens (valueType `sepEndBy` comma)
+
+typeConstructor :: Parser ASTValueType
+typeConstructor = do
+  id' <- typeIdent
+  params <- fromMaybe [] <$> optional (brackets $ valueType `sepEndBy` comma)
+  return $ TypeConstructor id' params
 
 functionType :: Parser ASTValueType
 functionType = try (keyword "fn") >> TypeArrow <$> parens (computationType `sepEndBy` comma) <*> computationType
@@ -305,13 +320,14 @@ expr = do
   root <-
     exprBlock
       <|> if'
-      <|> Val <$> value
+      <|> try (Val <$> value)
       <|> match'
       <|> handle
       <|> elab
       <|> handler
       <|> elaboration
       <|> (Var <$> ident)
+      <|> (Tuple <$> parens (expr `sepEndBy` comma))
   applications <- many (parens (expr `sepEndBy` comma))
   return $ foldl App root applications
 

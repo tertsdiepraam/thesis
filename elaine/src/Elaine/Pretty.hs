@@ -5,7 +5,7 @@ import qualified Data.MultiSet as MS
 import Elaine.AST
 import Elaine.Ident (Ident (Ident))
 import Elaine.TypeVar (TypeVar (ExplicitVar, ImplicitVar))
-import Elaine.Types (CompType (CompType))
+import Elaine.Types (CompType (CompType), Effect (..), Path, DataType (..))
 import qualified Elaine.Types as T
 import qualified Elaine.Types as Types
 
@@ -30,6 +30,10 @@ optionalType :: Pretty a => Maybe a -> String
 optionalType (Just a) = ":" ++ pretty a
 optionalType Nothing = ""
 
+pTypeVars :: Pretty a => [a] -> String
+pTypeVars [] = ""
+pTypeVars vs = "[" ++ intercalate "," (map pretty vs) ++ "]"
+
 instance Pretty Ident where
   pretty (Ident x _) = x
 
@@ -41,8 +45,8 @@ instance Pretty DeclarationType where
   pretty (Use s) = "use " ++ pretty s ++ ";"
   pretty (Module x decs) = "mod " ++ pretty x ++ concatBlock decs
   pretty (DecLet name t expr) = "let " ++ pretty name ++ optionalType t ++ " = " ++ pretty expr ++ ";"
-  pretty (DecType name constructors) =
-    "type " ++ pretty name ++ " " ++ concatBlock constructors
+  pretty (DecType name params constructors) =
+    "type " ++ pretty name ++ pTypeVars params ++ " " ++ concatBlock constructors
   pretty (DecEffect name operations) =
     "effect " ++ pretty name ++ " " ++ concatBlock operations
 
@@ -76,7 +80,7 @@ instance Pretty Value where
   pretty (Hdl (Handler ret functions)) =
     "handler "
       ++ pBlock (pRet ++ unlines (map pretty functions))
-    where 
+    where
       pRet = case ret of
         Just r -> "return" ++ pretty r ++ "\n"
         Nothing -> ""
@@ -131,8 +135,13 @@ instance Pretty TypeVar where
 
 instance Pretty ASTValueType where
   pretty TypeUnit = "()"
-  pretty (TypeName a) = pretty a
+  pretty (TypeConstructor name params) =
+    pretty name
+      ++ if not (null params) then "[" ++ intercalate "," (map pretty params) ++ "]" else ""
   pretty (TypeArrow args ret) = "(" ++ intercalate ", " (map pretty args) ++ ") -> " ++ pretty ret
+  pretty (TypeHandler eff from to) = "handler[" ++ pretty eff ++ "," ++ pretty from ++ "," ++ pretty to ++ "]"
+  pretty (TypeElaboration eff row) = "elaboration[" ++ pretty eff ++ "," ++ pretty row ++ "]"
+  pretty (TypeTuple params) = "(" ++ intercalate "," (map pretty params) ++ ")"
 
 instance Pretty Types.Row where
   pretty (Types.Row effs ext) = "<" ++ intercalate ", " (map (intercalate "::" . p) (MS.toList effs)) ++ maybe "" (("|" ++) . pretty) ext ++ ">"
@@ -150,8 +159,20 @@ instance Pretty T.ValType where
   pretty T.TypeInt = "Int"
   pretty T.TypeString = "String"
   pretty T.TypeBool = "Bool"
-  pretty (T.TypeHandler _ _ _) = "handler"
-  pretty (T.TypeElaboration _ _) = "elaboration"
+  pretty (T.TypeHandler eff from to) = "handler[" ++ pretty eff ++ "," ++ pretty from ++ "," ++ pretty to ++ "]"
+  pretty (T.TypeElaboration eff row) = "elaboration[" ++ pretty eff ++ "," ++ pretty row ++ "]"
   pretty (T.TypeV v) = pretty v
-  pretty (T.TypeName x) = pretty x
   pretty (T.TypeArrow (T.Arrow args ret)) = "(" ++ intercalate ", " (map pretty args) ++ ") -> " ++ pretty ret
+  pretty (T.TypeTuple params) = "(" ++ intercalate "," (map pretty params) ++ ")"
+  pretty (T.TypeData dataType params) =
+    pretty dataType
+      ++ if not (null params) then "[" ++ intercalate "," (map pretty params) ++ "]" else ""
+
+instance Pretty DataType where
+  pretty (DataType p _ _) = pretty p
+
+instance Pretty Effect where
+  pretty (Effect path _)= pretty path
+
+instance Pretty Path where
+  pretty path = intercalate "::" (map pretty path)

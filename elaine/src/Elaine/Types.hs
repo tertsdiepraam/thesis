@@ -1,4 +1,4 @@
-module Elaine.Types (Arrow (..), Row (..), TypeScheme (..), CompType (..), ValType (..), Effect (..), rowUpdate, rowMerge, rowInsert, rowVar, rowOpen, rowClosed, rowEmpty, rowIsEmpty, rowMaybe) where
+module Elaine.Types (DataType (..), Constructor (..), Path, Arrow (..), Row (..), TypeScheme (..), CompType (..), ValType (..), Effect (..), rowUpdate, rowMerge, rowInsert, rowVar, rowOpen, rowClosed, rowEmpty, rowIsEmpty, rowMaybe) where
 
 import Data.Map (Map)
 import Data.Maybe (isNothing)
@@ -22,6 +22,12 @@ data CompType = CompType Row ValType
 data Effect = Effect Path (Map Ident Arrow)
   deriving (Show, Eq, Ord)
 
+data DataType = DataType Path [TypeVar] [Constructor]
+  deriving (Show, Eq, Ord)
+
+data Constructor = Constructor Ident [CompType]
+  deriving (Show, Eq, Ord)
+
 data Arrow = Arrow [CompType] CompType
   deriving (Show, Eq, Ord)
 
@@ -30,10 +36,11 @@ data ValType
   | TypeString
   | TypeBool
   | TypeUnit
-  | TypeName Ident
   | TypeV TypeVar
   | TypeArrow Arrow
   | TypeHandler Effect ValType ValType
+  | TypeData DataType [ValType]
+  | TypeTuple [ValType]
   | TypeElaboration Effect Row
   deriving (Show, Eq, Ord)
 

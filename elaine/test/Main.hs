@@ -289,8 +289,8 @@ testRun = describe "run" $ do
     run
       [r|
       type Either {
-        Left(<> a)
-        Right(<> b)
+        Left(<> a),
+        Right(<> b),
       }
 
       let main = Left(5);
@@ -317,8 +317,8 @@ testRun = describe "run" $ do
     run
       [r|
       type Bool {
-        False()
-        True()
+        False(),
+        True(),
       }
 
       let main = match True() {
@@ -346,8 +346,8 @@ testRun = describe "run" $ do
       use std;
 
       type Maybe {
-        Just(<> a)
-        Nothing()
+        Just(<> a),
+        Nothing(),
       }
 
       let safediv = fn(x: Int, y: Int) <> Maybe {
@@ -370,8 +370,8 @@ testRun = describe "run" $ do
       use std;
       
       type Maybe {
-        Just(<> a)
-        Nothing()
+        Just(<> a),
+        Nothing(),
       }
 
       effect Abort {
@@ -407,8 +407,8 @@ testRun = describe "run" $ do
       use std;
 
       type Maybe {
-        Just(<> a)
-        Nothing()
+        Just(<> a),
+        Nothing(),
       }
 
       effect Abort {

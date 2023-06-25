@@ -27,13 +27,13 @@ import qualified Data.MultiSet as MS
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Elaine.AST (ASTValueType)
-import Elaine.AST hiding (ASTValueType (..), Row)
+import Elaine.AST hiding (Constructor (..), ASTValueType (..), Row)
 import qualified Elaine.AST as AST
 import Elaine.Ident (Ident (Ident, idText), Location (LocBuiltIn, LocNone))
 import Elaine.Pretty (Pretty, pretty)
 import Elaine.Std (stdTypes)
 import Elaine.TypeVar (TypeVar (ExplicitVar, ImplicitVar))
-import Elaine.Types (Arrow (Arrow), CompType (CompType), Effect (Effect), Row (..), TypeScheme (TypeScheme, effectVars, typ, typeVars), ValType (TypeArrow, TypeBool, TypeElaboration, TypeHandler, TypeInt, TypeName, TypeString, TypeUnit, TypeV), rowEmpty, rowIsEmpty, rowMaybe, rowOpen, rowUpdate, rowVar, rowMerge)
+import Elaine.Types (Arrow (Arrow), CompType (CompType), Effect (Effect), Row (..), TypeScheme (TypeScheme, effectVars, typ, typeVars), ValType (..), rowEmpty, rowIsEmpty, rowMaybe, rowOpen, rowUpdate, rowVar, rowMerge, DataType (..), Constructor (..))
 import GHC.Generics (Generic)
 import Prelude hiding (pure)
 
@@ -48,6 +48,7 @@ data Substitutions = Substitutions
 data TypeEnv = TypeEnv
   { _currentPath :: [Ident],
     _vars :: Map Ident TypeScheme,
+    _types :: Map Ident DataType,
     _effects :: Map Ident Effect,
     _mods :: Map Ident TypeEnv,
     _bound :: Set TypeVar
@@ -316,7 +317,30 @@ typeCheckDec' env = \case
     let env' = set currentPath path env
     modEnv <- typeCheckMod env' decs
     return $ singletonMod x (snd modEnv)
-  DecType _ _ -> throwError "Not implemented"
+  DecType name params constructors -> do
+    -- Create the data type
+    let path = view currentPath env ++ [name]
+    constructors' <- mapM
+      ( \(AST.Constructor name params) -> do
+        params' <- mapM (resolveCompType env) params
+        return $ Constructor name params'
+      )
+      constructors
+    let dataType = DataType path params constructors'
+
+    -- Create the functions for the constructors
+    functions <- mapM
+      ( \(Constructor name' params') -> do
+          ret <- pure $ TypeData dataType (map TypeV params)
+          typ <- pure $ TypeArrow $ Arrow params' ret
+          genType <- gen env typ
+          return (name', genType)
+      )
+          constructors'
+    return $ empty {
+      _types = Map.singleton name dataType,
+      _vars = Map.fromList functions
+    }
   DecEffect name signatures -> do
     let fullPath = view currentPath env ++ [name]
     arrows <-
@@ -360,18 +384,41 @@ typeCheckDec' env = \case
     return $ singletonVar x tExpr'
 
 resolveValType :: TypeEnv -> ASTValueType -> Infer ValType
-resolveValType _ AST.TypeUnit = return TypeUnit
-resolveValType _ (AST.TypeName (Ident "Bool" _)) = return TypeBool
-resolveValType _ (AST.TypeName (Ident "String" _)) = return TypeString
-resolveValType _ (AST.TypeName (Ident "Int" _)) = return TypeInt
-resolveValType _ (AST.TypeName x) | isLower (head $ idText x) = return $ TypeV (ExplicitVar x)
-resolveValType _ (AST.TypeName x) = return $ TypeName x
-resolveValType env (AST.TypeArrow args ret) = do
-  args' <- mapM (resolveCompType env) args
-  ret' <- resolveCompType env ret
-  return $ TypeArrow (Arrow args' ret')
-resolveValType _ (AST.TypeHandler {}) = error "not implemented"
-resolveValType _ (AST.TypeElaboration {}) = error "not implemented"
+resolveValType env = \case
+  AST.TypeUnit -> return TypeUnit
+  AST.TypeConstructor (Ident "Bool" _) [] -> return TypeBool
+  AST.TypeConstructor (Ident "String" _) [] -> return TypeString
+  AST.TypeConstructor (Ident "Int" _) [] -> return TypeInt
+  AST.TypeConstructor x params | isLower (head $ idText x) ->
+    if null params then
+      return $ TypeV (ExplicitVar x)
+    else
+      throwError "type variable cannot have type parameters"
+  AST.TypeConstructor x params -> do
+    dt@(DataType _ dtVars _) <- resolveDataType env x
+    params' <- mapM (resolveValType env) params
+
+    () <- when (length params' /= length dtVars) $
+      throwError "number of type arguments must match number of type vars of data type"
+  
+    return $ TypeData dt params'
+  AST.TypeTuple params -> do
+    params' <- mapM (resolveValType env) params
+    return $ TypeTuple params'
+  AST.TypeArrow args ret -> do
+    args' <- mapM (resolveCompType env) args
+    ret' <- resolveCompType env ret
+    return $ TypeArrow (Arrow args' ret')
+  AST.TypeHandler {} -> throwError "not implemented"
+  AST.TypeElaboration {} -> throwError "not implemented"
+
+resolveDataType :: TypeEnv -> Ident -> Infer DataType
+resolveDataType env t = case Map.lookup t (view types env) of
+  Just t'@(DataType p _ _) -> do
+    recordMetaDefinition t (last p)
+    return t'
+  Nothing -> throwError $ "Could not find data type " ++ pretty t
+
 
 resolveCompType :: TypeEnv -> ASTComputationType -> Infer CompType
 resolveCompType env (ASTComputationType row valType) = do
@@ -398,6 +445,8 @@ class Substitutable a where
 instance Substitutable ValType where
   sub subs vt | Just vt' <- Map.lookup vt (subTypeVars subs) = vt'
   sub subs (TypeArrow arr) = TypeArrow (sub subs arr)
+  sub subs (TypeData dt params) = TypeData dt $ map (sub subs) params
+  sub subs (TypeTuple params) = TypeTuple $ map (sub subs) params
   sub subs (TypeHandler name from to) = TypeHandler name (sub subs from) (sub subs to)
   sub _ vt = vt
 
@@ -632,7 +681,18 @@ instance Inferable Expr where
 
           f path1 (x, TypeScheme _ _ (CompType _ (TypeElaboration (Effect path2 _) row))) | path1 == path2 = [(x, row)]
           f _ _ = []
-      x -> error $ "Not implemented: " ++ show x
+      Tuple es -> do
+        row <- freshR
+        ts <- mapM (infer env) es
+        () <- mapM_ (unifyRows row . getRow <=< openRow) ts
+
+        ts' <- mapM subM ts
+        return $ CompType row $ TypeTuple (map getVal ts')
+        where
+          getRow (CompType r _) = r
+          getVal (CompType _ v) = v
+      _ -> error "Not implemented"
+
 
 extractVal :: CompType -> ValType
 extractVal (CompType _ v) = v

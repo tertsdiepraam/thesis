@@ -44,6 +44,8 @@ data Env = Env
 -- expression. However, they may require the operands to be values.
 reduce :: Expr -> Maybe Expr
 reduce = \case
+  Tuple es | Just vs <- mapM toVal es ->
+    Just $ Val $ TupleV vs
   If (Val v) e1 e2 -> Just $ case v of
     Bool b -> if b then e1 else e2
     _ -> error "Invalid condition for if expression"
@@ -104,10 +106,15 @@ ctxCommon (If e1 e2 e3) = Just (e1, \x -> If x e2 e3)
 -- The application ctx is a bit difficult, we need to accept both values and variables as
 -- function, because the variables might effect operations. We then enter the args if there
 -- any more args to evaluate.
-ctxCommon (App f args) | isApplicable f && not (all isVal args) = case span isVal args of
-  (vals, e : es) -> Just (e, \x -> App f (vals ++ [x] ++ es))
-  (_, []) -> Nothing
+ctxCommon (App f args) | isApplicable f && not (all isVal args) =
+  case span isVal args of
+    (vals, e : es) -> Just (e, \x -> App f (vals ++ [x] ++ es))
+    (_, []) -> Nothing
 ctxCommon (App e args) = Just (e, \x -> App x args)
+ctxCommon (Tuple es) =
+  case span isVal es of
+    (vals, e : es') -> Just (e, \x -> Tuple (vals ++ [x] ++ es'))
+    (_, []) -> Nothing
 ctxCommon (Let var t e1 e2) = Just (e1, \x -> Let var t x e2)
 ctxCommon (Match e arms) = case e of
   Val _ -> Nothing
@@ -213,6 +220,7 @@ subst subs e = foldl (flip subst1) e subs
 subst1 :: (Ident, Expr) -> Expr -> Expr
 subst1 (x, new) = \case
   Var y -> if x == y then new else Var y
+  Tuple es -> Tuple (map f es)
   App e es -> App (f e) (map f es)
   If e1 e2 e3 -> If (f e1) (f e2) (f e3)
   Handle e1 e2 -> Handle (f e1) (f e2)
@@ -327,10 +335,10 @@ updateEnv m (Use x) = case lookup x (envModules m) of
   Just imported -> imported
   Nothing -> error $ "Could not import module " ++ show x
 -- Type adds type constructors
-updateEnv _ (DecType typeIdent decs) =
+updateEnv _ (DecType typeIdent _ decs) =
   let -- We create a function for every constructor returning a Data value
       -- The parameters are called param0, param1, param2, etc.
-      lamParams params = map (\i -> (Ident ("param" ++ show i) LocNone)) (take (length params) [0 ..] :: [Int])
+      lamParams params = map (\i -> Ident ("param" ++ show i) LocNone) (take (length params) [0 ..] :: [Int])
       f (Constructor x params) =
         ( x,
           lam (lamParams params) (Val $ Data typeIdent x (map Var (lamParams params)))

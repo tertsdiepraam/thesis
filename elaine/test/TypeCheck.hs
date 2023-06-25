@@ -23,7 +23,7 @@ import Test.Hspec
     hspec,
     it,
     shouldBe,
-    shouldSatisfy,
+    shouldSatisfy, shouldStartWith,
   )
 import Test.Hspec.Runner (SpecResult (specResultSuccess))
 import Text.RawString.QQ (r)
@@ -925,6 +925,23 @@ testTypeCheck = describe "typeCheck" $ do
       let main = handle[hVal] val();
     |]
      `shouldBe` Right (pure TypeInt)
+  
+  it "can type a maybe type" $ do
+    check [r|
+      type Maybe[a] {
+        Just(a),
+        Nothing(),
+      }
+
+      let main = Just(5);
+    |] `shouldSatisfy` \case
+      Right (CompType _ (TypeData _ _)) -> True
+      _ -> False
+  
+  it "can type a tuple" $ do
+    check [r|
+      let main = (5, "Hello");
+    |] `shouldBe` Right (pure (TypeTuple [TypeInt, TypeString]))
 
 testUnifyRows :: SpecWith ()
 testUnifyRows = describe "unifyRows" $ do
