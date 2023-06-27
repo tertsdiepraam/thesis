@@ -86,11 +86,15 @@ This behaviour can be emulated for functions if anonymous functions are passed a
 
 \section{Compiling Elaborations to Dictionary Passing}
 
+\TODO{This is currently just an example. The actual transformation needs to be clearly defined too.}
+
 Instead, the elaborations can be transforms with a technique similar to dictionary-passing style: the implicit context of elaborations is explicitly passed to functions that require a higher-order effect.
 
 Any function with higher-order effects then takes the elaboration to apply as an argument and the operation is wrapped in an \el{elab}. The elaboration is then taken from \el{elabA} at the call-site.
 
-\begin{lstlisting}[language=elaine,style=fancy,float,caption={\fixme{Some explanation. Should be higher-order?}}]
+An example of what this transformation is given in \cref{lst:untransformed,lst:transformed}, where \cref{lst:untransformed} shows an untransformed program with higher-order effects and \cref{lst:transformed} shows the result of the transformation.
+
+\begin{lstlisting}[language=elaine,style=fancy,float,caption={Untransformed program. \fixme{This example should use a higher-order effect.}},label={lst:untransformed}]
 use std;
 
 effect A! {
@@ -105,7 +109,6 @@ let eMul = elaboration A! -> <> {
     arithmetic!(a, b) { mul(a, b) }
 };
 
-# The original program
 let foo = fn(k) {
     elab[eAdd] {
         let g = elab[eMul] {
@@ -119,6 +122,21 @@ let foo = fn(k) {
         };
         g()
     }
+};
+\end{lstlisting}
+\begin{lstlisting}[language=elaine,style=fancy,float,caption={Transformed program after compiling elaborations to dictionary passing.},label={lst:transformed}]
+use std;
+
+effect A! {
+    arithmetic!(Int, Int) Int
+}
+
+let eAdd = elaboration A! -> <> {
+    arithmetic!(a, b) { add(a, b) }
+};
+
+let eMul = elaboration A! -> <> {
+    arithmetic!(a, b) { mul(a, b) }
 };
 
 # Create a new type with one constructor to represent the
@@ -140,11 +158,13 @@ let eAdd = ElabA ( fn(a, b) { add(a(), b()) } );
 let eMul = ElabA ( fn(a, b) { mul(a(), b()) } );
 
 # The transformed program
-let foo' = fn(k) {
+let foo = fn(k) {
     let elab_A = eAdd;
     let g = {
         let elab_A = eMul;
-        let f = fn(elab_A) { elab_A_a(elab_a)(fn() { 5 }, fn() { 2 + 3) } };
+        let f = fn(elab_A) {
+            elab_A_a(elab_a)(fn() { 5 }, fn() { 2 + 3 })
+        };
         if k {
             f
         } else {
@@ -156,37 +176,15 @@ let foo' = fn(k) {
 };
 \end{lstlisting}
 
-\section{Handlers as Dictionary Passing}
-
-We now have two pieces of the puzzle: we know how to translate the semantics for higher-order operations into regular functions, and we have determined that we need something like dictionary passing to determine what elaboration should be applied. The problem is that our language -- as currently defined -- does not support dictionaries. Even if dictionaries were defined, the type safety of the transformed program would be difficult to check without a sub-structural type system.
-
-This leads to the final observation: effect handlers can be used as our dictionary passing construct. Conceptually, both \el{elab} and \el{handle} work similarly: they define a scope in which a given elaboration or handler is used. This scope is the same for both. We start by defining a handler that returns an elaboration for higher-order effect \el{A!}, much like the \el{Ask} effect from \cref{chap:basics}.
-
-\begin{lstlisting}[language=elaine,style=fancy]
-let hElab = fn(e) {
-    handler {
-        return(x) { x }
-        askElabA() { resume(e) }
-    }
-};
-
-handle[hElab(eOne)] {
-    let g = handle[hElab(eTwo)] {
-        let f = fn(e) { elab[askElabA()] a!() };
-        if k {
-            f
-        } else {
-            f();
-            fn() { () }
-        }
-    }
-    g()
-}
-\end{lstlisting}
-
-\TODO{Define the transformation.}
-
 \section{Compiling Elaborations into Handlers}
+
+\TODO{Talk about impredicativity and how that makes it so that it does not work.}
+
+While the transformation in the previous section is correct, the transformed program is quite verbose, because the elaboration types need to be passed to every function with higher-order effects. It would be more convenient if this was passed implicitly.
+
+As it turns out, we have a mechanism for passing implicit arguments: algebraic effects! Conceptually, both \el{elab} and \el{handle} are similar: they define a scope in which a given elaboration or handler is used. This scope is the same for both.
+
+To use this observation, we start by defining a handler that returns an elaboration for higher-order effect \el{A!}, much like the \el{Ask} effect from \cref{chap:basics}.
 
 Combining the ideas above, we obtain a surprisingly simple transformation. Each elaboration is transformed into a handler, which resumes with a function containing the original expression, where argument occurrences force the thunked values. Since elaborations are now handlers, we need to change the \el{elab} constructs to \el{handle} constructs accordingly. Finally, the arguments to operation calls are thunked and the function that is resumed is called, that is, there is an additional \el{()} at the end of the operation call.
 
@@ -230,100 +228,6 @@ $op_j$(fn() \{$e_1$\}, ..., fn() \{$e_k$\})()
 \end{tabular}
 \end{figure}
 
-\section{An Alternative Design for Elaine}
-
 The simplicity of the transformation makes it alluring and begs the question: are dedicated language features for higher-order effects necessary or is a simpler approach possible?
 
-Since we can encode elaborations as handlers, we can write higher-order effects as the result of the transformation above directly. Below is an example of an exception effect written in this style.
-
-\begin{lstlisting}[language=elaine,style=fancy]
-effect Exc {
-    catch(fn() <Throw> a, fn() a)
-}
-
-let hExc = handler {
-    return(x) { x }
-    catch(f, g) {
-        resume(fn() {
-            let res = handle[hThrow] f();
-            match res {
-                Just(x) => x,
-                Nothing => g(),
-            }
-        })
-    }
-};
-
-let main = handle[hCatch] catch(
-    fn() { ... },
-    fn() { ... },
-)();
-\end{lstlisting}
-
-Now let us introduce a few (hypothetical) syntactic conveniences. First, like Koka, we let \el{\{...\}}| represent \el{fn()\{...\}}. Second, we allow the \el{return} case to be omitted and default to the identity function. Third, if an operation ends with \el{!}, the operation body is wrapped in \el{resume(\{...\})} and the operations is given an underscore prefix with the original name brought into scope defined as
-
-\begin{lstlisting}[language=elaine,style=fancy]
-let op! = fn($x_1$, ..., $x_n$){ _op!($x_1$, ..., $x_n$)() };
-\end{lstlisting}
-
-Our previous example then reduces to
-
-\begin{lstlisting}[language=elaine,style=fancy]
-effect Exc {
-    catch!(fn() <Throw> a, fn() a)
-}
-
-let hExc = handler {
-    catch!(f, g) {
-        let res = handle[hThrow] f();
-        match res {
-            Just(x) => x,
-            Nothing => g(),
-        }
-    }
-};
-
-let main = handle[hExc] catch!(
-    { ... },
-    { ... },
-);
-\end{lstlisting}
-
-The result is almost as convenient as the version of Elaine presented in the previous chapters and does not have the split between elaborations and handlers, which possibly makes it easier to understand. The same design could be applied to other implementations of algebraic effects as well with relative ease.
-
-To illustrate that point, below is modular \el{catch} effect in Koka. While the handler is certainly more verbose than handlers for algebraic effects in Koka, the implementation is also quite simple. Koka could implement a shorthand for creating the boilerplate and essentially the same functionality as Elaine.
-
-\begin{lstlisting}[language={},style=fancy]
-effect abort
-  ctl abort(): a
-  
-effect exc
-  fun catch_( f : () -> <abort|e> a, g : () -> e a ) : (() -> e a)
-  
-val hAbort = handler
-  return(x)   Just(x)
-  ctl abort() Nothing
-
-val hExc = handler
-  fun catch_(f, g)
-    fn()
-      match hAbort(f)
-        Just(x) -> x
-        Nothing -> g()
-
-fun catch(f, g)
-  catch_(f, g)()
-
-fun main()
-  with hExc
-  println(catch({ if True then abort() else 5 }, { 0 }))
-\end{lstlisting}
-
-Because we can then ``emulate'' higher-order effects, the importance for explicit support for them is reduced. An advantage of this approach is that, because we do not have to elaborate into algebraic effects, we do not have to handle them. In Elaine the \el{main} function looks like this:
-
-\begin{lstlisting}[language=elaine,style=fancy]
-let main = handle[hAbort] elab catch!(if true { abort() } else { 5 }, { 0 });
-\end{lstlisting}
-
-\TODO{Talk about impredicativity and how that makes it so that it does not work.}
-
+\TODO{Answer: yes if you care about impredicativity, no otherwise.}
