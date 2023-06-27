@@ -119,7 +119,7 @@ get' m a = case Map.lookupIndex a m of
   Nothing -> throwError $ "undefined identifier: " ++ show a
 
 union :: TypeEnv -> TypeEnv -> TypeEnv
-union a = unionLens vars a . unionLens mods a . unionLens effects a
+union a = unionLens vars a . unionLens mods a . unionLens effects a . unionLens types a
   where
     unionLens :: Ord a => Lens' TypeEnv (Map a b) -> TypeEnv -> TypeEnv -> TypeEnv
     unionLens l a' = over l (Map.union $ a' ^. l)
@@ -159,6 +159,7 @@ empty =
   TypeEnv
     { _currentPath = [],
       _vars = Map.empty,
+      _types = Map.empty,
       _effects = Map.empty,
       _mods = Map.empty,
       _bound = Set.empty
@@ -208,6 +209,7 @@ freeTypeVars env t = allTypeVars t Set.\\ view bound env
 
     allTypeVarsV (TypeV v) = Set.singleton v
     allTypeVarsV (TypeArrow (Arrow args ret)) = Set.unions (map allTypeVars (args ++ [ret]))
+    allTypeVarsV (TypeData _ params) = Set.unions (map allTypeVarsV params)
     allTypeVarsV (TypeHandler _ from to) = Set.union (allTypeVarsV from) (allTypeVarsV to)
     allTypeVarsV _ = Set.empty
 
@@ -504,6 +506,10 @@ unify a b = do
       () <- unifyV from1 from2
       () <- unifyV to1 to2
       return ()
+    unifyV (TypeData d1 params1) (TypeData d2 params2) | d1 == d2 =
+      mapM_ (uncurry unifyV) (zip params1 params2)
+    unifyV (TypeTuple params1) (TypeTuple params2) =
+      mapM_ (uncurry unifyV) (zip params1 params2)
     unifyV _ _ = throwError "Failed to unify: type error"
 
 unifyRows :: Row -> Row -> Infer ()
@@ -691,7 +697,60 @@ instance Inferable Expr where
         where
           getRow (CompType r _) = r
           getVal (CompType _ v) = v
-      _ -> error "Not implemented"
+      Match e arms -> do
+        -- In a match, the arms should define the type
+        -- the other way around might lead to an undefined
+        -- type.
+        --
+        -- So we do the following:
+        --  - Get the functions corresponding to the arms
+        --  - Check that it matches a datatype in scope
+        --  - Check that the numbers of arguments match
+        --  - Check that the expr matches that type
+        --  - Check that all the arms have the same type.
+        let patternNames = map (getPatternName . getPattern) arms
+        
+        dataType@(DataType _ dtParams constructors) <- case find (constructorsMatch patternNames) (view types env) of
+              Just dt -> return dt
+              Nothing -> throwError $ "Could not find datatype with constructors: " ++ show patternNames
+        
+        -- We now know the type but not yet the type parameters of the type
+        -- so, we have to add those.
+        vars' <- mapM (const freshV) dtParams
+        let typeData = TypeData dataType vars' 
+        final@(CompType finalRow _) <- freshC
+
+        -- Infer and unify the type from e
+        te <- infer env e
+        () <- unify te (CompType finalRow typeData)
+
+        -- Infer and unify the arms
+        () <- 
+          mapM_ 
+            (
+              \(MatchArm (Pattern name args) body) -> do
+                -- Find the corresponding constructor
+                let Constructor _ params = fromJust $ find (\c' -> name == getConstructorName c') constructors
+                
+                -- Substitute the type params of the data type in the params of the
+                -- constructor 
+                let params' = map (sub $ Substitutions {subTypeVars=Map.fromList (zip (map TypeV dtParams) vars'), subEffectVars=Map.empty}) params
+                tBody <- inferFunctionLike env args params' Nothing body
+                let ret = case tBody of
+                      CompType _ (TypeArrow (Arrow _ r)) -> r
+                      _ -> error "ICE"
+                unify final ret
+            ) 
+            arms
+
+        subM final
+        where
+          getPattern (MatchArm p _) = p
+          getPatternName (Pattern n _) = n
+          getConstructorName (Constructor n _) = n
+          constructorsMatch names (DataType _ _ cs) =
+            Set.fromList names == Set.fromList (map getConstructorName cs)
+      -- _ -> error "Not implemented"
 
 
 extractVal :: CompType -> ValType
@@ -747,6 +806,10 @@ forceValue (TypeHandler name1 from1 to1) (TypeHandler name2 from2 to2) = do
   () <- forceValue from1 from2
   () <- forceValue to1 to2
   return ()
+forceValue (TypeData d1 params1) (TypeData d2 params2) | d1 == d2 =
+  mapM_ (uncurry forceValue) (zip params1 params2)
+forceValue (TypeTuple params1) (TypeTuple params2) =
+  mapM_ (uncurry forceValue) (zip params1 params2)
 forceValue a b = throwError $ "Failed to force: " ++ pretty a ++ " to " ++ pretty b
 
 inferMany :: Inferable a => TypeEnv -> [a] -> Infer [CompType]

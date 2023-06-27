@@ -1,0 +1,58 @@
+use std;
+
+effect A! {
+    a!() Int
+}
+
+let eOne = elaboration A! -> <> {
+    a!() { 1 }
+};
+
+let eTwo = elaboration A! -> <> {
+    a!() { 2 }
+};
+
+# The untransformed program
+let foo = fn(k) {
+    elab[eTwo] {
+        let g = elab[eOne] {
+            let f = fn() { a!() };
+            if k {
+                f
+            } else {
+                let x = f();
+                fn() { x }
+            }
+        };
+        g()
+    }
+};
+
+# The transformed program
+let foo' = fn(k) {
+    let elab_A_a = fn() { 2 };
+    let g = {
+        let elab_A_a = fn() { 1 };
+        let f = fn(elab_A_a) { elab_A_a() };
+        if k {
+            f
+        } else {
+            let x= f(elab_A_a);
+            fn(elab_A_a) { x }
+        }
+    };
+    g(elab_A_a)
+};
+
+let fmt = fn(x) { concat(show_int(x), "\n") };
+
+let main = concat(
+    concat(
+        fmt(foo(false)),
+        fmt(foo(true)),
+    ),
+    concat(
+        fmt(foo'(false)),
+        fmt(foo'(true)),
+    ),
+);

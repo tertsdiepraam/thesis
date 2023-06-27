@@ -1,0 +1,23 @@
+use std;
+
+effect Yield {
+    yield(Int) ()
+}
+
+let hCollect = handler {
+    return(x) { "" }
+    yield(x) { concat(concat(show_int(x), "\n"), resume(())) }
+};
+
+let map = fn(f: fn(Int) Int, c: fn() <Yield|e> a) <Yield|e> a {
+    handle[handler {
+        return(x) { x }
+        yield(a) { yield(f(a)); resume(()) }
+    }]
+    c()
+};
+
+let main = handle[hCollect] map(
+    fn(x) { mul(2, x) },
+    fn() { yield(1); yield(2) },
+);

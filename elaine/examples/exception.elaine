@@ -1,0 +1,48 @@
+use std;
+
+type Maybe[a] {
+    Just(a),
+    Nothing(),
+}
+
+effect Throw {
+    throw() a
+}
+
+effect Exc! {
+    catch!(a, a) a
+}
+
+let hThrow = handler {
+    return(x) { Just(x) }
+    throw() { Nothing() }
+};
+
+let eExc = elaboration Exc! -> <Throw> {
+    catch!(x, y) {
+        match handle[hThrow] x {
+            Just(a) => a,
+            Nothing() => y
+        }
+    }
+};
+
+let safe_div = fn(x, y) <Throw> Int {
+    if eq(y, 0) {
+        throw()
+    } else {
+        div(x, y)
+    }
+};
+
+let main = handle[hThrow] elab[eExc] {
+    # Div by zero, returns 0
+    let a = catch!(safe_div(3, 0), 0);
+    
+    # Div by zero, returns 8
+    let b = catch!(safe_div(10, 0), 8);
+    
+    # Ok, returns 10/2 = 5
+    let c = catch!(safe_div(10, 2), 4);
+    add(a, add(b, c))
+};

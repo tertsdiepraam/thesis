@@ -1,0 +1,7 @@
+mod higher_order {
+    pub effect SomeEffect! {
+        some_operation!(a) a
+    }
+
+    let eSome = 
+}

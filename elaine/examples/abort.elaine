@@ -1,21 +1,18 @@
-let f = fn() { () };
-let g = fn() { () };
+type Maybe[a] {
+    Just(a),
+    Nothing(),
+}
 
-use std;
-# ----
 effect Abort {
     abort() a
 }
 
 let hAbort = handler {
-    return(x) { () }
-    abort() { () }
+    return(x) { Just(x) }
+    abort() { Nothing() }
 };
 
-let main = {
-    handle[hAbort] {
-        abort();
-        f()
-    };
-    g()
+let main = handle[hAbort] {
+    abort();
+    5
 };

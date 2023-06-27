@@ -15,23 +15,27 @@ import Test.Hspec
     shouldBe,
     shouldSatisfy,
   )
+import Elaine.Pretty (Pretty(pretty))
+import Debug.Trace (traceShowId)
 
-expected :: String -> Value
-expected "state.elaine" = Int 6
-expected "id.elaine" = Int 5
-expected "abort.elaine" = Unit
-expected "safe_division.elaine" = Int 5
-expected "implicit.elaine" = String "The answer is: 23"
-expected "basics.elaine" = Int 8
-expected "structured_logging.elaine" = String "main: msg1\nmain:foo: msg2\nmain:bar: msg3\n"
-expected "square_is_even.elaine" = String "The square of 4 is even"
-expected "local_reader.elaine" = Int 4
-expected "logic.elaine" = String "False, True, True\nFalse, True, False\n"
-expected "val.elaine" = Int 32
-expected "logic_once.elaine" = String "False, True, True\n"
-expected "yield.elaine" = String "2\n4\n"
-expected "elab_transformed.elaine" = String "1\n2\n1\n2\n"
-expected _ = error "Example does not have an expected value"
+expected :: String -> Value -> Bool
+expected "abort.elaine" v = pretty v == "Maybe::Nothing()"
+expected "basics.elaine" v = v == Int 8
+expected "elab_transformed.elaine" v = v == String "1\n2\n1\n2\n"
+expected "id.elaine" v = v == Int 5
+expected "implicit.elaine" v = v == String "The answer is: 23"
+expected "local_reader.elaine" v = v == Int 4
+expected "logic_once.elaine" v = v == String "False, True, True\n"
+expected "logic.elaine" v = v == String "False, True, True\nFalse, True, False\n"
+expected "match.elaine" v = v == String "5"
+expected "safe_division.elaine" v = v == Int 5
+expected "square_is_even.elaine" v = v == String "The square of 4 is even"
+expected "state.elaine" v = v == Int 6
+expected "structured_logging.elaine" v = v == String "main: msg1\nmain:foo: msg2\nmain:bar: msg3\n"
+expected "val.elaine" v = v == Int 32
+expected "yield.elaine" v = v == String "2\n4\n"
+expected "exception.elaine" v = pretty v == "Maybe::Just(13)"
+expected _ _ = error "Example does not have an expected value"
 
 testAllExamples :: SpecWith ()
 testAllExamples = describe "Text Examples" $ do
@@ -49,4 +53,6 @@ testExample :: FilePath -> SpecWith ()
 testExample p = do
   contents <- runIO $ readFile $ "examples/" ++ p
   it p $ do
-    run p contents `shouldBe` Right (expected p)
+    run p contents `shouldSatisfy` \case
+      Right v -> expected p v
+      _ -> False

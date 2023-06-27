@@ -1,0 +1,13 @@
+use std;
+
+type Either[a,b] {
+    Left(a),
+    Right(b),
+}
+
+let foo = if true { Left(5) } else { Right("hello") };
+
+let main = match foo {
+    Left(a) => show_int(a),
+    Right(b) => concat(b, "!!!!!!"),
+};

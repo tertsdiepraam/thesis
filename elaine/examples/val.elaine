@@ -4,10 +4,10 @@ effect Val {
     val() Int
 }
 
-let hVal = fn(x) {
+let hVal = fn(v) {
     handler {
         return(x) { x }
-        val() { resume(x) }
+        val() { resume(v) }
     }
 };
 

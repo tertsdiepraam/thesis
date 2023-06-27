@@ -22,6 +22,8 @@ data CompType = CompType Row ValType
 data Effect = Effect Path (Map Ident Arrow)
   deriving (Show, Eq, Ord)
 
+-- A custom data type, possibly with type vars
+-- These vars are constant and do not change while typechecking
 data DataType = DataType Path [TypeVar] [Constructor]
   deriving (Show, Eq, Ord)
 

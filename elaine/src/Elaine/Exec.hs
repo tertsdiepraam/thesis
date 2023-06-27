@@ -10,7 +10,7 @@ import Elaine.AST (Program, Value)
 import Elaine.Eval (eval)
 import Elaine.Ident (Ident)
 import Elaine.Parse (Spans, parseProgram)
-import Elaine.Pretty (pretty)
+import Elaine.Pretty (pretty, Pretty)
 import Elaine.Transform (elabToHandle, makeElabExplicit)
 import Elaine.TypeCheck (CheckState (stateMetadata), Metadata (elabs), getMain, typeCheck)
 import Elaine.Types (CompType, TypeScheme (TypeScheme))
@@ -82,7 +82,7 @@ makeElabExplicit' (p, m) = Right $ makeElabExplicit m p
 transform' :: Program -> Result Program
 transform' = Right . elabToHandle
 
-pretty' :: Program -> Result String
+pretty' :: Pretty a => a -> Result String
 pretty' = Right . pretty
 
 show' :: Show a => a -> Result String
@@ -131,8 +131,8 @@ cmd "pretty" = execPretty
 cmd "spans" = execSpans >=> pShow'
 cmd "spans-json" = execSpans >=> json
 cmd "check" = execCheck >=> show'
-cmd "run" = execRun >=> show'
-cmd "run-unchecked" = execRunUnchecked >=> show'
+cmd "run" = execRun >=> pretty'
+cmd "run-unchecked" = execRunUnchecked >=> pretty'
 cmd "explicit" = execExplicit
 cmd "metadata" = execCheckMetadata >=> pShow'
 cmd "metadata-json" = execCheckMetadata >=> json

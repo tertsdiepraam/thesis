@@ -370,7 +370,7 @@ elab = do
 match' :: Parser Expr
 match' = do
   l <- try (keyword "match") >> expr
-  Match l <$> braces (many matchArm)
+  Match l <$> braces (matchArm `sepEndBy` comma)
 
 matchArm :: Parser MatchArm
 matchArm = do
