@@ -113,6 +113,7 @@
 \usepackage[colorinlistoftodos,prependcaption,textsize=tiny]{todonotes}
 
 \newcommandx{\TODO}[2][1=]{\todo[inline,#1]{\textbf{TODO}: #2}}
+\newcommandx{\feedback}[2][1=]{\todo[backgroundcolor=blue!10,caption={FEEDBACK},#1]{#2}}
 \newcommandx{\unsure}[2][1=]{\todo[linecolor=red,backgroundcolor=red!25,bordercolor=red,#1]{\textbf{UNSURE}: #2}}
 \newcommandx{\question}[2][1=]{\todo[linecolor=yellow,backgroundcolor=yellow!25,bordercolor=yellow,#1]{\textbf{QUESTION}: #2}}
 \newcommandx{\change}[2][1=]{\todo[linecolor=blue,backgroundcolor=blue!25,bordercolor=blue,#1]{\textbf{CHANGE}: #2}}
@@ -130,6 +131,7 @@
 \usepackage[
   backend=biber,
   style=authoryear-comp,
+  useprefix=false
   % style=numeric
 ]{biblatex}
 
@@ -356,3 +358,7 @@
 \newcommand\opt[1]{[#1]}
 \newcommand\rep[1]{#1 \dots #1}
 \newcommand\csep[1]{#1\tok{,} \dots \tok{,}\ #1}
+
+\makeatletter
+\AtBeginDocument{\toggletrue{blx@useprefix}}
+\makeatother

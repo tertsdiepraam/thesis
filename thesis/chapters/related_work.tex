@@ -1,5 +1,7 @@
 \chapter{Related Work}\label{chap:related_work}
 
+\feedback[inline]{Can be expanded. Provide context for this thesis. What have others done, what's missing, and what does this thesis add?}
+
 As the theoretical research around effects has progressed, new libraries and languages have emerged using the state-of-the-art effect theories. These frameworks can be divided into two categories: effects encoded in existing type systems and effects as first-class features.
 
 These implementations provide ways to define, use and handle effectful operations. Additionally, many implementations provide type level information about effects via \emph{effect rows}. These are extensible lists of effects that are equivalent up to reordering. The rows might contain variables, which allows for \emph{effect row polymorphism}.
@@ -12,7 +14,7 @@ As explained in \cref{chap:preliminaries}, monads correspond with effectful comp
 
 Haskell currently features an \el{IO} monad \autocite{peyton_jones_imperative_1993} as well as a large collection of monads and monad transformers available via libraries, such as \lib{mtl}{https://github.com/haskell/mtl}. This is notable, because there is a strong connection between monad transformers and algebraic effects \autocite{schrijvers_monad_2019}.
 
-Algebraic effects have also been encoded in Haskell, Agda and other languages. The key to this encoding is the observation that the sum of two algebraic theories yields an algebraic theory. This theory then again corresponds to a monad. In particular, we can construct a \hs{Free} monad to model the theory.\citationneeded
+Algebraic effects have also been encoded in Haskell, Agda and other languages. The key to this encoding is the observation that the sum of two algebraic theories yields an algebraic theory. This theory then again corresponds to a monad. In particular, we can construct a \hs{Free} monad to model the theory \autocite{kammar_handlers_2013,swierstra_data_2008}.
 
 We can therefore define a polymorphic \hs{Free} monad as follows:
 \begin{lstlisting}[language=haskell]
@@ -22,7 +24,7 @@ data Free f a
 \end{lstlisting}
 The parameter \el{f} here can be a sum of effect operations, which forms the effect row. This yields some effect row polymorphism, but the effect row cannot usually be reordered. To compensate for this lack of reordering, many libraries define typeclass constraints that can be used to reason about effects in effect rows.
 
-Effect rows are often constructed using the \emph{data types à la carte} technique \autocite{swierstra_data_2008}, which requires a fairly robust typeclass system. Hence, many languages cannot encode effects within the language itself. In some languages, it is possible to work around the limitations with metaprogramming, such as the Rust library \lib{effin-mad}{https://github.com/rosefromthedead/effing-mad}, though the result does not integrate well with the rest of language and its use is discouraged by the author.
+Effect rows are often constructed using the \emph{Data Types à la Carte} technique \autocite{swierstra_data_2008}, which requires a fairly robust typeclass system. Hence, many languages cannot encode effects within the language itself. In some languages, it is possible to work around the limitations with metaprogramming, such as the Rust library \lib{effin-mad}{https://github.com/rosefromthedead/effing-mad}, though the result does not integrate well with the rest of language and its use is discouraged by the author.
 
 Using the \code{eff} Haskell library as an example, we get the following function signature for an effectful function that accesses the filesystem:
 \begin{lstlisting}[language=Haskell,style=fancy]
@@ -35,22 +37,22 @@ Contrast the signature above with a more conventional signature of \code{readfil
 \begin{lstlisting}[language=Haskell,style=fancy]
 readfile :: String -> IO String
 \end{lstlisting}
-This signature is much more concise and arguably easier to read. Therefore, while libraries for algebraic effects offer semantic improvements over monads (and monad transformers), they are limited in the syntactic sugar they can provide.
+This signature is more concise and arguably easier to read\feedback{But it's too coarse grained!}. Therefore, while libraries for algebraic effects offer semantic improvements over monads (and monad transformers), they are limited in the syntactic sugar they can provide.\feedback{Feedback to self: this is a non-sequitur}
 
-However, the ergonomics of these libraries depend on the capabilities of the type system of the language.   Since the effects are encoded as a monad, a monadic style of programming is still required. For both versions of \hs{readline}, we can use the function the same way. For example, a function that reads the first line from a file might be written as below.
+However, the ergonomics of these libraries depend on the capabilities of the type system of the language. Since the effects are encoded as a monad, a monadic style of programming is still required. For both versions of \hs{readline}, we can use the function the same way. For example, a function that reads the first line from a file might be written as below.
 \begin{lstlisting}[language=Haskell,style=fancy,mathescape=false]
 firstline filename = do
     res <- readfile filename
     return $ head $ lines $ res    
 \end{lstlisting}
 
-Some of these libraries support \emph{scoped effects} \autocite{wu_effect_2014}, which is a limited but practical frameworks for higher-order effects. It can express the \olocal and \ocatch operations, but some higher-order effects are not supported.\question{any simple examples?}
+Some of these libraries support \emph{scoped effects} \autocite{wu_effect_2014}, which is a limited but practical frameworks for higher-order effects. It can express the \olocal and \ocatch operations, but some higher-order effects are not supported.\question{any simple examples?}\feedback{$\lambda$-abstraction}
 
 \subsection{First-class Effects}
 
-The motivation of add effects to a programming language is twofold. First, we want to explore how to integrate effects into languages with type systems in which effects cannot be natively encoded. Second, built-in effects allow for more ergonomic and performant implementations. Naturally, the ergonomics of any given implementation are subjective, but we undeniably have more control over the syntax by adding effects to the language. For example, a language might include the previously mentioned implicit \code{do}-notation
+The motivation of \fixme{add effects} to a programming language is twofold. First, we want to explore how to integrate effects into languages with type systems in which effects cannot \fixme{be natively encoded}. Second, built-in effects allow for more ergonomic and performant implementations. Naturally, the ergonomics of any given implementation are subjective, but we undeniably have more control over the syntax by adding effects to the language. For example, a language might include the previously mentioned implicit \code{do}-notation
 
-Notable examples of languages with support for algebraic effects are Eff \autocite{bauer_programming_2015}, Koka \autocite{leijen_koka_2014}, Idris \autocite{brady_programming_2013} and Frank \autocite{lindley_be_2017}, which are all specialized around effects. OCaml also gained support for effects \autocite{sivaramakrishnan_retrofitting_2021}.
+Notable examples of languages with support for algebraic effects are Eff \autocite{bauer_programming_2015}, Koka \autocite{leijen_koka_2014}, Idris \autocite{brady_programming_2013} and Frank \autocite{lindley_be_2017}, which are all specialized around effects. OCaml also gained support for effects \autocite{sivaramakrishnan_retrofitting_2021}.\feedback{Elaborate (hehe) on these languages: what are the limitations, why is a new language necessary}
 
 We can write the \code{readfile} signature and \code{firstline} function from before in Koka as follows:
 \begin{lstlisting}[language={},style=fancy]
@@ -61,7 +63,7 @@ fun firstline( s: string ) : <filesystem> maybe<string>
 \end{lstlisting}
 From this example, we can see that the syntactic overhead of the effect rows is much smaller than what is provided by the Haskell libraries. Furthermore, the monadic style of programming is no longer necessary in Koka.
 
-The tail can be used to ensure the same effects across multiple functions. This is especially useful for higher-order functions. For example, we can ensure that \code{map} has the same effect row as its argument:
+Effect row variables can be used to ensure the same effects across multiple functions without specifying what they are. This is especially useful for higher-order functions. For example, we can ensure that \code{map} has the same effect row as its argument:
 \begin{lstlisting}[language={},style=fancy]
 fun map ( xs : list<a>, f : a -> e b ) : e list<b>
     ...

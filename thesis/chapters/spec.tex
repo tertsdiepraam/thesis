@@ -1,6 +1,8 @@
 \chapter{Elaine Specification}\label{chap:spec}
 \TODO{This needs to become more of a story. Maybe it should be integrated with the previous chapter?}
 
+\TODO{Type definitions}
+
 This chapter contains the detailed specification for Elaine: the syntax, semantics, the type inference rules and finally some specifics on the type checker that deviate from standard Hindley-Milner type checking.
 
 \section{Syntax definition}
@@ -301,7 +303,7 @@ The modules are gathered into $\Gamma_M$ and the variables that are in scope are
     }
 \end{gather*}
 
-\subsection{First-Order Effects and Handlers}
+\subsection{Algebraic Effects and Handlers}
 Effects are declared with the \kw{effect} keyword. The signatures of the operations are stored in $\Gamma_\Phi$. The types of the arguments and resumption must all have no effects.
 
 A handler must have operations of the same signatures as one of the effects in the context. The names must match up, as well as the number of arguments and the return type of the expression, given the types of the arguments and the resumption. The handler type then includes the handled effect $\phi$, an ``input'' type $\tau$ and an ``output'' type $\tau'$. In most cases, these will be at least partially generic.
@@ -405,20 +407,20 @@ The \el{elab} expression then checks that a elaboration for all higher-order eff
 \end{gather*}
 
 \section{Desugaring}
-Fold over the syntax tree with the following operation:
+To simplify the reduction rules, we simplify the AST by desugaring some constructs. This transform is given by a fold over the syntax tree with the following operation:
 
 \begin{align*}
     D(\fn(x_1: T_1, \dots, x_n: T_n)\;T\;\{e\}) &= \lambda x_1,\dots,x_n . e \\
     D(\kw{let}\;x = e_1;\;e_2) &= (\lambda x . e_2)(e_1)\\
     D(e_1; e_2) &= (\lambda \_ . e_2)(e_1)\\
     D(\S{e}) &= e\\
-    D(e) &= e
 \end{align*}
 
-\section{Elaboration resolution}
+\section{Semantics}\label{sec:semantics}
 
-\section{Semantics}
-\subsection{Reduction contexts}
+The semantics of Elaine are defined as reduction semantics.
+
+We use two separate contexts to evaluate expressions. The $E$ context is for all constructs except effect operations, such as \code{if}, \code{let} and function applications. The $X_{op}$ context is the context in which a handler can reduce an operation $op$.
 
 \begin{align*}
     E
@@ -436,7 +438,8 @@ Fold over the syntax tree with the following operation:
         \OR & \elab[X_{op}]\;e \OR \kw{elab}[\epsilon]\;X_{op} \text{ if } op! \not\in e
 \end{align*}
 
-\subsection{Reduction rules}
+\TODO{Add some explanation}
+
 \newcommand{\reduce}{\quad\longrightarrow\quad}
 \begin{align*}
     c(v_1, \dots, v_n) \reduce& \delta(c, v_1, \dots, v_n) \\
@@ -457,3 +460,48 @@ Fold over the syntax tree with the following operation:
     \kw{elab}[\epsilon]\;X_{op!}[op!(e_1, \dots, e_n)] \reduce& \kw{elab}[\epsilon]\;X_{op!}[e[x_1 \mapsto e_1, \dots, x_n \mapsto e_n]] \\
     &\qquad \text{where } op!(x_1, \dots, x_n) \S{e} \in \epsilon \\
 \end{align*}
+
+\section{Standard Library}
+
+Elaine does not include any operators. This choice was made to simplify parsing of the language. For the lack of operators, any manipulation of primitives needs to be done via the standard library of built-in functions.
+
+These functions reside in the \el{std} module, which can be imported like any other module with the \el{use} statement to bring its contents into scope.
+
+The full list of functions available in the \el{std} module, along with their signatures and descriptions, is given in \cref{fig:std}.
+
+\begin{figure}[htbp]
+\begin{tabular}{lllll}
+& Name & Type signature &  & Description \\
+\hline
+Arithmetic
+& \code{add}    & \code{fn(Int, Int)} & \code{Int} & addition \\
+& \code{sub}    & \code{fn(Int, Int)} & \code{Int} & subtraction \\
+& \code{neg}    & \code{fn(Int)}      & \code{Int} & negation \\
+& \code{mul}    & \code{fn(Int, Int)} & \code{Int} & multiplication \\
+& \code{div}    & \code{fn(Int, Int)} & \code{Int} & division \\
+& \code{modulo} & \code{fn(Int, Int)} & \code{Int} & modulo \\
+& \code{pow}    & \code{fn(Int, Int)} & \code{Int} & exponentiation \\
+\hline
+Comparisons
+& \code{eq}  & \code{fn(Int, Int)} & \code{Bool} & equality \\
+& \code{neq} & \code{fn(Int, Int)} & \code{Bool} & inequality \\
+& \code{gt}  & \code{fn(Int, Int)} & \code{Bool} & greater than \\
+& \code{geq} & \code{fn(Int, Int)} & \code{Bool} & greater than or equal \\
+& \code{lt}  & \code{fn(Int, Int)} & \code{Bool} & less than \\
+& \code{leq} & \code{fn(Int, Int)} & \code{Bool} & less than or equal \\
+\hline
+Boolean operations
+& \code{not} & \code{fn(Bool)} & \code{Bool} & boolean negation \\
+& \code{and} & \code{fn(Bool, Bool)} & \code{Bool} & boolean and \\
+& \code{or} & \code{fn(Bool, Bool)} & \code{Bool} & boolean or \\
+\hline
+String operations
+& \code{concat} & \code{fn(Bool, Bool)} & \code{Bool} & string concatenation \\
+\hline
+Conversions
+& \code{show_int} & \code{fn(Int)} & \code{String} & integer to string \\
+& \code{show_bool} & \code{fn(Bool)} & \code{String} & integer to string \\
+\end{tabular}
+\caption{Overview of the functions in the \el{std} module in Elaine.}
+\label{fig:std}
+\end{figure}

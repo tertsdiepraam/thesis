@@ -1,12 +1,12 @@
 \chapter{Elaboration Compilation}\label{chap:elabcomp}
 
-Since Elaine has novel semantics for elaborations, it is worth examining its relation to well-studied constructs from programming language theory. We therefore defined a transformation from elaborations into handlers, translating higher-order effects into algebraic effects, while preserving their semantics.
+Since Elaine has a novel semantics for elaborations, it is worth examining its relation to well-studied constructs from programming language theory. Therefore, we introduce a transformation from programs with higher-order effects to a program with only algebraic effects, translating higher-order effects into algebraic effects, while preserving their semantics.
 
-The goal of this transformation is twofold. First, it further connects hefty algebras and Elaine to existing literature. For example, by compiling to a representation with only algebraic effects, we can then further compile the program using existing techniques, such as the compilation procedures defined for Koka \autocite{leijen_type_2017}. Second, the transformation allows us to encode elaborations in existing libraries and languages for algebraic effects.
+The goal of this transformation is twofold. First, it further connects hefty algebras and Elaine to existing literature. For example, by compiling to a representation with only algebraic effects, we can then further compile the program using existing techniques, such as the compilation procedures defined for Koka \autocite{leijen_type_2017}. In this thesis and the accompanying implementation, we provide the first step of this compilation. Second, the transformation allows us to encode elaborations in existing libraries and languages for algebraic effects.
 
-In this thesis and the accompanying implementation, we only provide the first step: transforming elaborations into handlers.
+\section{Non-locality of Elaborations}
 
-\section{Observations about Elaborations}
+\TODO{Actually it's not just non-locality but also undecidable}
 
 Examining the semantics of elaborations, we observe that elaborations are similar to macros: they perform a syntactic substitution. For instance, the program on the left transforms into the program on the right by replacing \el{plus_two!}, with the expression \el{\{ x + 2 \}}.
 
@@ -33,7 +33,7 @@ let main = { add(5, 2) };
 \end{lstlisting}
 \end{minipage}
 
-Additionally, the location of the \el{elab} does not matter as long as the operations are contained within it. For instance, these expressions are equivalent:
+Additionally, the location of the \el{elab} does not matter as long as the operations are evaluated within it. For instance, these expressions are equivalent:
 
 \begin{minipage}[b]{0.5\textwidth}
 \begin{lstlisting}[language=elaine,style=fancy]
@@ -52,13 +52,14 @@ let main = {
 \end{lstlisting}
 \end{minipage}
 
-In some cases, it should therefore be possible to match up elaborations and operations at compile-time. However, this does not hold in general. A clear hurdle is that we might have a complex expression for the elaboration, such as an \el{if} expression:
+In some cases, it is therefore possible to statically determine the elaboration that should be applied. In that situation, we can remove the elaboration from the program by performing the syntactic substitution.
+
+However, we cannot apply that technique in general. One example where it does not work is when the elaboration is given by a complex expression, such as an \el{if}-expression:
 \begin{lstlisting}[language=elaine,style=fancy]
 elab[if cond { elab1 } else { elab2 }] c
 \end{lstlisting}
-In this example, the elaboration might depend on a run-time value, making compile-time substitution difficult.
 
-Moreover, a single operation might need to be elaborated by different \el{elab} constructs, depending on run-time computations. In the listing below, there are two elaborations \el{eOne} and \el{eTwo} of an effect with the operation \el{a!()}. The \el{a!()} operation in \el{f} is elaborated where \el{f} is called. If the condition \el{k} evaluates to \el{true}, \el{f} is assigned to \el{g}, which is elaborated by \el{eOne}. However, if \el{k} evaluates to \el{false}, \el{f} is called in the inner \el{elab} and hence \el{a!()} is elaborated by \el{eTwo}.
+Moreover, a single operation might need to be elaborated by different \el{elab} constructs, depending on run-time computations. In the listing below, there are two elaborations \el{eOne} and \el{eTwo} of an operation \el{a!()}. The \el{a!()} operation in \el{f} is elaborated where \el{f} is called. If the condition \el{k} evaluates to \el{true}, \el{f} is assigned to \el{g}, which is elaborated by \el{eOne}. However, if \el{k} evaluates to \el{false}, \el{f} is called in the inner \el{elab} and hence \el{a!()} is elaborated by \el{eTwo}.
 
 \begin{lstlisting}[language=elaine,style=fancy]
 elab[eOne] {
@@ -75,30 +76,85 @@ elab[eOne] {
 }
 \end{lstlisting}
 
-Therefore, the analysis of determining the elaboration that should be applied to an operation is non-local. The substitution might still be a nice optimization or simplification step, but it cannot guarantee that the transformed program will not contain higher-order effects.
+Therefore, the analysis of determining the elaboration that should be applied to an operation is non-local. The static substitution could be used as an optimization or simplification step, but it cannot guarantee that the transformed program will not contain higher-order effects.
 
-Instead, the elaborations can be localized with a technique similar to dictionary-passing style. Any function with higher-order effects then takes the elaboration to apply as an argument and the operation is wrapped in an \el{elab}. The elaboration is then taken from \el{elabA} at the call-site.
-\begin{lstlisting}[language=elaine,style=fancy]
-let elabA = eOne;
-let g = {
-    let elabA = eTwo;
-    let f = fn(e) { elab[e] a!() };
-    if k {
-        f
-    } else {
-        f(elabA);
-        fn() { () }
-    }
+\section{Operations as Functions}
+
+As explained in \cref{sec:semantics}, higher-order operations are evaluated differently from functions. The main difference is that the arguments are thunked and passed by name, instead of by value. 
+
+This behaviour can be emulated for functions if anonymous functions are passed as arguments instead of expressions. That is, for any operation call \el{op!(e1, ..., eN)}, we wrap the arguments into functions to get \el{op(fn() \{ e1 \}, ..., fn() \{ eN \})}. In the body of \el{op}, we then replace each occurrence of an argument \el{x} with \el{x()} such that the thunked value is obtained. The \el{op} operation can then be evaluated like a function instead, but it still has the intended semantics.
+
+\section{Compiling Elaborations to Dictionary Passing}
+
+Instead, the elaborations can be transforms with a technique similar to dictionary-passing style: the implicit context of elaborations is explicitly passed to functions that require a higher-order effect.
+
+Any function with higher-order effects then takes the elaboration to apply as an argument and the operation is wrapped in an \el{elab}. The elaboration is then taken from \el{elabA} at the call-site.
+
+\begin{lstlisting}[language=elaine,style=fancy,float=p,caption={\fixme{Some explanation. Should be higher-order?}}]
+use std;
+
+effect A! {
+    arithmetic!(Int, Int) Int
 }
-g(elabA)
+
+let eAdd = elaboration A! -> <> {
+    arithmetic!(a, b) { add(a, b) }
+};
+
+let eMul = elaboration A! -> <> {
+    arithmetic!(a, b) { mul(a, b) }
+};
+
+# The original program
+let foo = fn(k) {
+    elab[eAdd] {
+        let g = elab[eMul] {
+            let f = fn() { a!(5, 2 + 3) };
+            if k {
+                f
+            } else {
+                let x = f();
+                fn() { x }
+            }
+        };
+        g()
+    }
+};
+
+# Create a new type with one constructor to represent the
+# elaboration. The fields of the constructor are the 
+# operations. We assume for convenience that all the
+# generated identifiers do not conflict with existing
+# identifiers.
+type ElabA {
+    ElabA(fn(fn() Int, fn() Int) Int)
+}
+
+# Convenience function to access the operation a from A!
+let elab_A_a = fn(e: ElabA) {
+    let ElabA(v) = e;
+    v
+};
+
+let eAdd = ElabA ( fn(a, b) { add(a(), b()) } );
+let eMul = ElabA ( fn(a, b) { mul(a(), b()) } );
+
+# The transformed program
+let foo' = fn(k) {
+    let elab_A = eAdd;
+    let g = {
+        let elab_A = eMul;
+        let f = fn(elab_A) { elab_A_a(elab_a)(fn() { 5 }, fn() { 2 + 3) } };
+        if k {
+            f
+        } else {
+            let x = f(elab_A);
+            fn(elab_A) { x }
+        }
+    };
+    g(elab_A_a)
+};
 \end{lstlisting}
-
-\section{Encoding Macros as Functions}
-\TODO{Macros are functions with arguments and return value transformed wrapped in functions.}
-
-The main difference between a function and a macro-like operation in our semantics is that macro arguments are thunked. This holds because the macro is type-checked independently and is not allowed to use anything apart from its arguments.\question{Macro is not really the right word, but it is macro-like. What term would be good to use?} Hence, we can translate the higher-order operations to functions, where the functions are defined by the elaboration.
-
-For any operation call \el{op!(e1, ..., eN)}, we wrap the arguments into functions to get \el{op!(fn() \{ e1 \}, ..., fn() \{ eN \})}. In the body of \el{op!}, we then replace each occurrence of an argument \el{x} with \el{x()} such that the thunked value is obtained. The \el{op!} operation can then be evaluated like a function instead of having special semantics for its evaluation.
 
 \section{Handlers as Dictionary Passing}
 
@@ -127,6 +183,8 @@ handle[hElab(eOne)] {
     g()
 }
 \end{lstlisting}
+
+\TODO{Define the transformation.}
 
 \section{Compiling Elaborations into Handlers}
 
@@ -267,4 +325,5 @@ Because we can then ``emulate'' higher-order effects, the importance for explici
 let main = handle[hAbort] elab catch!(if true { abort() } else { 5 }, { 0 });
 \end{lstlisting}
 
-\TODO{Figure out whether this breaks down in Agda. Either way it needs more explaination.}
+\TODO{Talk about impredicativity and how that makes it so that it does not work.}
+

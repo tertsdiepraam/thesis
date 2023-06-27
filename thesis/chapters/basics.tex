@@ -1,12 +1,12 @@
 \chapter{A Tour of Elaine}\label{chap:basics}
 
-The language designed for this thesis is called ``Elaine''. The distinguishing feature of this language is its support for higher-order effects via elaborations. As far as we know, it is the second language with support for elaborations, the first being Heft. Elaine adds two new features: implicit elaboration resolution and compilation of elaborations, which are explained in \cref{chap:elabres,chap:elabcomp}, respectively. Additionally, Elaine differs by not requiring monadic style programming for effectful computation.
+The language designed for this thesis is called ``Elaine''. The distinguishing feature of this language is its support for higher-order effects via elaborations. The basic feature of elaborations has been extended with two novel features: implicit elaboration resolution and compilation of elaborations, which are explained in \cref{chap:elabres,chap:elabcomp}, respectively.
 
-This chapter introduces Elaine with motivating examples for the design choices. The full specification is given in \cref{chap:spec}. More example programs are available online\footnote{\url{https://github.com/tertsdiepraam/thesis/tree/main/elaine/examples}}.
+This chapter introduces Elaine with motivating examples for the design choices. The full specification is given in \cref{chap:spec}. More example programs are available in the artifact accompanying this thesis.\feedback{Overview of what can be found in the artifact.}
 
 \section{Basics}
 
-The design of Elaine is similar to Koka, with syntactical elements inspired by Rust. Apart from the elaborations and handlers, the language should not be particularly surprising; it has standard let bindings, if-else expressions, first-class functions, booleans, integers and strings.
+The design of Elaine is similar to Koka, with syntactical elements inspired by Rust. \fixme{Apart from the elaborations and handlers, it features let bindings, modules, if-else expressions, first-class functions, booleans, integers and strings.}
 
 An Elaine program consists of a tree of modules. Top level declarations are part of the root module. The result of the program will be the value assigned to the \el{main} variable in the root module. A module is declared with \el{mod}, which takes a name and a block of declarations. Declarations can be marked as public with the \el{pub} keyword. A module's public declarations can be imported into another module with \el{use}.
 
@@ -129,12 +129,15 @@ Just like we can ignore the continuation, we can also call it multiple times, wh
     language=elaine,
     style=fancy,
     caption={A naive SAT solver in Elaine.},
-    captionpos=b,
     float=p,
     label={lst:sat}
 ]{../../elaine/examples/logic.elaine}
 
 \section{Higher-Order Effects in Elaine}
+
+\TODO{Remove all mentions of macros, they're too distracting and do not actually explain anything}
+
+\feedback[inline]{Val as a higher-order effect is weird, because there's no reason for it to be HO. Change it to something actually HO.}
 
 Higher-order effects in Elaine are supported via elaborations, as proposed by \textcite{bach_poulsen_hefty_2023}. To distinguish higher-order effects from algebraic effects, we write them with a \el{!} suffix. This syntax was chosen to be reminiscent of macros in Rust, since elaborations are syntactic substitutions and hence behave much like macros. However, it should be noted that they do not behave exactly the same.
 
@@ -161,11 +164,11 @@ Of course, the goal of elaborations is not to write handlers differently, but to
 
 \begin{lstlisting}[language=elaine,style=fancy]
 effect Val!{
-    val!(): Int
+    val!() Int
 }
 
 effect Val {
-    val(): Int
+    val() Int
 }
 
 let hVal = fn(x) { 
@@ -185,7 +188,8 @@ The higher-order operations differ from other functions and algebraic operations
 
 This allows us to manipulate computations directly. For example, it is possible to wrap the computation in a handler within an elaboration.
 
-\begin{lstlisting}[language=elaine,style=fancy]
+\feedback{Listings should probably be in figures and not break over pages.}
+\begin{lstlisting}[language=elaine,style=fancy,float=htbp,caption={Reader effect with higher-order \olocal operation in Elaine.}]
 use std;
 
 effect Ask {
