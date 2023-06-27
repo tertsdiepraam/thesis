@@ -4,7 +4,7 @@ type Maybe[a] {
 }
 
 effect Abort {
-    abort() a
+    abort() ()
 }
 
 let hAbort = handler {

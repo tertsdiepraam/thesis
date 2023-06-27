@@ -16,7 +16,6 @@ import Test.Hspec
     shouldSatisfy,
   )
 import Elaine.Pretty (Pretty(pretty))
-import Debug.Trace (traceShowId)
 
 expected :: String -> Value -> Bool
 expected "abort.elaine" v = pretty v == "Maybe::Nothing()"
@@ -24,7 +23,8 @@ expected "basics.elaine" v = v == Int 8
 expected "elab_transformed.elaine" v = v == String "1\n2\n1\n2\n"
 expected "id.elaine" v = v == Int 5
 expected "implicit.elaine" v = v == String "The answer is: 23"
-expected "local_reader.elaine" v = v == Int 4
+expected "local_reader.elaine" v = v == Int 8
+expected "local_reader_implicit.elaine" v = v == Int 8
 expected "logic_once.elaine" v = v == String "False, True, True\n"
 expected "logic.elaine" v = v == String "False, True, True\nFalse, True, False\n"
 expected "match.elaine" v = v == String "5"

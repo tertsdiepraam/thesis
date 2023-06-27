@@ -8,7 +8,7 @@ The goal of this transformation is twofold. First, it further connects hefty alg
 
 \TODO{Actually it's not just non-locality but also undecidable}
 
-Examining the semantics of elaborations, we observe that elaborations are similar to macros: they perform a syntactic substitution. For instance, the program on the left transforms into the program on the right by replacing \el{plus_two!}, with the expression \el{\{ x + 2 \}}.
+Examining the semantics of elaborations, we observe that elaborations perform a syntactic substitution. For instance, the program on the left transforms into the program on the right by replacing \el{plus_two!}, with the expression \el{\{ x + 2 \}}.
 
 \begin{minipage}[b]{0.5\textwidth}
 \begin{lstlisting}[language=elaine,style=fancy]
@@ -90,7 +90,7 @@ Instead, the elaborations can be transforms with a technique similar to dictiona
 
 Any function with higher-order effects then takes the elaboration to apply as an argument and the operation is wrapped in an \el{elab}. The elaboration is then taken from \el{elabA} at the call-site.
 
-\begin{lstlisting}[language=elaine,style=fancy,float=p,caption={\fixme{Some explanation. Should be higher-order?}}]
+\begin{lstlisting}[language=elaine,style=fancy,float,caption={\fixme{Some explanation. Should be higher-order?}}]
 use std;
 
 effect A! {

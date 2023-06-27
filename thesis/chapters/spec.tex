@@ -1,11 +1,10 @@
 \chapter{Elaine Specification}\label{chap:spec}
-\TODO{This needs to become more of a story. Maybe it should be integrated with the previous chapter?}
 
-\TODO{Type definitions}
+\TODO{Custom type declarations are in the language but not explained in this chapter yet.}
 
 This chapter contains the detailed specification for Elaine: the syntax, semantics, the type inference rules and finally some specifics on the type checker that deviate from standard Hindley-Milner type checking.
 
-\section{Syntax definition}
+\section{Syntax definition}\label{sec:syntax}
 
 The Elaine syntax was designed to be relatively easy to parse. The grammar is white-space insensitive and most constructs are unambiguously identified with keywords at the start.
 
@@ -72,7 +71,7 @@ The full syntax definition is given in \cref{fig:syntax}. For convenience, we de
 \label{fig:syntax}
 \end{figure}
 
-\subsection{Effect row semantics}\label{ssec:effectrows}
+\section{Effect row semantics}\label{sec:effectrows}
 
 Before explaining the typing judgments of Elaine, let us examine effect rows. The effect row of a computation type determines the context in which the computation can be evaluated. For example, a computation with effect row \el{<A,B,C>} is valid in a function with effect row \el{<A,B,C>}. Additionally, the effect rows \el{<A,B>} and \el{<B,A>} should be considered to be equivalent.
 

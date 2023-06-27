@@ -292,6 +292,9 @@
     framexbottommargin=8pt,
 }
 
+% Insert an Elaine example with proper style and label
+\newcommandx{\example}[2][1=]{\lstinputlisting[language=elaine,style=fancy,float,label={lst:#2},#1]{../../elaine/examples/#2.elaine}}
+
 \newcommand\code[1]{\lstinline{#1}}
 \newcommand\mcode[1]{\text{\lstinline{#1}}}
 
