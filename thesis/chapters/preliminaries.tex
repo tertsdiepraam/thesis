@@ -1,122 +1,174 @@
-\chapter{Preliminaries}\label{chap:preliminaries}
-\feedback[inline]{This chapter should be less about the fundamentals and more about the things that are relevant to the rest of the thesis.}
+% Let's figure this out
+%
+% We have several things to discuss here. The main focus should be on higher-order effects and elaborations,
+% naturally. Then we just construct a knowledge dependency graph:
+%
+%                          monads
+%                            |
+%                    algebraic theory? (The question is how far back do we go?)
+%                            |
+%                    algebraic effects
+%                   /               \
+%   algebraicity property            \
+%            |                        \
+%   higher-order effects           Hefty algebras (in another chapter)
+%                     \            /
+%                      elaborations (in another chapter)
 
-While hefty algebras are a relatively new concept, the analysis of effectful computation and the representation of effects in programming language has a rich history. This chapter details the parts of this history that are relevant to Elaine.
+\chapter{Algebraic Effects}\label{chap:algebraic_effects}
 
-\section{Monads and Monad Transformers}
-
-The study of effects starts right at the two foundational theories of computation: $\lambda$-calculus and Turing machines. Their respective treatment of effects could not be more different. The former is only concerned with pure computation, while the latter consists solely of effectful operations.
-
-In $\lambda$-calculus, effects are not modelled; every function is a function in the mathematical sense, that is, a pure computation \autocite{moggi_computational_1989}. Hence, many observable properties of programs are ignored, such as non-determinism and side effects. In their seminal paper, \textcite{moggi_computational_1989} unified \emph{monads} with computational effects, which they initially called notions of computation. \citeauthor{moggi_computational_1989} identified that for any monad $T: C \to C$ and a type of values $A$, the type $T A$ is the type of a computation of values of type $A$.
-
-Since many programming languages have the ability to express monads from within the language\feedback{The meaning of this is unclear}, monads became a popular way to model effectful computation in functional programming languages. In particular, \textcite{peyton_jones_imperative_1993} introduced a technique to model effects via monads in Haskell. This technique\feedback{``technique'' is mysterious} keeps the computation pure, while not requiring any extensions to the type system.
-
-\feedback[inline]{Monad transformers should be moved to related work and in a separate section.}
-
-A limitation of treating effects as monads is that they do not compose well; the composition of two monads is not itself a monad\todo{Well it is, but not a ``combined'' monad. Not sure how to describe that. I guess that the monad \code{A (B a)} is not a monad over \code{a}, but only over \code{B a}. Need to explain why that is a problem}. A solution to this are \emph{monad transformers}, which are functors over monads that add operations to a monad \autocite{moggi_abstract_1989}. A regular monad can then be obtained by applying a monad transformer to the \el{Identity} monad. The representation of a monad then becomes much like that of a list of monad transformers, with the \el{Identity} monad as \el{Nil} value. This ``list'' of transformers is ordered. For example, using the terminology from Haskell's \el{mtl} library, the monad \el{StateT a (ReaderT b Identity)} is distinct from \el{ReaderT b (StateT a Identity)}. The order of the monad transformers also determines the order in which they must be handled: the outermost monad transformer must be handled first\feedback{translate handling to the context of monad transformers}.
-
-In practice, this model has turned out to work quite well, especially in combination with \el{do}-notation, which allowed for easier sequential execution of effectful computations.\feedback{Should be motivated}
-
-\section{Algebraic Effects}\label{sec:alg}
-
-\TODO{Add a section on effect rows}
-
-\feedback[inline]{The notation should be more consistent.}
+Elaine is based on the theory of hefty algebras, which is an extension of the theory of algebraic effects. Hence, to discuss higher-order effects, we first give an introduction to algebraic effects. Readers familiar with algebraic effects may want to skip this chapter.
 
 Algebraic effects have emerged as another model for effects. In this model, effects are treated as \emph{algebraic theories}.
 
-\subsection{Algebraic Theories}
+\section{Monads}
+
+\TODO{Introduce monads}
+
+% What is a monad?
+% - Kleisli triple
+% - Resumable thingy? I.e. thennable
+% - Computation as a data type
+
+Monads are the canonical way to deal with effects in functional programming. The difficulty with effects in functional languages is that these languages usually require that all functions are pure. A function can therefore not, for example, arbitrarily modify some global value. The way then to encode effectful computation is similar to perform part of the computation and yield to an outer function, which performs the effect and then continues the computation.
+
+A monad is the name for the class of types that enable this abstraction. These types represent either a finished computation returning a single value or a computation that has yielded on some operation and can be continued. Monads are then handled by some function which consumes the monad and return a value. These functions typically keep calling the continuation of the monad while possible and then return the final value. For this outer function, the operations encoded in the monad are not effectful, since it handles the effect only within its own scope. Therefore it does not violate the purity constraints that functional languages impose.
+
+\TODO{Bwaaa I can't handle monads right now}
+\begin{lstlisting}
+newtype State s a = State { runState :: s -> (a, s) }
+
+instance Monad (State s) where
+    return a = State $ \s -> (a, s)
+    m >>= k = State $ \s -> let (a, s') = runState m s
+                         in runState (k a) s'
+
+get :: State s s
+get = State $ \s -> (s,s)
+
+put :: s -> State s ()
+put s = State $ \_ -> (s,())
+\end{lstlisting}
+
+To discuss effects, we introduce several example effects as they are commonly defined in the Haskell ecosystem. In particular, we base their definition on the mtl library of monads and monad transformers.
+
+\TODO{Make better}
+First, there is the \el{State} monad, which has two operations: \el{get} and \el{put}. These operations read and modify a values throughout the computation. The \el{get} operation takes no arguments and returns the value and \el{put} stores the value and returns the unit value.
+
+The \el{Reader} monad is also meant to read some global value which can be retrieved with the \el{ask} operation, however, that value cannot be modified. A modified value can be scoped to a part of the computation with the \el{local} operation. This operation takes a computation and a function and when \el{ask} is used within the computation, the value is modified with the given function.
+
+The \el{Exception} effect is for throwing and catching exceptions, much like in languages like Python and Java. The \el{throw} operation will halt execution and return to the innermost \el{catch} operation in which it is evaluated.
+
+\section{Algebraic Theories}
 
 This section introduces algebraic theories. In particular, we will discuss algebraic theories with parametrized operations and general arities. This forms a foundation on which we can define algebraic effects. For a more complete introduction to algebraic theories, we refer to \textcite{bauer_what_2018}.
 
-\TODO{Replace formal definitions with definitions more in line with the rest of the thesis.}
-
-\begin{definition}[Algebraic theory]
-    An algebraic theory (or \emph{equational theory}) is a pair $\T = (\Sig_\T, \mathcal{E}_\T)$ consisting of a signature $\Sig_\T$ and a collection $\mathcal{E}_\T$ of $\Sig_\T$-equations. The signature $\Sig_\T$ is a consist of a set of operations and their corresponding arities. The $\T$-equations define what laws should hold for these operations.
-\end{definition}
+An algebraic theory is a structure that we can impose on values and operations. We impose this structure only using equations. That is, using a expression of the form $a = b$, which is imposing that both sides of the equation must be equivalent. The set of equations is called the signature of the algebraic theory.
 
 For example, we can define the suggestively-named operations \code{mul} with arity 2, \code{inv} with arity 1 and \code{zero} with arity 0. We can then build a collection of equations that specify the behaviour of these operations. If we want them to behave like a group, we need the laws of associativity, identity and inverse:
 \begin{align*}
-    \oadd(x, \oadd(y, z)) &= \oadd(\oadd(x, y), z) \\
-    \oadd(x, \ozero) &= x \\
-    \oadd(x, \oinv(x)) &= \ozero \\
-    \oadd(\oinv(x), x) &= \ozero
+    \el{add(x, add(y, z))} &= \el{add(add(x, y), z)} \\
+    \el{add(x, zero())} &= \el{x} \\
+    \el{add(x, inv(x))} &= \el{zero()} \\
+    \el{add(inv(x), x)} &= \el{zero()}
 \end{align*}
-Hence, the operations, arities and these equations form the algebraic theory for a group.
+With these operations, arities and equations, the algebraic theory then forms the theory a group. However, it is not itself a group, because an algebraic theory is hollow; it is only a specification. The implementation or meaning of the operations that we apply to the operation symbols needs to be given via an interpretation. That is, they need to be given associated functions that define their implementation. We call this interpretation a \emph{model} of the theory.
 
-An algebraic theory is hollow; it is only a specification, not an implementation. The implementation or meaning of the operations that we apply to the operation symbols needs to be given via an interpretation. That is, they need to be given associated functions that define their implementation.
+For instance, a model of the algebraic theory above is the ``obvious'' interpretation where we interpret values as numbers. We then treat \ozero as the number $0$, \oadd as the numeric addition and \oinv as numeric negation. Now we can check our equations. The third equation for instance gives us that for any number $x$,
+\[
+    \el{add(x, inv(x))} = x + (-x) = x - x = 0 = \el{zero()},
+\]
+and thus our model satisfies the equation. The same thing can be done with the other equation to verify that the model satisfies the theory.
 
-\begin{definition}[Model]
-    A \emph{model} of an algebraic theory $\T$ is an interpretation of $\Sig_\T$ for which all the equations in $\mathcal{E}_T$ hold.
-\end{definition}
+Crucially, we can create a \emph{free model} for any algebraic theory for which a valid model exists. This free model is constructed by interpreting the operations as a tree where the arguments to an operation are its children in the tree. In programming language terminology, we are interpreting the operations as an abstract syntax tree. In such a model, the equations hold by definition.
 
-Crucially, we can create a \emph{free model} for any algebraic theory for which a valid model exists. This free model is constructed by interpreting the operations as a tree where the arguments to an operation are its children in the tree. In programming language terminology, we are interpreting the operations as an abstract syntax tree.
+\section{Notation for Computations}
 
-\subsection{Notation for Computations}
+The example from the previous section already looks somewhat like a programming language with only pure functions. While this is technically sufficient to write our programs in a continuation-passing style, we introduce some additional notation for convience. The notation from this point onward will match Elaine's syntax unless mentioned otherwise.
 
-To reason about computations, we need to introduce some more notation. We write
-\[ op(p_1, \dots, p_n, \lambda x. \kappa) \]
-for an effectful operation $op$, with parameters $p_1,\dots,p_n$ and some continuation $\kappa$. This notation follows the continuation passing style of programming, where the operation is evaluated first and then calls the continuation with some value.
+First, we write a semicolon to sequence operations, such that they are evaluated in order. Second, we introduce \el{let} bindings to store the result of an operation in a variable for later use.
 
-However, denoting the continuation as an argument of the operations does not match how we tend to think of operations. For a more intuitive notation, we introduce a sequencing operator\feedback{Why not do-notation or bind operator? Answer: Make it similar to elaine. But I could change it to do-notation or bind.}:
-\begin{align*}
-    x \gets op(p_1,\dots,p_n)\seq \kappa.
-\end{align*}
-When the value passed to the continuation is discarded, we will omit the variable assignment and write 
-\[ op(p_1,\dots,p_n); \kappa. \]
-This gives us a notation that is close to what an effectful program might look like, but is still rooted in the representation from algebraic theories.
+As an example, take the \el{State} effect. To use this effect, we need two operations: \el{put} and \el{get}. The computation
+\begin{center}
+\el{put(a); get()}
+\end{center}
+then first performs the \oput operation and then the \oget operation, returning the result of the \oget operation.
 
-As an example, take the \el{State} effect. To use this effect, we need two operations: \oput and \oget. The computation
-\[ \oput(a)\seq \oget() \]
-then first performs the \oput and then the \oget operation, returning the result of the \oget operation. This can be equivalently written as
-\[ \oput(a, \lambda \_. \oget()), \]
-which is more in line with the notation for operations from algebraic theories.
+For another example, we can sequence some operations with some \el{let} bindings inbetween:
+\begin{center}
+    \el{put(a); let x = get(); put(b); let y = get(); get()}
+\end{center}
 
-\subsection{Effects as Algebraic Theories}
+Naturally, this computation is nonsensical, but that is only because have not introduced any interesting operations yet! When we extend our little language with more operations, we will be able to express more interesting programs.
+
+\section{Effects as Algebraic Theories}
 
 \textcite{goos_adequacy_2001} have shown that many effects can be represented as algebraic theories. To do so, we have to define a signature and a set of equations for a given effect.
 
-We start with the signature for \el{State}:\feedback{What are signatures? The arrow is undefined?}
-\[
-    \oput : S \to \mathbf{1}
-    \quad\text{and}\quad
-    \oget : \mathbf{1} \to S.
-\]
-This signature indicates that \oput takes some value of type $S$ as parameter and resumes with the unit $()$ and that \oget takes $()$ and calls the continuation with a value of type $S$. Now we can define the equations that we want \el{State} to follow:
+We start by again looking at the \el{State} effect. The equations that \el{State} should satisfy are the following:
 \begin{align*}
-    s \gets \oget() \seq t \gets \oget() \seq \kappa(s,t)
-        &\quad=\quad s \gets \oget()\seq \kappa(s, s) \\
-    s \gets\oget()\seq \oput(s)\seq \kappa() &\quad=\quad \kappa () \\
-    \oput(s)\seq t\gets\oget()\seq \kappa(t) &\quad=\quad \oput(s)\seq \kappa(s) \\
-    \oput(s)\seq \oput(t)\seq \kappa() &\quad=\quad \oput(t)\seq \kappa()
+    \el{let s = get(); let t = get(); k(s, t)}
+        &\quad=\quad \el{let s = get(); k(s, s)} \\
+    \el{let s = get(); put(s); k()} &\quad=\quad \el{k()} \\
+    \el{put(s); let t = get(); k(t)} &\quad=\quad \el{put(s); k(s)} \\
+    \el{put(s); put(t); k()} &\quad=\quad \el{put(t); k()}
 \end{align*}
-This gives us an algebraic theory corresponding to the \el{State} monad\feedback{State monad undefined (could be part of the monad section)}. \textcite{goos_adequacy_2001} have shown that this theory gives rise to the canonical \el{State} monad. Many other effects can also be represented as algebraic theories, including but not limited to, non-determinism, iteration, cooperative asynchronicity, traversal, input and output\citationneeded. These effects are called \emph{algebraic effects}.
+Here, \el{k} is some function representing the rest of the computation.
 
-\feedback[inline]{We need to define the State/Reader/Exception monads.}
+This gives us an algebraic theory corresponding to the \el{State} monad. \textcite{goos_adequacy_2001} have shown that this theory gives rise to the canonical \el{State} monad. Many other effects can also be represented as algebraic theories, including but not limited to, non-determinism, iteration, cooperative asynchronicity, traversal, input and output\citationneeded. These effects are called \emph{algebraic effects}.
 
-As shown by \textcite{plotkin_algebraic_2003}, an effect is algebraic if and only if it satisfies the \emph{algebraicity property}, which can be expressed as follows when $m_1, \dots, m_n$ are computation parameters:
+An essential property of algebraic effects is that they can be composed. If we have two effects with disjoint operations and equations, we can construct a new effect which has the operations and equations of both effects. For algebraic effects \el{A} and \el{B}, we will write the composed effect as \el{<A,B>}. Note that the order here does not matter, since there is no significant order in both the operations or the equations. Therefore, \el{<A,B>} is equivalent to \el{<B,A>}.
+
+We can extend this notation to any number of effects since the composition is associative as well. This gives us the notion of \emph{effect rows}: order-independent sets of effects. In this notation, \el{<>} is the empty effect row.
+
+\section{Higher-Order Effects}
+
+An effect is algebraic if its operations are algebraic. As shown by \textcite{plotkin_algebraic_2003}, an effect operation is algebraic if and only if it satisfies the \emph{algebraicity property}, which can be expressed as follows when \el{m1, ..., mN} are computation parameters:
+
+\begin{center}
+\begin{minipage}{0.4\textwidth}
+    \begin{lstlisting}
+{
+    let x = op(m1, ..., mN);
+    k
+}
+    \end{lstlisting}
+\end{minipage}
+$\qquad\Longleftrightarrow\qquad$
+\begin{minipage}{0.4\textwidth}
+    \begin{lstlisting}
+op(
+    {let x = m1; k},
+    ...,
+    {let x = mN; k},
+)
+    \end{lstlisting}
+}
+\end{minipage}
+\end{center}
+
+Therefore, sequencing the continuation must distribute over the operations of algebraic effects. This effectively means that any operation has to assume that its computation parameters will execute the entire remainder of the computation. In other words, the parameters are \emph{computation-like}.
+
+A simple effect for which the algebraicity property does not hold is the \el{Reader} monad with the \el{local} and \el{ask} operations. The intended effect is that \el{local} applies some transformation \el{f} to the value retrieved with \el{ask} within the computation \el{m}, but not outside \el{m}. Therefore, we have that
+\TODO{Format nicely}
 \[
-    x \gets op(m_1, \dots, m_n)\seq \kappa \quad=\quad op(\S{x \gets m_1\seq \kappa}, \dots, \S{x \gets m_n\seq\kappa}).
-\]
-Therefore, sequencing the continuation must distribute over the operations. In other words, all computation parameters must be \emph{continuation-like}, that is, they are some computation followed by the continuation \autocite{bach_poulsen_hefty_2023}.\feedback{Emphasize Plotkin \& Power instead of Bach Poulsen}
-
-A simple effect for which the algebraicity property does not hold is the \el{Reader} monad with the \olocal and \oask operations. The intended effect is that \olocal applies some transformation $f$ to the value retrieved with \oask within the computation $m$, but not outside $m$. Therefore, we have that
-\[
-    \olocal(f, m) \bind \oask() \quad\neq\quad \olocal(f, m \bind \oask()),
+    \el{let x = local(f, m); ask()} \quad\neq\quad \el{local(f, \{let x = m; ask()\})},
 \]
 and have to conclude that we cannot represent the \el{Reader} monad as an algebraic theory and the effect is not algebraic.
 
-A similar argument goes for the \el{Exception} effect. The \ocatch operation takes two computation parameters, it executes the first and jumps to the second on encountering the \othrow operation. The problem arises when we bind with an \othrow operation:
+A similar argument goes for the \el{Exception} effect. The \el{catch} operation takes two computation parameters, it executes the first and jumps to the second on encountering the \el{throw} operation. The problem arises when we bind with an \el{throw} operation:
+\TODO{Format nicely}
 \[
-    \ocatch(m_1, m_2) \bind \othrow() \quad\neq\quad \ocatch(m_1\bind\othrow(), m_2\bind\othrow()).
+    \el{let x = catch(m1, m2); throw()} \quad\neq\quad \el{catch(\{let x = m1; throw()\}, \{let x = m2;throw()\})}.
 \]
-On the left-hand side, $m_2$ will not be executed if $m_1$ does not throw, while on the right-hand side, $m_2$ will always get executed. The two sides therefore have different semantics and hence the \ocatch effect is not algebraic. 
+On the left-hand side, \el{m2} will not be executed if \el{m1} does not throw, while on the right-hand side, \el{m2} will always get executed. The two sides therefore have different semantics and hence the \el{catch} operation is not algebraic.
 
-\subsection{Effect Handlers}
+The distinction between effects which are and which are not algebraic has been described as the difference between \emph{effect constructors} and \emph{effect deconstructors} \autocite{plotkin_algebraic_2003}. The \el{local} and \el{catch} operations have to act on effectful computations and change the meaning of the effects in that computation. So, they have to deconstruct the effects in their computations.
+
+\section{Effect Handlers}
 
 \feedback[inline]{This needs to be expanded.}
 
-The distinction between effects which are and which are not algebraic has been described as the difference between \emph{effect constructors} and \emph{effect deconstructors} \autocite{plotkin_algebraic_2003}. The \olocal and \ocatch operations have to act on effectful computations and change the meaning of the effects in that computation. So, they have to deconstruct the effects in their computations.
 
 \textcite{castagna_handlers_2009} introduced \emph{effect handlers} as a mechanism to allow for this deconstruction. Effect handlers are a generalization of exception handlers. They define the implementation for a set of algebraic operations in the sub-expression.
 
@@ -140,6 +192,7 @@ With that handler we can give a definition of \olocal that has the intended beha
 However, \olocal cannot be defined as an algebraic operation, meaning that we cannot write a handler for it, it can only be defined as a handler. This is known as the \emph{modularity problem} with higher-order effects \autocite{wu_effect_2014}.
 
 \section{Elaborations}\label{sec:elab}
+\TODO{Move this somewhere else}
 
 Several solutions to the modularity problem have been proposed \autocite{wu_effect_2014,oh_latent_2021}. Most recently, \textcite{bach_poulsen_hefty_2023} introduced hefty algebras. The idea behind hefty algebras is that there is an additional layer of modularity, specifically for higher-order effects. The higher-order operations are not algebraic, but they can be \emph{elaborated} into algebraic operations.
 

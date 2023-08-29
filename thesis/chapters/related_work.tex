@@ -2,9 +2,21 @@
 
 \feedback[inline]{Can be expanded. Provide context for this thesis. What have others done, what's missing, and what does this thesis add?}
 
+\section{Monads and Monad Transformers}
+
+The study of effects starts right at the two foundational theories of computation: $\lambda$-calculus and Turing machines. Their respective treatment of effects could not be more different. The former is only concerned with pure computation, while the latter consists solely of effectful operations.
+
+In $\lambda$-calculus, effects are not modelled; every function is a function in the mathematical sense, that is, a pure computation \autocite{moggi_computational_1989}. Hence, many observable properties of programs are ignored, such as non-determinism and side effects. In their seminal paper, \textcite{moggi_computational_1989} unified \emph{monads} with computational effects, which they initially called notions of computation. \citeauthor{moggi_computational_1989} identified that for any monad $T: C \to C$ and a type of values $A$, the type $T A$ is the type of a computation of values of type $A$.
+
+Since many programming languages have the ability to express monads from within the language\feedback{The meaning of this is unclear}, monads became a popular way to model effectful computation in functional programming languages. In particular, \textcite{peyton_jones_imperative_1993} introduced a technique to model effects via monads in Haskell. This technique\feedback{``technique'' is mysterious} keeps the computation pure, while not requiring any extensions to the type system.
+
+\section{Monad Transformers}
+
+A limitation of treating effects as monads is that they do not compose well; the composition of two monads is not itself a monad\todo{Well it is, but not a ``combined'' monad. Not sure how to describe that. I guess that the monad \code{A (B a)} is not a monad over \code{a}, but only over \code{B a}. Need to explain why that is a problem}. A solution to this are \emph{monad transformers}, which are functors over monads that add operations to a monad \autocite{moggi_abstract_1989}. A regular monad can then be obtained by applying a monad transformer to the \el{Identity} monad. The representation of a monad then becomes much like that of a list of monad transformers, with the \el{Identity} monad as \el{Nil} value. This ``list'' of transformers is ordered. For example, using the terminology from Haskell's \el{mtl} library, the monad \el{StateT a (ReaderT b Identity)} is distinct from \el{ReaderT b (StateT a Identity)}. The order of the monad transformers also determines the order in which they must be handled: the outermost monad transformer must be handled first\feedback{translate handling to the context of monad transformers}.
+
+In practice, this model has turned out to work quite well, especially in combination with \el{do}-notation, which allowed for easier sequential execution of effectful computations.\feedback{Should be motivated}
 \TODO{Contextual vs parametric effect rows (see effects as capabilities paper). The paper fails to really connect the two: contextual is just parametric with implicit variables. However, it might be more convenient. The main difference is in the interpretation of purity (real vs contextual). In general, I'd like to have a full section on effect row semantics. In the capabilities paper effect rows are sets, which makes it possible to do stuff like \autocite{leijen_extensible_2005}.}
 
-\TODO{Monad transformers}
 
 As the theoretical research around effects has progressed, new libraries and languages have emerged using the state-of-the-art effect theories. These frameworks can be divided into two categories: effects encoded in existing type systems and effects as first-class features.
 
@@ -14,7 +26,7 @@ These implementations provide ways to define, use and handle effectful operation
 
 There are many examples of libraries like this for Haskell, including \lib{fused-effects}{https://github.com/fused-effects/fused-effects}, \lib{polysemy}{https://github.com/polysemy-research/polysemy}, \lib{freer-simple}{https://github.com/lexi-lambda/freer-simple} and \lib{eff}{https://github.com/hasura/eff}. Each of these libraries give the encoding of effects a slightly different spin in an effort to find the most ergonomic and performant representation.
 
-As explained in \cref{chap:preliminaries}, monads correspond with effectful computations. Any language in which monads can be expressed therefore has some support for effects. Languages that encourage a functional style of programming have embraced this framework in particular.
+As explained in \cref{chap:algebraic_effects}, monads correspond with effectful computations. Any language in which monads can be expressed therefore has some support for effects. Languages that encourage a functional style of programming have embraced this framework in particular.
 
 Haskell currently features an \el{IO} monad \autocite{peyton_jones_imperative_1993} as well as a large collection of monads and monad transformers available via libraries, such as \lib{mtl}{https://github.com/haskell/mtl}. This is notable, because there is a strong connection between monad transformers and algebraic effects \autocite{schrijvers_monad_2019}.
 

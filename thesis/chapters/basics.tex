@@ -2,7 +2,7 @@
 
 The language designed for this thesis is called ``Elaine''. The distinguishing feature of this language is its support for higher-order effects via elaborations. The basic feature of elaborations has been extended with two novel features: implicit elaboration resolution and compilation of elaborations, which are explained in \cref{chap:elabres,chap:elabcomp}, respectively.
 
-This chapter introduces Elaine with motivating examples for the design choices. The full specification is given in \cref{chap:spec}. More example programs are available in the artifact accompanying this thesis.\feedback{Overview of what can be found in the artifact.}
+This chapter introduces Elaine with motivating examples for the design choices. The full specification is given in \cref{chap:spec}. More example programs are available in the artifact accompanying this thesis.
 
 \section{Basics}
 
@@ -58,9 +58,9 @@ Effect rows need special treatment in the unification algorithm of the type chec
 
 To define the implementation of an effect, we have to define a handler it. Handlers are first-class values in Elaine and can be created with the \el{handler} keyword. They can then be applied to an expression with the \el{handle} keyword. When \el{handle} expressions are nested with handlers for the same effect, the innermost \el{handle} applies.
 
-For example, if we want to use an effect to provide an implicit value, we can make an effect \el{Val} and a corresponding handler, which \el{resume}s execution with some values. The \el{resume} function represents the continuation of the program after the operation. Since handlers are first-class values, we can return the handler from a function to simplify the code. This pattern is quite common to create dynamic handlers with small variations.
+For example, if we want to use an effect to provide an implicit value, we can make an effect \el{Ask} and a corresponding handler, which \el{resume}s execution with some values. The \el{resume} function represents the continuation of the program after the operation. Since handlers are first-class values, we can return the handler from a function to simplify the code. This pattern is quite common to create dynamic handlers with small variations.
 
-\example[float=h]{val}
+\example[float=h]{ask}
 
 Calling the \el{resume} function is not required. All effect operations are executed by the \el{handle} expression, hence, if we return from the operation, we return from the \el{handle} expression.
 

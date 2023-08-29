@@ -1,0 +1,86 @@
+\chapter{Introduction}\label{chap:introduction}
+
+% Ok, time to start writing this out. First some requirements:
+%  - It needs to read like a funnel: broad to specific
+%  - It needs to be understandable for all CS master students
+%  - Structure overview:
+%    - Q: How do we know what a function is _doing_? What _effects_ does it have on the system?
+%    - pure computations
+%    - effects in general
+%    - failure to model effects in (imperative) languages
+%    - manually encoding effects in FP
+%    - monads as mathematical model for effects
+%    - monads as FP technique (Phil Wadler): We can make a PL out of this! (Haskell)
+%    - monads separate specification from implementation: modularity
+%    - algebraic effects: convenient and modular, yay! We can make a PL out of this! (Koka)
+%    - but wait! Higher-order effects don't fit and aren't modular...
+%    - New mathematical model: Hefty Algebras
+%    - Can we also make a PL out of this?
+%    - Yeah, that's what we did: Elaine
+%    - Contributions
+%    - Artefact
+
+Consider an arbitrary function signature in a programming language like Python, Java or C. How can we tell what this function does? The function signature might indicate what the inputs and output of the function are, but it does not give any indication about how this function will interact with its environment. It might, for instance, read or modify a global variable, write to a file, throw an exception or even exit the program altogether. These are all examples of \emph{effects}.
+
+Historically, programming languages have modelled effects in many different ways. Some programming languages opt to give the programmer virtually unrestricted access to effectful operations. For instance, any part of a C program can interact with memory, the filesystem or the network. The program can even yield control to any location in program with the \code{goto} keyword, which has famously been criticized by \textcite{dijkstra_letters_1968}. This ``anything goes'' approach puts a large burden of ensuring correct behaviour of effects on the programmer.
+
+Other languages have dedicated features for specific effects, such as exceptions, coroutines and generators. These features are useful, but they lack flexibility and modularity; any effect must be backed by the language and new effects cannot be created without adding a new feature to the language. It is also not usually possible to change the behaviour of these features.
+
+In contrast, languages adhering to the functional programming paradigm disallow (with some exceptions) effectful operations all together. Here, all functions are \emph{pure}, meaning that they are functions in the mathematical sense: only a mapping of values. Such a function always returns identical outputs for identical inputs. They also do not interact with their environment. By dictating that all functions are pure, a type signature of a function becomes almost a full specification of what the function can do.
+
+Yet this rule is quite limiting, since effects are often an important part of a computation. For instance, if we want to keep some mutable state \hs{a} in a Haskell program, we have to encode that state in the inputs and outputs of the program. Manually threading the state through the program quickly becomes laborious in larger programs. The same goes for encodings of other effects. A more practical method of dealing with effectful operations in functional languages is through the use of \emph{monads} \autocite{wadler_essence_1992,peyton_jones_imperative_1993}.
+
+Monads were introduced as a mathematical model for effectful computation by \textcite{moggi_notions_1991}. A function returning a monad is not fully executed. Instead, it is evaluated until the first effectful operation is encountered. This partially evaluated result is only further evaluated when it is passed to a \emph{handler}. This handler decides what to do with this result and can resume the computation, which will again evaluate the until the next effectful operation and the cycle repeats. If we then wish to have some state in our Haskell program, we have to wrap all our stateful functions in the \hs{State} monad and pass it to the \hs{runState} handler.
+
+This split between the procedure and the handler provides some modularity. We can swap out the standard \hs{runState} handler for some other handler. We might for instance write a handler that does not just yield the final value of the state, but a list containing the history of all values that the state has been set to. Or, we create a handler where every \hs{get} operation increases the value of the state by one, such that every \hs{get} yields a unique value. This is all possible without changing the code using the \hs{State} monad.
+
+The limitations of the monad approach become apparent when we look at procedures that use multiple effects. The problem is that monads do not compose well. Composing two monads \hs{A} and \hs{B} yields \hs{A (B c)}. This is a computation using \hs{A}, which yields a computation using \hs{B}, which yields \hs{c}. It is not a computation which can use both \hs{A} and \hs{B} at the same time. To achieve that, we need \emph{monad transformers}, which is a type constructor that adds monadic operation to a monad. The two monads above can be composed by applying the transformer \hs{AT} corresponding to \hs{A} to \hs{B}: \hs{(AT B) c}. 
+
+The order of the monad transformers is fixed. That is, \hs{(AT B) c} is not the same type as \hs{(BT A) c}. This presents some problems with modularity. If we have a computation using both monads, we would also like to be able to use functions that only require one of the two. We can define a function that requires \hs{State} and some arbitrary other set of effects with \hs{StateT e}. Similarly, we can define a function that returns \hs{ReaderT e}, but those types cannot be unified automatically to either \hs{StateT Reader} or \hs{ReaderT State}. To unify the types we have to \hs{lift} one of them. This leads to fairly confusing error messages and becomes fairly laborious.
+
+% \TODO{Reference or remove examples}
+% \begin{lstlisting}[language=Haskell]
+% foo :: Monad m => StateT a m a
+% foo = get
+%
+% bar :: Monad m => ReaderT a m a
+% bar = ask
+%
+% combined :: StateT Int (ReaderT Int Identity) Int
+% combined = do
+%     a <- foo
+%     b <- lift bar  -- note the lift call
+%     return (a + b)
+% \end{lstlisting}
+
+The theory of \emph{algebraic effects} aims to address these limitations of monad transformers. First, it removes the distinction between monads and monad transformers. Second, it ignores the order of effects in types. In languages with algebraic effects, such as Koka \autocite{leijen_koka_2014}, Eff \autocite{bauer_programming_2015}, Frank \autocite{lindley_be_2017}, and Effekt \autocite{brachthauser_effects_2020}, effect handlers can be modularly defined within the language. The programmer can freely declare new effects and handlers. An effect here consists of a set of \emph{effect operations}, which yield control to their corresponding handler, which then performs the operation. The handler can resume the computation by calling the \emph{continuation}, which is a function that represents the rest of the computation. Moreover, these languages often feature type systems that can reason about the effects in each function. The programmer can therefore see from the signature what a function can do, such that effects act as capabilities \autocite{brachthauser_effects_2020}.
+
+As it turns out, however, not all effects are algebraic. \emph{Higher-order effects} are effects with operations that take effectful computations as arguments that do not behave like continuations. The issue is that the handlers need be able to handle the effect and then let the rest of the computation evaluate, but that is not sufficient for higher-order effects.
+
+Several extensions and modifications to algebraic effects have been proposed to accomodate for higher-order effects \autocite{wu_effect_2014,oh_latent_2021}. One such extension is \emph{hefty algebras} by \textcite{bach_poulsen_hefty_2023}, which introduces elaborations to implement higher-order effects. This is a mechanism to define higher-order effects by defining a translation into a program with only algebraic effects. This means that evaluation of higher-order effects is a two-step process: first higher-order effects are elaborated into algebraic effects, which are then evaluated. Like handlers, elaborations are modular and it is possible to define multiple elaborations for a single effect.
+
+In this thesis, we introduce a novel programming language called \emph{Elaine}. The core idea of Elaine is to define a language which features elaborations and higher-order effects as a first-class construct. This brings the theory of hefty algebras into practice. With Elaine, we aim to demonstrate the usefulness of elaborations as a language feature. Throughout this thesis, we present example programs with higher-order effects to argue that elaborations are a natural and easy representation of higher-order effects.
+
+Like handlers for algebraic effects, elaborations require the programmer to specify which elaboration should be applied. However, elaborations have several properties which make it likely that there is only one relevant possible elaboration. Hence, we argue that elaboration instead should often be implicit and inferred by the language. To this end, we introduce \emph{implicit elaboration resolution}, a novel feature that infers an elaboration from the variables in scope.
+
+Additionally, we give transformations from higher-order effects to algebraic effects. There are two reasons for defining such a transformation. The first is to show how elaborations can be compiled in a larger compilation pipeline. The second is that these transformations show how elaborations could be added to existing systems for algebraic effects.
+
+We present a specification for Elaine, including the syntax definition, typing judgments and semantics. Along with this specification, we provide a reference implementation written in Haskell in the artefact accompanying this thesis. This implementation includes a parser, type checker, interpreter, pretty printer, and the transformations mentioned above. Elaine opens up exploration for programming languages with higher-order effects. While not a viable general purpose language in its own right, it can serve as inspiration for future languages.
+
+\section{Contributions}
+
+The main contribution of this thesis is the specification and implementation of Elaine. This consists of several parts.
+
+\begin{itemize}
+    \item We define a syntax suitable for a language with both handlers and elaboration (\cref{sec:syntax}).
+    \item We provide a set of examples for programming with higher-order effect operations.
+    \item We present a type system for a language with higher-order effects and elaborations, based on Hindley-Milner type inference and inspired by the Koka type system. This type system introduces a novel representation of effect rows as multiset which, though semantically equivalent to earlier representations, allows for a simple definition of effect row unification.
+    \item We propose that elaborations should be inferred in most cases and provide a type-directed procedure for this inference (\cref{chap:elabres}).
+    \item We define two transformations form programs with elaborations and higher-order effects to programs with only handlers and algebraic effects. The first transformation is convenient, but relies on impredicativity and therefore only works in languages that allow impredicativity, such as Elaine, Haskell and Koka. The second transformation is more involved, but does not rely on impredicativity and would therefore also be allowed in a language like Agda.
+\end{itemize}
+
+\section{Artefact}
+
+\TODO{Describe contents and structure of artefact}
+
+The artefact is available online at \url{https://github.com/tertsdiepraam/thesis/elaine}.

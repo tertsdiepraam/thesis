@@ -32,7 +32,7 @@ expected "safe_division.elaine" v = v == Int 5
 expected "square_is_even.elaine" v = v == String "The square of 4 is even"
 expected "state.elaine" v = v == Int 6
 expected "structured_logging.elaine" v = v == String "main: msg1\nmain:foo: msg2\nmain:bar: msg3\n"
-expected "val.elaine" v = v == Int 32
+expected "ask.elaine" v = v == Int 32
 expected "yield.elaine" v = v == String "2\n4\n"
 expected "exception.elaine" v = pretty v == "Maybe::Just(13)"
 expected _ _ = error "Example does not have an expected value"

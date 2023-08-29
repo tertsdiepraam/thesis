@@ -334,6 +334,18 @@
 \newcommand\hs[1]{\lstinline[language=Haskell]{#1}}
 % \newcommand\code[1]{\lstinline[language=plain]{#1}}
 
+\usepackage{etoolbox}
+\expandafter\patchcmd\csname \string\lstinline\endcsname{%
+  \leavevmode
+  \bgroup
+}{%
+  \leavevmode
+  \ifmmode\hbox\fi
+  \bgroup
+}{}{%
+  \typeout{Patching of \string\lstinline\space failed!}%
+}
+
 \DeclarePairedDelimiter{\inter}{\llbracket}{\rrbracket}
 \DeclareMathOperator{\Tree}{Tree}
 \DeclareMathOperator{\return}{\ensuremath{\mathsf{return}}\xspace}

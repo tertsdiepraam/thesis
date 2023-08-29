@@ -1,9 +1,11 @@
+effect ask
+  val somefun: (() -> e Int) -> e Int
+
 effect abort
   ctl abort(): a
 
 effect exc
   fun catch_( f : () -> <abort|e> a, g : () -> e a ) : (() -> e a)
-
 
 val hAbort = handler
   return(x)   Just(x)

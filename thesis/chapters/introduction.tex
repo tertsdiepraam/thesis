@@ -1,12 +1,29 @@
 \chapter{Introduction}\label{chap:introduction}
 
+% Ok, time to start writing this out. First some requirements:
+%  - It needs to read like a funnel: broad to specific
+%  - It needs to be understandable for all CS master students
+%  - Structure overview:
+%    - Q: How do we know what a function is _doing_? What _effects_ does it have on the system?
+%    - effects in general
+%    - failure to model effects in (imperative) languages
+%    - pure computations in FP
+%    - manually encoding effects in FP
+%    - monads as mathematical model for effects
+%    - monads as FP technique (Phil Wadler): We can make a PL out of this! (Haskell)
+%    - monads separate specification from implementation: modularity
+%    - algebraic effects: convenient and modular, yay! We can make a PL out of this! (Koka)
+%    - but wait! Higher-order effects don't fit and aren't modular...
+%    - New mathematical model: Hefty Algebras
+%    - Can we also make a PL out of this?
+
 As a program runs, it usually interacts with its environment. A program might, for example, allocate some memory, open a file or throw an exception. Apart from producing a value, such a procedure therefore also has some other observable \emph{effects} \autocite{moggi_computational_1989}.
 
 \emph{Pure} functions are the computations which always return identical values for identical inputs and do not interact with their environment. While some programs can be viewed as pure, analysing only pure computation leaves out many aspects of programs, such as side effects, non-determinism and non-termination \autocite{moggi_computational_1989}. So, in practice, many programs are \emph{impure} or \emph{effectful}.
 
 \fixme{We can extend this analysis to the type checker of a programming language. Such a type checker not only checks the types of values, but also the effects that a computation might have. This helps programmers reason about effects in a program.}\todo{Not sure where to put this and how to add more motivation.}
 
-While many effects does not seem to have anything in common at first glance, they do share an important property: they yield control to some other procedure.\citationneeded This procedure, called an \emph{effect handler}, implements the necessary operations to perform the effect. An effect handler could be a memory allocator, a scheduler, a kernel, an exception handler or something else. Swapping out one effect handler for another then changes the semantics of the computation. This modularity of effect handlers is a powerful concept, allowing us to reuse computations within different contexts. For example, we might want to swap out one asynchronous runtime for another, or we could replace writing to \code{stdout} with writing to \code{stderr}.\todo{Better examples?}
+While many effects do not seem to have anything in common at first glance, they do share an important property: they yield control to some other procedure.\citationneeded This procedure, called an \emph{effect handler}, implements the necessary operations to perform the effect. An effect handler could be a memory allocator, a scheduler, a kernel, an exception handler or something else. Swapping out one effect handler for another then changes the semantics of the computation. This modularity of effect handlers is a powerful concept, allowing us to reuse computations within different contexts. For example, we might want to swap out one asynchronous runtime for another, or we could replace writing to \code{stdout} with writing to \code{stderr}.\todo{Better examples?}
 
 Some programming languages opt to give the programmer virtually unrestricted access to effectful operations. For instance, any part of a C program can interact with memory, the filesystem or the network. The program can even yield control to any location with the \code{goto} keyword, which has famously been criticized by \textcite{dijkstra_letters_1968}. This ``anything goes'' approach puts a large burden of ensuring correct behaviour of effects on the programmer.
 

@@ -1,0 +1,85 @@
+use std;
+
+effect Ask {
+    ask() Int
+}
+
+# The Elabs type as a type variable and a field for every
+# effect in the entire program.
+type Elabs[a] {
+    Elabs(a)
+}
+
+let hAsk = fn(elabs: Elabs[a], v: Int) {
+    handler {
+        return(x) { x }
+        ask() { resume(v) }
+    }
+};
+
+let double = fn(elabs: Elabs[a], x) { mul(2, x) };
+
+# This signature means that **every** function needs to be transformed
+# OR every higher-order function needs two versions.
+# OR we wrap every function when necessary.
+# Instead of adding the elabs, we curry:
+#     fn(Elabs[a,b]) fn(args) ret
+# if a function `foo` needs to be "lifted" we simply wrap it in
+#     fn(_: Elabs[a,b]) { foo }
+# But that is technically harder.
+# Also it's hard to prove that a function will never use an effect
+# Especially with effect type parameters.
+let apply = fn(elabs: Elabs[a], f: fn(Elabs[a]) c) c {
+    f(elabs)
+};
+
+# Define a type for elaborations of the Reader effect
+# TODO: ReaderElaboration needs to be generic over the
+# effect row that we elaborate into. That is not currently
+# supported
+type ElabReader[e] {
+    ElabReader(
+        # local
+        fn(Elabs[a], fn() <|e> fn(Elabs[a], Int) Int, fn() <|e> a) <|e> a
+    )
+}
+
+let add_reader_elab = fn(elabs: Elabs[a], e: ElabReader[e]) Elabs[ElabReader[e]] {
+    match elabs {
+        Elabs(a) => Elabs(e)
+    }
+};
+
+# A convenience method to get the local operation from the
+# elabs
+let reader_local = fn(elabs: Elabs[ElabReader[e]]) fn(Elabs[a], fn() <|e> fn(Elabs[a], Int) Int, fn() <|e> a) <|e> a {
+    let a = match elabs {
+        Elabs(a) => a
+    };
+    match a {
+        ElabReader(local) => local
+    }
+};
+
+# An elaboration becomes a value of type ElabReader
+let eLocal = ElabReader(
+    fn(elabs: Elabs[a], f: fn() <Ask> fn(Elabs[a], Int) Int, c: fn() <Ask> a) {
+        handle[hAsk(elabs, f()(elabs, ask()))] c()
+    }
+);
+
+# elab becomes a local variable
+# Not shown here: that value should be passed to any
+# functions using the Reader effect
+let main = {
+    # All elabs start as the unit type
+    let elabs = Elabs(());
+    handle[hAsk(elabs, 2)] {
+        let elabs = add_reader_elab(elabs, eLocal);
+        reader_local(elabs)(
+            elabs,
+            fn() { double },
+            fn() { add(ask(), ask()) }
+        );
+    }
+};

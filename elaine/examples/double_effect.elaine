@@ -1,0 +1,29 @@
+use std;
+
+effect Ask {
+    ask() Int
+}
+
+let hAsk = fn(v: Int) {
+    handler {
+        return(x) { x }
+        ask() { resume(v) }
+    }
+};
+
+effect DoubleAsk! {
+    double_ask!(a) a
+}
+
+let eDoubleAsk = elaboration DoubleAsk! -> <Ask> {
+    double_ask!(c) {
+        let doubled = mul(2, ask());
+        handle[hAsk(doubled)] c
+    }
+};
+
+let main = handle[hAsk(2)] elab[eDoubleAsk] {
+    add(ask(), double_ask!(add(ask(), ask())));
+    # which is equivalent to
+    # add(2, add(4, 4)) = 10
+};

@@ -1,0 +1,110 @@
+\documentclass{beamer}
+\usepackage{listings}
+\usepackage{amsmath}
+
+\usetheme{metropolis}
+
+\setmonofont[
+   Numbers =,
+   Scale = 0.9,
+   Extension = .otf,
+   WordSpace = {1,0,0},
+   PunctuationSpace = WordSpace,
+   UprightFont =*-Regular,
+   ItalicFont =*-RegularIt,
+   BoldFont=*-Bold,
+   BoldItalicFont=*-BoldIt
+ ]{SourceCodePro}
+
+\lstset{
+  breaklines=false,%true,
+  basicstyle=\normalsize\ttfamily,
+}
+
+\title{{\small Greenlight Presentation Msc Thesis}\\Elaine: Elaborations of Higher-Order Effects as First-Class Language Feature}
+\author{Terts Diepraam \\ Supervisors: Casper Bach Poulsen \& Cas van der Rest \\ Thesis advisor: Matthijs Spaan}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Effects}
+    \begin{itemize}
+        \item Printing,
+        \item State,
+        \item Filesystem access,
+        \item Coroutines,
+        \item Exceptions,
+        \item \& everything else monads can do.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Effects}
+Many programming languages have limitations when dealing with effects:
+\begin{itemize}
+    \item the effects are not reflected in the type system,
+    \item the effects are not modular.
+\end{itemize}
+
+What they do have is limited to specific features (e.g. exceptions).
+
+\begin{lstlisting}[language=python]
+def foo(x: int) -> int: # <- does not include effect
+    print(x)            # <- implementation is fixed
+    return x * x
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}{Algebraic Effects}
+
+In languages with algebraic effects, we can:
+
+\begin{itemize}
+\item declare custom effects,
+\item and define \textbf{handlers} for them.
+\end{itemize}
+
+Effects need to satisfy the \emph{algebraicity property}.
+
+Languages: Koka, Frank, Eff, and more.
+
+Example effects: state, IO, iteration, nondeterminism
+\end{frame}
+
+\begin{frame}{Higher-Order Effects}
+
+Higher-order effects: effect operations that take effectful computations as parameters.
+
+They are not algebraic: we cannot make them modular.
+
+Example effects: Reader monad with local, exception catching, lambda abstraction
+
+\end{frame}
+
+\begin{frame}{Hefty Algebras}
+
+Higher-order effects are \textbf{elaborated} into expressions with only algebraic effects.
+
+The elaboration provides modularity we want.
+
+\end{frame}
+
+\begin{frame}{Elaine}
+Language designed in this thesis
+
+Core idea: apply hefty algebras to PL design
+
+\vspace{2em}
+
+Novel features:
+
+\begin{itemize}
+    \item elaborations as language construct
+    \item implicit elaboration resolution
+    \item elaboration compilation
+\end{itemize}
+\end{frame}
+
+\end{document}
