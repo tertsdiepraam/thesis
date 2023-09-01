@@ -1,4 +1,0 @@
-packages: .
-
-package elaine
-  tests: True
