@@ -20,6 +20,8 @@ On the left-hand side, \el{m2} will not be executed if \el{m1} does not throw, w
 
 The distinction between effects which are and which are not algebraic has been described as the difference between \emph{effect constructors} and \emph{effect deconstructors} \autocite{plotkin_algebraic_2003}. The \el{local} and \el{catch} operations have to act on effectful computations and change the meaning of the effects in that computation. So, they have to deconstruct the effects in their computations.
 
+% However, \olocal cannot be defined as an algebraic operation, meaning that we cannot write a handler for it, it can only be defined as a handler. This is known as the \emph{modularity problem} with higher-order effects \autocite{wu_effect_2014}.
+
 \section{Elaborations}\label{sec:elab}
 
 \TODO{Move this somewhere else}
