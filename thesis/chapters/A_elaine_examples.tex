@@ -1,0 +1,13 @@
+\chapter{Elaine Example Programs}\label{chap:examples}
+
+This chapter contains longer Elaine samples with some additional explanation.
+
+\section{A naive SAT solver}\label{sec:sat}
+
+This program is a naive brute-forcing SAT solver. We first define a \el{Yield} effect, so we can yield multiple values from the computation. We will use this to find all possible combinations of boolean inputs that satisfy the formula. The \el{Logic} effect has two operations. The \el{branch} operation will call the continuation twice; once with \el{false} and once \el{true}. With \el{fail}, we can indicate that a branch has failed. To find all solutions, we just \el{branch} on all inputs and \el{yield} when a correct solution has been found and \el{fail} when the formula is not satisfied. In the listing below, we check for solutions of the equation $\neg a \wedge b$.
+
+\example[float=false]{logic}
+
+\section{The Reader effect}\label{sec:reader}
+
+\example[float=false]{local_reader}

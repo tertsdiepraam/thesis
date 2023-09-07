@@ -2,7 +2,7 @@
 
 \feedback[inline]{Can be expanded. Provide context for this thesis. What have others done, what's missing, and what does this thesis add?}
 
-\section{Monads and Monad Transformers}
+\section{Monad Transformers}\label{sec:monad_transformers}
 
 The study of effects starts right at the two foundational theories of computation: $\lambda$-calculus and Turing machines. Their respective treatment of effects could not be more different. The former is only concerned with pure computation, while the latter consists solely of effectful operations.
 
@@ -12,6 +12,7 @@ Since many programming languages have the ability to express monads from within 
 
 \section{Monad Transformers}
 
+\TODO{Have to define how operations interact between each pair of transformers: $N^2$ number of implementations for each operation.}
 A limitation of treating effects as monads is that they do not compose well; the composition of two monads is not itself a monad\todo{Well it is, but not a ``combined'' monad. Not sure how to describe that. I guess that the monad \code{A (B a)} is not a monad over \code{a}, but only over \code{B a}. Need to explain why that is a problem}. A solution to this are \emph{monad transformers}, which are functors over monads that add operations to a monad \autocite{moggi_abstract_1989}. A regular monad can then be obtained by applying a monad transformer to the \el{Identity} monad. The representation of a monad then becomes much like that of a list of monad transformers, with the \el{Identity} monad as \el{Nil} value. This ``list'' of transformers is ordered. For example, using the terminology from Haskell's \el{mtl} library, the monad \el{StateT a (ReaderT b Identity)} is distinct from \el{ReaderT b (StateT a Identity)}. The order of the monad transformers also determines the order in which they must be handled: the outermost monad transformer must be handled first\feedback{translate handling to the context of monad transformers}.
 
 In practice, this model has turned out to work quite well, especially in combination with \el{do}-notation, which allowed for easier sequential execution of effectful computations.\feedback{Should be motivated}

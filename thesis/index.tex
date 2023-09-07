@@ -17,32 +17,33 @@
 
 \addbibresource{bibliography.bib}
 
-\input{chapters/metadata.tex}
+\input{chapters/0_metadata.tex}
 
 \begin{document}
 \frontmatter
 \thispagestyle{empty}
 \maketitle
-\makeformaltitlepages{\input{chapters/abstract.tex}}
-\include{chapters/preface.tex}
+\makeformaltitlepages{\input{chapters/0_abstract.tex}}
+\include{chapters/0_preface.tex}
 
 \cleardoublepage\tableofcontents
-% \cleardoublepage\listoffigures
-% \cleardoublepage\listoftables
 \cleardoublepage\mainmatter{}
 
 \include{chapters/1_introduction.tex}
-\include{chapters/preliminaries.tex}
-\include{chapters/basics.tex}
-\include{chapters/elaboration_resolution.tex}
-\include{chapters/elaboration_compilation.tex}
-\include{chapters/spec.tex}
-\include{chapters/related_work.tex}
-\include{chapters/conclusion.tex}
+\include{chapters/2_algebraic_effects.tex}
+\include{chapters/3_higher-order_effects.tex}
+\include{chapters/4_a_tour_of_elaine.tex}
+\include{chapters/5_elaboration_resolution.tex}
+\include{chapters/6_elaboration_compilation.tex}
+\include{chapters/7_related_work.tex}
+\include{chapters/8_conclusion.tex}
 
 \printbibliography
 
 \appendix
 \def\chaptername{Appendix}
+
+\include{chapters/A_elaine_examples.tex}
+\include{chapters/B_spec.tex}
 
 \end{document}

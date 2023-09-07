@@ -10,7 +10,7 @@
 \usepackage[dvips]{color}
 \usepackage[dvipsnames]{xcolor}
 \usepackage{float}
-
+\usepackage{subcaption}
 \usepackage{xspace}
 
 % Fonts
@@ -40,9 +40,7 @@
 \usepackage{proof}
 
 % References
-\usepackage[
-    hidelinks
-]{hyperref}
+\usepackage[hidelinks]{hyperref}
 \usepackage{bookmark}
 \usepackage[capitalise, noabbrev, nameinlink]{cleveref}
 % Use:
@@ -67,6 +65,7 @@
 % Listings
 \usepackage{microtype}
 \usepackage{listings}           % \lstinline
+\usepackage{listings-rust}
 \lstset{
   breaklines=false,%true,
   basicstyle=\normalsize\ttfamily,
@@ -265,17 +264,16 @@
 \definecolor{green}{rgb}{0.2,0.4,0.2}
 \definecolor{darkgray}{rgb}{0.4,0.4,0.4}
 \lstdefinelanguage{elaine}{
-    morekeywords={fn,use,let,handle,handler,elab,elaboration,true,false,effect,type,pub,mod,if,then,else},
+    morekeywords={fn,use,let,rec,handle,handler,elab,elaboration,true,false,effect,type,pub,mod,if,then,else,match},
     morecomment=[l]{\#},
     morestring=[b]",
 }
 \lstset{
-    mathescape=true,
+    mathescape=false,
     basicstyle=\ttfamily,
     keywordstyle=\bfseries\upshape,
     commentstyle=\color{darkgray},
     stringstyle=\color{green},
-    columns=fullflexible,
     language=elaine,
     showstringspaces=false,
 }
@@ -330,8 +328,9 @@
 \renewcommand\infer[2]{\oldinfer{#1}{\begin{gathered}#2\end{gathered}}}
 \allowdisplaybreaks[1]
 
-\newcommand\el[1]{\lstinline[language=elaine]{#1}}
+\newcommand\el[1]{\lstinline[language=Elaine]{#1}}
 \newcommand\hs[1]{\lstinline[language=Haskell]{#1}}
+\newcommand\rs[1]{\lstinline[language=Rust]{#1}}
 % \newcommand\code[1]{\lstinline[language=plain]{#1}}
 
 \usepackage{etoolbox}
