@@ -11,7 +11,7 @@ The goal of this transformation is twofold. First, it further connects hefty alg
 Examining the semantics of elaborations, we observe that elaborations perform a syntactic substitution. For instance, the program on the left transforms into the program on the right by replacing \el{plus_two!}, with the expression \el{\{ x + 2 \}}.
 
 \begin{minipage}[b]{0.5\textwidth}
-\begin{lstlisting}[language=elaine,style=fancy]
+\begin{lst}{Elaine}
 use std;
 
 effect PlusTwo! {
@@ -25,43 +25,43 @@ let ePlusTwo = {
 };
 
 let main = elab plus_two!(5);
-\end{lstlisting}
+\end{lst}
 \end{minipage}
 \begin{minipage}[b]{0.5\textwidth}
-\begin{lstlisting}[language=elaine,style=fancy]
+\begin{lst}{Elaine}
 let main = { add(5, 2) };
-\end{lstlisting}
+\end{lst}
 \end{minipage}
 
 Additionally, the location of the \el{elab} does not matter as long as the operations are evaluated within it. For instance, these expressions are equivalent:
 
 \begin{minipage}[b]{0.5\textwidth}
-\begin{lstlisting}[language=elaine,style=fancy]
+\begin{lst}{Elaine}
 let main = elab[e] {
     a!();
     a!()
 };
-\end{lstlisting}
+\end{lst}
 \end{minipage}
 \begin{minipage}[b]{0.5\textwidth}
-\begin{lstlisting}[language=elaine,style=fancy]
+\begin{lst}{Elaine}
 let main = {
     elab[e] a!();
     elab[e] a!()
 };
-\end{lstlisting}
+\end{lst}
 \end{minipage}
 
 In some cases, it is therefore possible to statically determine the elaboration that should be applied. In that situation, we can remove the elaboration from the program by performing the syntactic substitution.
 
 However, we cannot apply that technique in general. One example where it does not work is when the elaboration is given by a complex expression, such as an \el{if}-expression:
-\begin{lstlisting}[language=elaine,style=fancy]
+\begin{lst}{Elaine}
 elab[if cond { elab1 } else { elab2 }] c
-\end{lstlisting}
+\end{lst}
 
 Moreover, a single operation might need to be elaborated by different \el{elab} constructs, depending on run-time computations. In the listing below, there are two elaborations \el{eOne} and \el{eTwo} of an operation \el{a!()}. The \el{a!()} operation in \el{f} is elaborated where \el{f} is called. If the condition \el{k} evaluates to \el{true}, \el{f} is assigned to \el{g}, which is elaborated by \el{eOne}. However, if \el{k} evaluates to \el{false}, \el{f} is called in the inner \el{elab} and hence \el{a!()} is elaborated by \el{eTwo}.
 
-\begin{lstlisting}[language=elaine,style=fancy]
+\begin{lst}{Elaine}
 elab[eOne] {
     let g = elab[eTwo] {
         let f = fn() { a!() };
@@ -74,7 +74,7 @@ elab[eOne] {
     }
     g()
 }
-\end{lstlisting}
+\end{lst}
 
 Therefore, the analysis of determining the elaboration that should be applied to an operation is non-local. The static substitution could be used as an optimization or simplification step, but it cannot guarantee that the transformed program will not contain higher-order effects.
 

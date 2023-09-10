@@ -66,6 +66,7 @@
 \usepackage{microtype}
 \usepackage{listings}           % \lstinline
 \usepackage{listings-rust}
+\usepackage[listings,skins,breakable]{tcolorbox}
 \lstset{
   breaklines=false,%true,
   basicstyle=\normalsize\ttfamily,
@@ -283,20 +284,61 @@
     showstringspaces=false,
 }
 \lstdefinestyle{fancy}{
-    backgroundcolor=\color{background},
+    % backgroundcolor=\color{background},
     numbers=left,
     numberstyle=\sffamily\small\color{gray},
     numbersep=10pt,
     frame=l,
-    xleftmargin=16pt,
+    xleftmargin=22pt,
     rulecolor=\color{darkgray},
     framesep=4pt,
-    framextopmargin=8pt,
-    framexbottommargin=8pt,
+    % framextopmargin=8pt,
+    % framexbottommargin=8pt,
+}
+
+
+\newtcblisting{lst}[1]{%
+    enhanced,
+    listing only,
+    boxrule=0mm,
+    title={\scriptsize\texttt{#1}},
+    attach boxed title to top right={yshift=-\tcboxedtitleheight},
+    boxed title style={boxrule=0mm,sharp corners=downhill},
+    listing options={language=#1,style=fancy},
+    left=1mm,
+    top=0mm,
+    right=1mm,
+    bottom=0mm,
+    boxsep=0mm,
+}
+
+\newtcbinputlisting{\myinputlisting}[3]{%
+    listing file={#2},
+    enhanced,
+    listing only,
+    breakable,
+    boxrule=0mm,
+    title={\scriptsize\texttt{#1}},
+    attach boxed title to top right={yshift=-\tcboxedtitleheight},
+    boxed title style={boxrule=0mm,sharp corners=downhill},
+    listing options={language=#1,style=fancy,#3},
+    left=1mm,
+    top=0mm,
+    right=1mm,
+    bottom=0mm,
+    boxsep=0mm,
 }
 
 % Insert an Elaine example with proper style and label
-\newcommandx{\example}[2][1=]{\lstinputlisting[language=elaine,style=fancy,float,label={lst:#2},#1]{../../elaine/examples/#2.elaine}}
+\newcommandx{\example}[2][1=]{\myinputlisting{Elaine}{../elaine/examples/#2.elaine}{label={lst:#2},#1}}
+
+\newcommandx{\examplef}[3][1=]{
+    \begin{figure}[htbp]
+        \myinputlisting{Elaine}{../elaine/examples/#2.elaine}{#1}
+        \caption{#3}
+        \label{lst:#2}
+    \end{figure}
+}
 
 \newcommand\code[1]{\lstinline{#1}}
 \newcommand\mcode[1]{\text{\lstinline{#1}}}

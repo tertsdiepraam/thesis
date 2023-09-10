@@ -1,0 +1,3 @@
+{"rule":"UPPERCASE_SENTENCE_START","sentence":"^\\Qclass Monad m where return :: a -> m a (>>=) :: m a -> (a -> m b) -> m b\\E$"}
+{"rule":"EN_SPECIFIC_CASE","sentence":"^\\QLet bindings with \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q definitions are desugared into the Y combinator.\\E$"}
+{"rule":"EN_SPECIFIC_CASE","sentence":"^\\QHowever, it is impossible to write the Y combinator manually, because it would have an infinite type.\\E$"}

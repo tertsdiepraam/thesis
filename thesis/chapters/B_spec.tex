@@ -76,13 +76,13 @@ The full syntax definition is given in \cref{fig:syntax}. For convenience, we de
 Before explaining the typing judgments of Elaine, let us examine effect rows. The effect row of a computation type determines the context in which the computation can be evaluated. For example, a computation with effect row \el{<A,B,C>} is valid in a function with effect row \el{<A,B,C>}. Additionally, the effect rows \el{<A,B>} and \el{<B,A>} should be considered to be equivalent.
 
 One possible treatment is then to model effect rows as sets. However, as noted by \textcite{leijen_koka_2014}, this leads to some problems. Consider the following (abridged) program.
-\begin{lstlisting}[language=elaine,style=fancy]
+\begin{lst}{Elaine}
 let v: fn(f: fn() <abort|e> a) e a {
     handle[hAbort] f()
 };
 
 let main = handle[hAbort] v(fn() { abort() });
-\end{lstlisting}
+\end{lst}
 The function \el{v} ``removes'' an \el{abort} effect from the effect row. By treating the effect row as a set, there would be no \el{abort} effect in return type of \el{v}. However, in \el{main}, there is another handler for \el{abort} and hence \el{abort} should be in the effect row.
 
 The treatment of effect rows then simplifies if duplicated effects are allowed \autocite{leijen_koka_2014}. Hence, we use multisets to model effect rows, meaning that the row $\row{A, B, B, C}$ is represented by the multiset $\S{A, B, B, C}$. This yields a semantics where the multiplicity of effects is significant, but the order is not.
@@ -161,7 +161,7 @@ If the following invariants are violated there should be a type error:
 
 \subsection{Type inference}
 
-We have the usual generalize and instantiate rules. But, the generalize rule requires an empty effect row.
+We have the usual generalize and instantiate rules. But, the ``generalize'' rule requires an empty effect row.
 
 \question{Koka requires an empty effect row. Why?}
 
@@ -358,7 +358,7 @@ Elaborations are of course similar to handlers, but we explicitly state the high
 \\
 \info{Later, we could add more precise syntax for which effects need to be present in the arguments of the elaboration operations.}
 
-The \el{elab} expression then checks that a elaboration for all higher-order effects in the inner expression are in scope and that all effects they elaborate into are handled.
+The \el{elab} expression then checks that an elaboration for all higher-order effects in the inner expression are in scope and that all effects they elaborate into are handled.
 \\
 \info{It is not possible to elaborate only some higher-order effects. We could change the behaviour to allow this later.}
 

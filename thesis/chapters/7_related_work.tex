@@ -34,34 +34,34 @@ Haskell currently features an \el{IO} monad \autocite{peyton_jones_imperative_19
 Algebraic effects have also been encoded in Haskell, Agda and other languages. The key to this encoding is the observation that the sum of two algebraic theories yields an algebraic theory. This theory then again corresponds to a monad. In particular, we can construct a \hs{Free} monad to model the theory \autocite{kammar_handlers_2013,swierstra_data_2008}.
 
 We can therefore define a polymorphic \hs{Free} monad as follows:
-\begin{lstlisting}[language=haskell]
+\begin{lst}{Haskell}
 data Free f a
     = Pure a
     | Do (f (Free f a))
-\end{lstlisting}
+\end{lst}
 The parameter \el{f} here can be a sum of effect operations, which forms the effect row. This yields some effect row polymorphism, but the effect row cannot usually be reordered. To compensate for this lack of reordering, many libraries define typeclass constraints that can be used to reason about effects in effect rows.
 
 Effect rows are often constructed using the \emph{Data Types à la Carte} technique \autocite{swierstra_data_2008}, which requires a fairly robust typeclass system. Hence, many languages cannot encode effects within the language itself. In some languages, it is possible to work around the limitations with metaprogramming, such as the Rust library \lib{effin-mad}{https://github.com/rosefromthedead/effing-mad}, though the result does not integrate well with the rest of language and its use is discouraged by the author.
 
 Using the \code{eff} Haskell library as an example, we get the following function signature for an effectful function that accesses the filesystem:
-\begin{lstlisting}[language=Haskell,style=fancy]
+\begin{lst}{Haskell}
 readfile :: FileSystem :< effs => String -> Eff effs String
-\end{lstlisting}
+\end{lst}
 In this signature, \hs{FileSystem} is an effect and \hs{effs} is a polymorphic tail. The signature has a constraint stating that the \hs{FileSystem} effect should be in the effect row \hs{effs}. This means that the \hs{readfile} function must be called in a context at least wrapped in a handler for the \hs{FileSystem} effect.
 
 Contrast the signature above with a more conventional signature of \code{readfile} using the \hs{IO} monad:
 % spell-checker:ignore readfile firstline
-\begin{lstlisting}[language=Haskell,style=fancy]
+\begin{lst}{Haskell}
 readfile :: String -> IO String
-\end{lstlisting}
+\end{lst}
 This signature is more concise and arguably easier to read\feedback{But it's too coarse grained!}. Therefore, while libraries for algebraic effects offer semantic improvements over monads (and monad transformers), they are limited in the syntactic sugar they can provide.\feedback{Feedback to self: this is a non-sequitur}
 
 However, the ergonomics of these libraries depend on the capabilities of the type system of the language. Since the effects are encoded as a monad, a monadic style of programming is still required. For both versions of \hs{readline}, we can use the function the same way. For example, a function that reads the first line from a file might be written as below.
-\begin{lstlisting}[language=Haskell,style=fancy,mathescape=false]
+\begin{lst}{Haskell}
 firstline filename = do
     res <- readfile filename
     return $ head $ lines $ res    
-\end{lstlisting}
+\end{lst}
 
 Some of these libraries support \emph{scoped effects} \autocite{wu_effect_2014}, which is a limited but practical frameworks for higher-order effects. It can express the \olocal and \ocatch operations, but some higher-order effects are not supported.\todo{Add $\lambda$-abstraction as example.}
 
@@ -70,24 +70,24 @@ Some of these libraries support \emph{scoped effects} \autocite{wu_effect_2014},
 The motivation of \fixme{add effects} to a programming language is twofold. First, we want to explore how to integrate effects into languages with type systems in which effects cannot \fixme{be natively encoded}. Second, built-in effects allow for more ergonomic and performant implementations. Naturally, the ergonomics of any given implementation are subjective, but we undeniably have more control over the syntax by adding effects to the language. For example, a language might include the previously mentioned implicit \code{do}-notation
 
 Notable examples of languages with support for algebraic effects are Eff \autocite{bauer_programming_2015}, Koka \autocite{leijen_koka_2014}, Idris \autocite{brady_programming_2013} and Frank \autocite{lindley_be_2017}, which are al\question{any simple examples?}We can write the \code{readfile} signature and \code{firstline} function from before in Koka as follows:
-\begin{lstlisting}[language={},style=fancy]
+\begin{lst}{Koka}
 fun readfile( s : string ) : <filesystem>  string
 
 fun firstline( s: string ) : <filesystem> maybe<string>
     head(lines(readfile(s)))
-\end{lstlisting}
+\end{lst}
 From this example, we can see that the syntactic overhead of the effect rows is much smaller than what is provided by the Haskell libraries. Furthermore, the monadic style of programming is no longer necessary in Koka.
 
 Effect row variables can be used to ensure the same effects across multiple functions without specifying what they are. This is especially useful for higher-order functions. For example, we can ensure that \code{map} has the same effect row as its argument:
-\begin{lstlisting}[language={},style=fancy]
+\begin{lst}{Koka}
 fun map ( xs : list<a>, f : a -> e b ) : e list<b>
     ...
-\end{lstlisting}
+\end{lst}
 
 Other languages choose a more implicit syntax for effect polymorphism. Frank \autocite{lindley_be_2017} opts to have the empty effect row represent the \emph{ambient effects}. The signature of \code{map} is then written as
-\begin{lstlisting}[language={},style=fancy]
+\begin{lst}{Koka}
 map : {X -> []Y} -> List X -> []List Y
-\end{lstlisting}
+\end{lst}
 Since Koka's representation is slightly more explicit, we will be using that style throughout this paper. Elaine's row semantics are inspired by Koka's and are explained in \cref{chap:basics}.
 
 Several extensions to algebraic effects have been explored in the languages mentioned above. Koka supports scoped effects and named handlers \autocite{xie_first-class_2022}, which provides a mechanism to distinguish between multiple occurrences of an effect in an effect row.
