@@ -1,8 +1,6 @@
 \chapter{Algebraic Effects}\label{chap:algebraic_effects}
 
-Elaine is based on the theory of hefty algebras, which is an extension of the theory of algebraic effects. Hence, the theory of algebraic effects also applies. In this chapter, we give an introduction to algebraic effects. In the next chapter, we discuss its limitations regarding higher-order effects and describe how hefty algebras overcome those limitations.
-
-This chapter builds up to a fairly established model for programming languages, such as Koka. Readers familiar with algebraic effects and Koka may therefore want to skip this chapter.
+Elaine is based on the theory of hefty algebras, which is an extension of the theory of algebraic effects. Hence, the theory of algebraic effects also applies to Elaine. In this chapter, we give an introduction to algebraic effects. In the next chapter, we discuss its limitations regarding higher-order effects and describe how hefty algebras overcome those limitations.
 
 \section{Monads}
 
@@ -10,7 +8,7 @@ This chapter builds up to a fairly established model for programming languages, 
 
 We will build up the notion of algebraic effects from monads. Monads are an abstraction over effectful computation commonly used in functional programming.
 
-While many descriptions of monads using category theory and analogies are possible, for our purposes, a monad is a type constructor \hs{m} and two functions: \hs{return} and \hs{>>=}, with the latter pronounced ``bind''. In Haskell, this concept is easily encoded in a type class, which is listed below, along with the definition of a function \hs{>>}.
+While many descriptions of monads using category theory and various analogies can be employed in explaining them, for our purposes, a monad is a type constructor \hs{m} with two associated functions: \hs{return} and \hs{>>=}, with the latter pronounced ``bind''. In Haskell, this concept is easily encoded in a type class, which is listed below.
 
 \begin{lst}{Haskell}
 class Monad m where
@@ -21,7 +19,7 @@ class Monad m where
 a >> b = a >>= \_ -> b
 \end{lst}
 
-This class tells us that we can construct a value of \hs{m a} for any type \hs{a} and for any monad \hs{m} using \hs{return}. Additionally, we can compose two monads using \hs{>>=} by providing a \hs{m a} and a function from \hs{a} to \hs{m b}.
+This class tells us that we can construct a value of \hs{m a} for any type \hs{a} and for any monad \hs{m} using \hs{return}. Additionally, we can compose two monadic computations using \hs{>>=}, which takes a monadic computation and a \emph{continuation}, which is the function that should be called after the operation has been performed. The continuation is passed the return value of the operation as an argument.
 
 To explain how effectful operations can be encoded with this, we can look at a simple example: the \hs{Maybe} monad. Our goal with this monad is to create an ``abort'' effect, where the computation stops and returns immediately once \hs{Nothing} is encountered.
 
@@ -54,7 +52,7 @@ main = do
   print $ head [2,3,4] >>= safeDiv 10 -- -> Just 5
 \end{lst}
 
-A more involved example is the \hs{State} monad. If we were to keep track of state manually a function that modifies state would need to take some state \hs{s} and an argument and return a new value for the state. Therefore, if a function \hs{foo} normally is a function with type \hs{a -> b}, it would need to have the type \hs{a -> s -> (s, b)} to modify state. Then we need to ensure that we update the state with the modified value. For example, if the function is called multiple times, the code would look something like the code before.
+A more involved example is the \hs{State} monad. If we were to keep track of state manually a function that modifies state would need to take some state of type \hs{s} as an argument and return a new value for the state. Therefore, if a function \hs{foo} normally is a function with type \hs{a -> b}, it would need to have the type \hs{a -> s -> (s, b)}. Instead of modifying the state directly, it maps an old state to a new state. Then we need to ensure that we update the state with the modified value. For example, if the function is called multiple times, the code would look something like the code before.
 
 \begin{lst}{Haskell}
 -- Increment the state by `a` and return the old state
@@ -68,7 +66,7 @@ multipleIncs s = let
   in inc 7 s''
 \end{lst}
 
-The program becomes verbose and repetitive as a result. If we look at the signature \hs{a -> s -> (s, b)}, we can see that there is a possibility for abstraction here: we can abstract over the pattern of \hs{s -> (s, b)}. Or definition of the \hs{State} type then becomes:
+The program becomes verbose and repetitive as a result. If we look at the signature \hs{a -> s -> (s, b)}, we can see that there is a possibility for abstraction here: we can abstract over the pattern of \hs{s -> (s, b)}. Our definition of the \hs{State} type constructor then becomes:
 
 \begin{lst}{Haskell}
 newtype State s a = State (s -> (s, a))
@@ -78,11 +76,11 @@ inc :: Int -> State Int Int
 inc a = State $ \s -> (s + a, s)
 \end{lst}
 
-That might look like a step backwards at first, but we can now implement the monad functions for \hs{State s} to allow us to compose functions returning the \hs{State} type. Additionally, we define some the \hs{get} and \hs{put} operations, which are the basic building blocks we can use to build more complex operations.
+That might look like a step backwards at first, but we can now implement the monad functions for \hs{State s} to allow us to compose functions returning the \hs{State} type. Additionally, we define the \hs{get} and \hs{put} operations, which are the basic building blocks we can use to build more complex operations.
 
 \begin{lst}{Haskell}
 instance Monad (State s) where
-  return = State (, a)
+  return x = State $ \s -> (s, x)
 
   State fa >>= k = State $ \s ->
     let (s', a) = fa s
@@ -103,25 +101,56 @@ runState :: s -> State s a -> (s, a)
 runState init (State s) = s init
 \end{lst}
 
-Using the bind operator, we can then reduce our \hs{bar} function to the following.
+The \hs{inc} operations can then be sequenced using the \hs{>>=} operator. Because the return value of \hs{inc} is irrelevant in the computation, we define a shorthand operator \hs{>>}, which ignores the return value of the first operation.
 
 \begin{lst}{Haskell}
+(>>) :: Monad m => m a -> m b -> m b
+ma >> mb = ma >>= \_ -> mb
+
 inc :: Int -> State Int Int
 inc x = get >>= \s -> put (s + x) >>= return s
 
-bar :: State Int Int
-bar = inc 5 >> inc 6 >> inc 7
+multipleIncs :: State Int Int
+multipleIncs = inc 5 >> inc 6 >> inc 7
 
-main = print $ runState 0 bar
+main = print $ runState 0 bar # prints 0 + 5 + 6 + 7 = 18
 \end{lst}
 
 This is the power of monads: they allow us to abstract the effectful operations away, while also signalling the effects that a function requires in the return type. In the final example, we do not have to think about how the \hs{State} monad works anymore, but only use the \hs{get} and \hs{put} operations to build complex computations.
+
+To make working with monads more convenient, Haskell also features do-notation, which is syntactic sugar for the \hs{>>=} and \hs{>>} operators. Using do-notation, the \hs{multipleIncs} computation from the previous example can be written as
+
+\begin{lst}{Haskell}
+multipleIncs = do
+  inc 5
+  inc 6
+  inc 7
+\end{lst}
+
+If the results from the \hs{inc} computations needs to be used, the \hs{<-} operator, which is part of the do-notation, can be used to bind the result of a computation to a variable. For example, the sum of all the results from the \hs{inc} calls can be returned.
+
+\begin{lst}{Haskell}
+multipleIncs = do
+  a <- inc 5
+  b <- inc 6
+  c <- inc 7
+  return (a + b + c)
+
+-- which is equivalent to
+multipleIncs = 
+  inc 5 >>= \a ->
+    inc 6 >>= \b ->
+      inc 7 >>= \c ->
+        return (a + b + c)
+\end{lst}
+
+This is a convenient method for programming with effects in Haskell, while also staying true to its functional paradigm.
 
 \section{Effect Composition with the Free Monad}
 
 \TODO{Cite Casper's blog or a more academic version of it from somewhere. http://casperbp.net/posts/2023-07-algebraic-effects/index.html}
 
-A limitation of the monads above is that they cannot be composed: it is not possible to make a computation with them that uses both \hs{State} and \hs{Maybe} at the same time. One solution to this is to used monad transformers, as explained in \cref{sec:monad_transformers}. Another solution is to use the \emph{free monad}.
+A limitation of the monads above is that they cannot be composed: it is not possible to make a computation with them that uses both \hs{State} and \hs{Maybe} at the same time. One solution to this is to use monad transformers, as explained in \cref{sec:monad_transformers}. Another solution is to use the \emph{free monad}.
 
 \begin{lst}{Haskell}
 data Free f a
@@ -163,6 +192,7 @@ We can then make monads for any combination of the functors we have defined, suc
 
 However, we have no way to use any of the effect operations for this functor. For example, if we have \hs{Free (State s + Abort + End)}, how would we use the \hs{get} operation that we expect from the state monad? The solution is to give a definition for \hs{get} for the free monad if and only if \hs{State} is one of the composed functors. We do this with a typeclass relation \hs{<}, which defines an injection from a functor \hs{f} to any composed functor \hs{g} that contains \hs{f}. We can use this injection to define \hs{get}, \hs{put} and \hs{abort}. These convenience functions are called \emph{smart constructors}.
 
+\TODO{Parts of this might not be important}
 \begin{lst}{Haskell}
 class f < g where
   inj :: f k -> g k
@@ -191,7 +221,9 @@ decrement = get >>= \s ->
               else abort 
 \end{lst}
 
-However, there is no way to evaluate this computation, because Haskell does not know what to do with these operations. To do that, there needs to be a function \hs{Free (f + f') a -> Free f' b} for every \hs{f} and finally a \hs{Free End a -> a} to reduce it all a single function. Following \textcite{castagna_handlers_2009}, these functions are called \emph{handlers}. Using a fold over the free monad, the definition of the handlers can be reduced to two smaller functions:
+However, there is no way to evaluate this computation, because Haskell does not know what to do with these operations. To do that, there needs to be a function with the type
+\[\mcode{Free (f + f') a -> Free f' b}\]
+for every \hs{f} and finally a \hs{Free End a -> a} to reduce the free monad to a final value. Following \textcite{castagna_handlers_2009}, these functions are called \emph{handlers}. Using a fold over the free monad, the definition of the handlers can be reduced to two smaller functions:
 \begin{itemize}
     \item the return case, \hs{a -> Free f' b};
     \item and the case for handling \hs{f}: \hs{f (Free f' b) -> Free f' b}.
@@ -222,20 +254,20 @@ handleAbort = handle (Pure . Just) (\Abort -> Nothing)
 
 This finally allows us to use the \hs{Abort} and \hs{State} monads together, while providing a handler per functor. While the plumbing needed for a free monad is extensive, it is worth considering what it provides. First, we can combine multiple functors in our type signatures. Second, we can define operations that work for any effect composition that contains an effect. Third, we can provide modular handlers that handle a single effect from the composed functors. Any effect we define in this way is automatically compatible with all the other effects.
 
-We have not only gained modularity for the effects themselves, but also for the handlers. There is nothing preventing other implementations of the handlers. It is, for example, possible to define a state handler in which \hs{put} operations are ignored or in which state propagates ``back in time''.\todo{I saw this somewhere, but I forgot where, I want to say Wadler?}
+We have not only gained modularity for the effects themselves, but also for the handlers. There is nothing preventing different implementations of the handlers. It is, for example, possible to define a state handler in which \hs{put} operations are ignored or in which state propagates ``back in time''.\todo{I saw this somewhere, but I forgot where, I want to say Wadler?}
 
 \section{Algebraic Effects}
 
-The term ``algebraic'' comes from the fact that this method works for effects that can be described as algebraic theories when encoded in a continuation-passing style \autocite{goos_adequacy_2001}. As shown by \textcite{plotkin_algebraic_2003}, this can only be done for effects that satisfy the \emph{algebraicity property}.
+The free monad encoding in the previous section is an implementation of algebraic effects in Haskell. The term ``algebraic'' comes from the fact that this method works for effects that can be described as algebraic theories \autocite{goos_adequacy_2001}. Later, \textcite{plotkin_algebraic_2003} showed that this is only possible for effects that satisfy the \emph{algebraicity property}.
 
-The algebraicity property states that the \hs{>>=} operation distributes over the computation parameters of an operation. This can be derived from the free monad as well, since it can be derived from the definitions of \hs{>>=} on \hs{Free} and \hs{fmap} for the effects. For example, we can apply the definitions to \hs{Free (State s)}.
+The algebraicity property states that the \hs{>>=} operation distributes over the computation parameters of an operation. This can be derived from the definitions of \hs{>>=} on \hs{Free} and \hs{fmap} for the effects. For example, we can apply the definitions to \hs{Free (State s)}.
 
 \begin{lst}{Haskell}
 -- we start with:
 put s >>= k
 -- expand smart constructor:
 Do (Put s (Pure ())) >>= k
--- apply >>= definition of Free:
+-- apply >>= of Free:
 Do $ fmap (>>= k) (Put s (Pure ()))
 -- apply fmap of Put:
 Do $ Put s (Pure () >>= k)
@@ -249,17 +281,21 @@ The state and abort effects satisfy this property, along with effects for non-de
 
 \section{Building a Language with Algebraic Effects}
 
-Technically, the previous sections contain an encoding of algebraic effects, but using them is not very ergonomic yet. Since Haskell is designed around pure and monadic functions, it is not possible to hide all unnecessary details. If we instead design a new language which integrates algebraic effects, we have much more freedom in designing a syntax and type system that work well in this context.
+Although the previous sections contain an encoding of algebraic effects, they are not yet very ergnomic to use. Since Haskell is designed around pure and monadic functions, it is not possible to hide all unnecessary details of the encoding. If we instead design a new language which integrates algebraic effects as a core feature in the language, we have much more freedom in designing a syntax and type system that work well for thus purpose.
 
-Elaine is such a language, but it is heavily inspired by existing languages. In this section we will first explore how Koka \autocite{leijen_koka_2014,leijen_koka_2023} supports algebraic effects and how that maps to the encoding in the previous section.
+Elaine is a language with support for algebraic effects, but also for higher-order effects. Therefore, this section focuses on Koka \autocite{leijen_koka_2014,leijen_koka_2023}, which only supports algebraic effects. Since Elaine is heavily inspired by Koka, the same concepts apply to Elaine.
 
-At the core of such languages is the following rule: all functions return the free monad. That means that a function \hs{a -> b} is not allowed, but \hs{a -> Free f b} is allowed. Because that is a bit verbose, we can introduce a shorthand: \hs{a -> f b}. We will no longer refer to \hs{f} as a functor, but as an \emph{effect row} and its elements as \emph{effects}. Because we change the name, we will also generally use an \hs{e} instead of an \hs{f} to denote an effect row. So, the function type \hs{a -> e b} should be read as: this function takes an \hs{a} and returns \hs{b} with effect row \hs{e}.
+At the core of such languages lies the following rule: all functions return the free monad. That means that a function \hs{a -> b} is not allowed, but \hs{a -> Free f b} is allowed. Because that is a bit verbose, we can introduce a shorthand: \hs{a -> f b}. We will no longer refer to \hs{f} as a functor, but as an \emph{effect row} and its elements as \emph{effects}. Because we change the name, we will use an \hs{e} from now on instead of an \hs{f} to denote an effect row. So, the function type \hs{a -> e b} should be read as: this function takes an \hs{a} and returns \hs{b} with effect row \hs{e}.
 
 Instead of using type-level operators, we can introduce special syntax for effect rows, too. Following the lead of Koka \autocite{leijen_koka_2014}, we will write effect rows as
-\begin{center}{\ttfamily<e1,e2,...,eN|es>},\end{center}
-where the \el{|es} part is optional. Effects \el{e1} to \el{eN} are the explicit effects and \el{es} is the tail; a variable representing the effect row with which this effect row can be extended. In the type system, we are then allowed to use different orders of effects interchangeably. This is a clear ergonomic improvement over the free monad encoding, where we could only reason about inclusion of one effect at a time. With effect rows, the type reason about, for example, equality between \el{<a,b>} and \el{<b,a>}. Additionally, it can distinguish \el{<state<a>,state<a>>} from \el{<state<a>>}, whereas with the functor interface we could only check \el{State s < f}, which would hold in both cases.
+\begin{center}\texttt{<e1,e2,...,eN>}.\end{center}
+In the type system, we are then allowed to use different orders of effects interchangeably. This is a clear ergonomic improvement over the free monad encoding, where we could only reason about inclusion of one effect at a time. With effect rows, the type reason about, for example, equality between \el{<a,b>} and \el{<b,a>}. Additionally, it can distinguish \el{<state<a>,state<a>>} from \el{<state<a>>}, whereas with the functor interface we could only check \el{State s < f}, which would hold in both cases.
 
-We can define the same effects as before, state and abort, but in Koka, we do not define them as functors. Instead, we use the \code{effect} keyword. Each constructor of the functors then becomes a \code{ctl} operation.
+All the effects in this row are single effects, they are not composed. In Haskel, this is not the case, some functor \hs{f} can represent a composed functor. Therefore we need notation to express that an effect row can be extended with another effect row. This is written as
+\begin{center}\texttt{<e1,e2,...,eN|es>,}\end{center}
+where \el{es} is the tail of the effect row; a variable representing the effect row with which this effect row can be extended.
+
+We can define the same effects as before, like state and abort, but in Koka, we do not define them as functors. Instead, we use the \code{effect} keyword. Each constructor of the functors then becomes a \code{ctl} operation.
 
 \begin{lst}{Koka}
 effect abort
@@ -270,7 +306,7 @@ effect state<a>
   ctl put(x: a): ()
 \end{lst}
 
-There are a few small differences. In this Koka's syntax, we cannot specify that \code{abort} does not resume, however, we can encode it in the type system instead. The return type \code{a} is a parameter of the function and, since we cannot construct an unknown type, it is functionally equivalent to a ``never'' type. All operations in Koka are also functions, so \code{get} is a function here, too. However, we can make it a function that does not take any arguments.
+There are a few small differences. In Koka's syntax, we cannot specify that \code{abort} does not resume, however, we can encode it in the type system instead. The return type \code{a} is a parameter of the function and, since we cannot construct an unknown type, it is functionally equivalent to a ``never'' or ``empty'' type, that is, a type that cannot be constructed. All operations in Koka are also functions, so \code{get} is a function here, too. However, we can make it a function that does not take any arguments.
 
 With these types, the equivalent of \hs{Free (State s + Abort + End) a} becomes \el{<state<s>,abort> a}. The equivalent of a handler would then be a function which takes \el{() -> <f|e> a} and returns \el{<|e> a}. In Koka, such a function can be defined with the \el{handler} construct, which requires an implementation for each operation of an effect and a special function for the return case. Note the similarity to the \hs{handle} function we defined in Haskell before. In the case of abort effect, this handler is assigned to variable for later use. The state handler is wrapped in another function which takes an initial value for the state.
 
@@ -309,7 +345,18 @@ fun main()
   printMaybe(hAbort(hState(0, foo))) // prints "nothing!"
 \end{lst}
 
-The \hs{>>=} operator is entirely implicit here. Effectful operations can be used anywhere as long as they are wrapped in a corresponding handler. In the end, the syntax here might even seem closer to imperative programming languages than functional programming languages. This might be true, but it should be noted that the type system is still very much like that of a functional language. For example, the type system is able to assert that a function is entirely pure. Programming in a more functional style is also still entirely possible in Koka.
+The \hs{>>=} operator is entirely implicit here. Therefore, it is similar to Haskell's do-notation. However, in do-notation, every effectful operation needs to be on a separate line. For example, if the state needs to be incremented by 1, this can be achieved in one line in Koka, but in Haskell using do-notation requires two lines.
+
+\begin{lst}{Koka}
+put(get() + 1)
+\end{lst}
+\begin{lst}{Haskell}
+do
+  x <- get
+  put (x + 1)
+\end{lst}
+
+In Koka, effectful operations can be used anywhere as long as they are wrapped in a corresponding handler. In the end, the syntax here might even seem closer to imperative programming languages than functional programming languages. However, the type system is still very much like that of a functional language. For example, the type system is able to assert that a function is entirely pure. In the listing below, the \hs{<>} in the type of the function asserts that it does not require effects, yet the \hs{println} function requires an effect. Hence, Koka's type checker will yield a type error.
 
 \begin{lst}{Koka}
 fun should_be_pure(x: int): <> int
@@ -317,4 +364,4 @@ fun should_be_pure(x: int): <> int
   x + 10
 \end{lst}
 
-As will become clear in \cref{chap:basics}, Elaine takes a lot of inspiration from Koka. Handlers and effects are defined in the same way, modulo some syntactical difference.
+As will become clear in \cref{chap:basics}, Elaine takes a lot of inspiration from Koka. Handlers and effects are defined in the same way, modulo some syntactical difference. What sets Elaine apart, is that it also supports higher-order effects, which will be explained in the next chapter.

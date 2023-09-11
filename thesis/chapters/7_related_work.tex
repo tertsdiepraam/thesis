@@ -2,17 +2,29 @@
 
 \feedback[inline]{Can be expanded. Provide context for this thesis. What have others done, what's missing, and what does this thesis add?}
 
+
+\emph{Alright what do I want to say? This is not the only way to do (higher-order) effects. Of course, monad transformers exist. Scoped effects and latent effect exist. Scoped effects are particularly succesful in Haskell libraries (I think).}
+
+\emph{There is also related work in integrating effects into a language. Koka, Frank, Eff, OCaml. Also keyword generics in Rust. The question is also \emph{which} effects to consider important enough. Exceptions are an effect system, because handlers are a generalization of exception handlers. Daan Leijen has also implemented effects in C.}
+
 \section{Monad Transformers}\label{sec:monad_transformers}
 
-The study of effects starts right at the two foundational theories of computation: $\lambda$-calculus and Turing machines. Their respective treatment of effects could not be more different. The former is only concerned with pure computation, while the latter consists solely of effectful operations.
+Monad transformers provide a way to compose monads \autocite{moggi_abstract_1989}. This makes them an alternative to the free monad.
 
-In $\lambda$-calculus, effects are not modelled; every function is a function in the mathematical sense, that is, a pure computation \autocite{moggi_computational_1989}. Hence, many observable properties of programs are ignored, such as non-determinism and side effects. In their seminal paper, \textcite{moggi_computational_1989} unified \emph{monads} with computational effects, which they initially called notions of computation. \citeauthor{moggi_computational_1989} identified that for any monad $T: C \to C$ and a type of values $A$, the type $T A$ is the type of a computation of values of type $A$.
+The goal of composition is to make the operations of all composed monads available to the computation. Given two monads \hs{A} and \hs{B}, a naive composition would result in the type \hs{A (B a)}. However, this type represents a computation using \hs{A} that returns a computation \hs{B a}, meaning that it is not possible to use operations of both monads arbitrarily.
 
-Since many programming languages have the ability to express monads from within the language\feedback{The meaning of this is unclear}, monads became a popular way to model effectful computation in functional programming languages. In particular, \textcite{peyton_jones_imperative_1993} introduced a technique to model effects via monads in Haskell. This technique\feedback{``technique'' is mysterious} keeps the computation pure, while not requiring any extensions to the type system.
+A monad transformer is a type constructor that takes some monad and yields a monad. Usually, the transformation it performs is to add operations to the input monad. Composing \hs{A} and \hs{B} then requires some transformer \hs{AT} to be defined, such \hs{AT B} is a monad that provides the operations of both \hs{A} and \hs{B}. An arbitrary number of monad transformers can be composed this way.
 
-\section{Monad Transformers}
+A neat property of monad transformers is that a monad can be easily obtained by applying the transformer to the identity monad. Haskell's mtl library, for instance, defines a monad transformer \hs{StateT} and then defines \hs{State} as \hs{StateT Identity}.
 
-\TODO{Have to define how operations interact between each pair of transformers: $N^2$ number of implementations for each operation.}
+\TODO{Downside: fixed order}
+
+\TODO{Downside: Have to define how operations interact between each pair of transformers: $N^2$ number of implementations for each operation.}
+
+% In $\lambda$-calculus, effects are not modelled; every function is a function in the mathematical sense, that is, a pure computation \autocite{moggi_computational_1989}. Hence, many observable properties of programs are ignored, such as non-determinism and side effects. In their seminal paper, \textcite{moggi_computational_1989} unified \emph{monads} with computational effects, which they initially called notions of computation. \citeauthor{moggi_computational_1989} identified that for any monad $T: C \to C$ and a type of values $A$, the type $T A$ is the type of a computation of values of type $A$.
+
+% Since many programming languages have the ability to express monads from within the language\feedback{The meaning of this is unclear}, monads became a popular way to model effectful computation in functional programming languages. In particular, \textcite{peyton_jones_imperative_1993} introduced a technique to model effects via monads in Haskell. This technique\feedback{``technique'' is mysterious} keeps the computation pure, while not requiring any extensions to the type system.
+
 A limitation of treating effects as monads is that they do not compose well; the composition of two monads is not itself a monad\todo{Well it is, but not a ``combined'' monad. Not sure how to describe that. I guess that the monad \code{A (B a)} is not a monad over \code{a}, but only over \code{B a}. Need to explain why that is a problem}. A solution to this are \emph{monad transformers}, which are functors over monads that add operations to a monad \autocite{moggi_abstract_1989}. A regular monad can then be obtained by applying a monad transformer to the \el{Identity} monad. The representation of a monad then becomes much like that of a list of monad transformers, with the \el{Identity} monad as \el{Nil} value. This ``list'' of transformers is ordered. For example, using the terminology from Haskell's \el{mtl} library, the monad \el{StateT a (ReaderT b Identity)} is distinct from \el{ReaderT b (StateT a Identity)}. The order of the monad transformers also determines the order in which they must be handled: the outermost monad transformer must be handled first\feedback{translate handling to the context of monad transformers}.
 
 In practice, this model has turned out to work quite well, especially in combination with \el{do}-notation, which allowed for easier sequential execution of effectful computations.\feedback{Should be motivated}

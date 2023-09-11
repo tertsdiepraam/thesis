@@ -300,10 +300,14 @@
 \newtcblisting{lst}[1]{%
     enhanced,
     listing only,
-    boxrule=0mm,
+    boxrule=0pt,
+    frame empty,
+    colback=black!3!white,
+    coltitle=black!60!white,
     title={\scriptsize\texttt{#1}},
+    arc=0.2mm,
     attach boxed title to top right={yshift=-\tcboxedtitleheight},
-    boxed title style={boxrule=0mm,sharp corners=downhill},
+    boxed title style={frame empty,boxrule=0mm,sharp corners=downhill,colback=black!10!white},
     listing options={language=#1,style=fancy},
     left=1mm,
     top=0mm,
@@ -318,9 +322,12 @@
     listing only,
     breakable,
     boxrule=0mm,
+    frame empty,
+    colback=black!3!white,
+    coltitle=black!60!white,
     title={\scriptsize\texttt{#1}},
     attach boxed title to top right={yshift=-\tcboxedtitleheight},
-    boxed title style={boxrule=0mm,sharp corners=downhill},
+    boxed title style={frame empty,boxrule=0mm,sharp corners=downhill,colback=black!10!white},
     listing options={language=#1,style=fancy,#3},
     left=1mm,
     top=0mm,
@@ -423,3 +430,15 @@
 \makeatletter
 \AtBeginDocument{\toggletrue{blx@useprefix}}
 \makeatother
+
+\renewcommand{\maketitle}{%
+\thispagestyle{empty}
+\begin{center}
+\vspace*{\droptitle}
+{\Huge\thetitle}
+\vfill
+\includegraphics[width=13cm]{./img/cover.png}
+\vfill
+{\Large\theauthor}\par
+\thedate
+\end{center}}

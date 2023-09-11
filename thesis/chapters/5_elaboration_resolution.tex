@@ -1,15 +1,8 @@
 \chapter{Implicit Elaboration Resolution}\label{chap:elabres}
 
-\feedback[inline]{The process is not interesting for readers. Stick to the definition and motivation.}
+With Elaine, we aim to explore further ergonomic improvements for programming with effects. We note that elaborations are often not parametrized and that there is often only one in scope at a time. Hence, when we encounter an \elab, there is only one possible elaboration that could be applied. Therefore, we propose that the language should be able to infer the elaborations. Take the example in the listing below, where we let Elaine infer the elaboration for us.
 
-With Elaine, we aim to explore the further ergonomic improvements we can make for programming with effects. We note that elaborations are often not parametrized and that there is often only one in scope at a time. Hence, when we encounter an \elab, there is only one possible elaboration that could be applied.
-
-Therefore, we propose that, in this situation, the language should allow the elaboration to be inferred. Take the example in \cref{lst:local_reader_implicit}, where we let Elaine infer the elaboration for us.
-
-%%\example[firstline=20,
-%caption={The \el{Local!} effect with implicit elaboration. The definition of the effect and the Reader effect are identical to \cref{lst:local_reader} and omitted here.},
-%float=ht
-%]{local_reader_implicit}
+\example[firstline=20]{local_reader_implicit}
 
 A use case of this feature is when an effect and elaboration are defined in the same module. When this module is imported, the effect and elaboration are both brought into scope and \el{elab} will apply the standard elaboration automatically.
 
@@ -23,38 +16,42 @@ mod local {
 
 use local;
 
-# We don't have to specify the elaboration, since it is
+# We do not have to specify the elaboration, since it is
 # imported along with the effect.
 let main = handle[hAsk] elab { local!(double, ask!()) };
+#                          ^^^
 \end{lst}
 
-The order in which elaborations are applied does not influence the semantics of the program.\todo{This needs justification.} Therefore, implicit elaboration resolution can also be used to elaborate multiple effects with a single \el{elab} construct. To make the inference predictable, we require that an implicit elaboration must elaborate all higher-order effects.
-
-This is a nice convenience, but it requires some caution. A problem arises when multiple elaborations for an effect are in scope; which one should then be used? To keep the result of the inference predictable and deterministic, we give a type error in this case. Hence, we know that, if type checking succeeds, the inference procedure has found exactly one elaboration to apply for each higher-order effect. If not, we simply write the elaboration explicitly.
+However, while useful, this feature only saves a few characters in the examples above. It becomes more important when multiple higher-order effects are involved: and \el{elab} without argument will elaborate all higher-order effects in the subcomputation. For instance, if elaborations for both \el{Exception} and \el{Reader} are in scope, the following program works.
 
 \begin{lst}{Elaine}
-let eLocal1 = elaboration Local! -> <> { ... };
-let eLocal2 = elaboration Local! -> <> { ... };
+let main = handle[hAsk(2)] handle[hThrow] elab {
+    local!(double, {
+        if gt(ask(), 3) {
+            throw() 
+        } else {
+            add(ask(), 4)
+        }
+    })
+}
+\end{lst}
+
+This relies on the fact that the order in which elaboration are applied does not affect the semantics of the program as explained in \cref{sec:hefty_algebras}. To make the inference predictable, we require that an implicit elaboration must elaborate all higher-order effects in the sub-computation.
+
+A problem with this feature arises when multiple elaborations for a single effect are in scope; which one should then be used? To keep the result of the inference predictable and deterministic, the type checker should yield a type error in this case. Hence, if type checking succeeds, then the inference procedure has found exactly one elaboration to apply for each higher-order effect. If not, the elaboration cannot be inferred and must be written explicitly.
+
+\begin{lst}{Elaine}
+let eLocal1 = elaboration Local! -> <Ask> { ... };
+let eLocal2 = elaboration Local! -> <Ask> { ... };
 
 let main = elab { local!(double, ask!()) }; # Type error here!
 \end{lst}
 
-The elaboration resolution consists of two parts: inference and transformation. The inference is done by the type checker and is hence type-directed, which records the inferred elaboration\feedback{bad sentence}. After type checking the program is then transformed such that all implicit elaborations have been replaced by explicit elaborations.
+The elaboration resolution consists of two parts: inference and transformation. The inference is done by the type checker and is hence type-directed, which records the inferred elaboration. After type checking the program is then transformed such that all implicit elaborations have been replaced by explicit elaborations.
 
-To infer the elaborations, the type checker first analyses the sub-expression. This will yield some computation type with an effect row containing both higher-order and algebraic effects: $\row{H!_1, \dots, H!_n, A_1, \dots, A_m}$. It then checks the type environment to look for elaborations $E_1, \dots, E_n$ which elaborate $H!_1, \dots, H!_n$, respectively. Only elaborations that are directly in scope are considered, so if an elaboration resides in another module, it needs be imported first. For each higher-order effect, there must be exactly one elaboration.
+To infer the elaborations, the type checker first analyses the sub-expression. This will yield some computation type with an effect row containing both higher-order and algebraic effects: \el{<H1!, ..., HN!, A1, ..., AM>}. It then checks the type environment to look for elaborations \el{e1}, ..., \el{eN} which elaborate \el{H1!}, ..., \el{HN!}, respectively. Only elaborations that are directly in scope are considered, so if an elaboration resides in another module, it needs be imported first. For each higher-order effect, there must be exactly one elaboration.
 
-The \el{elab} is finally transformed into one explicit \el{elab} per higher-order effect. Recall that the order of elaborations does not matter for the semantics of the program, meaning that we safely apply them any order.
+The \el{elab} is finally transformed into one explicit \el{elab} per higher-order effect. Recall that the order of elaborations does not matter for the semantics of the program, meaning that we apply them in arbitrary order.
 
-\begin{lst}{Elaine}
-elab[$E_1$] elab[$E_2$] ... elab[$E_n$]
-\end{lst}
+A nice property of this transformation is that it results in very readable code. Because the elaboration is in scope, there is an identifier for it in scope as well. The transformation then simply inserts this identifier. The \elab in the first example of this chapter will, for instance, be transformed to \el{elab[eVal]}. A code editor could then display this transformed \el{elab} as an inlay hint.
 
-A nice property of this feature is that the transformation results in very readable code. Because the elaboration is in scope, there is an identifier for it in scope as well. The transformation then simply inserts this identifier. The \elab in the first example of this chapter will, for instance, be transformed to \el{elab[eVal]}. An IDE could then display this transformed \el{elab} as an inlay hint.
-
-\TODO{If Jonathan's syntax highlighting and linking is integrated we can talk about that here too.}
-
-The same inference could trivially be added for handlers. However, this would yield to unpredictable results, because the semantics of the program depend on the order in which handlers are applied. If we then have an expression with two algebraic effects, how do we determine the order in which they should be applied?
-
-There are some solutions for this. For example, we could require that the sub-expression can only use a single algebraic effect, but that would make the feature much less useful. Another possibility is to assign some standard precedence to effects. We think that this would become quite confusing in the end.
-
-Another difficulty with using inference for handlers is that handlers are often parametrized and that there is then not just a handler in scope, but only a function returning a handler. This makes inference impossible in most cases.

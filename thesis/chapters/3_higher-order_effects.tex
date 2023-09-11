@@ -100,19 +100,30 @@ Several solutions to the modularity problem have been proposed \autocite{wu_effe
 
 For a full treatment of hefty algebras, we refer to \textcite{bach_poulsen_hefty_2023}. In addition, the encoding of hefty algebras is explained in more detail by \textcite{bach_poulsen_algebras_2023}.
 
-At the core of hefty algebras are the hefty tree. A hefty tree is a generalization of the free monad to higher-order functors, which will write \hs{HOFunctor}.
+At the core of hefty algebras are the hefty tree. A hefty tree is a generalization of the free monad to higher-order functors, which will write \hs{HOFunctor}. In the listing below, we also repeat the definition of a functor from the previous chapter for comparison.
 \begin{lst}{Haskell}
+-- A regular functor
+class Functor f where
+  fmap :: (a -> b) -> f a -> f b
+
+-- An higher-order functor
 class (forall f. Functor (h f)) => HOFunctor h where
-  hmap :: (f ->: g) -> (h f ->: h g)
+  hmap :: (f a -> g a) -> (h f a -> h g a)
 \end{lst}
-The definition of a \hs{Hefty} tree then becomes:
+The definition of a hefty tree, with the free monad for reference, then becomes:
 \begin{lst}{Haskell}
+-- free monad
+data Free f a
+  = Pure a
+  | Do (f (Free f a))
+
+-- hefty tree
 data Hefty h a
   = Return a
   | Do (h (Hefty h) (Hefty h a))
 \end{lst}
 
-A hefty tree and a free monad are very similar: we can define the \hs{>>=}, \hs{<} and \hs{+} operators from the previous chapter for hefty trees, so that the hefty tree can be used in the same way.\footnote{We are abusing Haskell's syntax here. In the real Haskell encoding these operators need to have different names from their free monad counterparts, for example \hs{:+} and \hs{:<}.} We refer to \textcite{bach_poulsen_hefty_2023} for the definition of these operators. Furthermore, any functor can be lifted to a higher-order functor:
+A hefty tree and a free monad are very similar: we can define the \hs{>>=}, \hs{<} and \hs{+} operators from the previous chapter for hefty trees, so that the hefty tree can be used in the same way.\footnote{We are abusing Haskell's syntax here. In the real Haskell encoding, these operators need to have different names from their free monad counterparts, for example \hs{:+} and \hs{:<}.} We refer to \textcite{bach_poulsen_hefty_2023} for the definition of these operators. Furthermore, any functor can be lifted to a higher-order functor with a \hs{Lift} data type.
 
 \begin{lst}{Haskell}
 data Lift f (m :: * -> *) k = Lift (f k)
@@ -150,28 +161,29 @@ elab :: HOFunctor h
 elab elabs = hfold Pure elabs
 \end{lst}
 
-For any algebraic -- and thus lifted -- effect, this is trivially defined by unwrapping the \hs{Lift} constructor.
+For any algebraic -- and thus lifted -- effect, this elaboration is trivially defined by unwrapping the \hs{Lift} constructor.
 
 \begin{lst}{Haskell}
 elabLift :: g < f => Lift g (Free f) (Free f a) -> Free f a
 elabLift (Lift x) = Op $ inj x
 \end{lst}
 
-The function \hs{elaborate elabLift} will then elaborate a \hs{Hefty (Lift f)} for any functor \hs{f}. The more interesting case is that of higher-order effects. For example, the \hs{local} operations of the \hs{Reader} effect can be mapped to a computation using the free monad as well, resembling the definition of \hs{local} as a function.
+Applying \hs{elabLift} to \hs{elab} then gives a function that elaborates \hs{Hefty (Lift f) a} to \hs{Free f a} for any functor \hs{f}. The more interesting case is that of higher-order effects. For example, the \hs{local} operation of the \hs{Reader} effect can be mapped to a computation using the free monad as well, resembling the definition of \hs{local} as a function.
 
 \begin{lst}{Haskell}
 data Reader r k = Local r k k
 
 elabReader :: Ask r < f
-           => Reader r (Free f) (Free f a) -> Free f a
+           => Reader r (Free f) (Free f a)
+           -> Free f a
 elabReader (Local f m k) = ask >>= \r -> handle (hAsk (f r)) m >>= k
 \end{lst}
 
-This definition of \hs{elabReader} is modular, because it is a transformation of the computation. Even if the computation is fixed, the elaboration gives the operation its meaning.
+This definition of \hs{elabReader} is modular, because it is a transformation of the computation. Even if the computation is fixed, the elaboration gives the \hs{local} operation its meaning. Hence, hefty algebras solve the modularity problem.
 
-These elaborations can be composed to construct elaborations for multiple effects as well. \textcite{bach_poulsen_hefty_2023} do this by introducing an operator which composes elaborations. However, that approach is limited because it requires all higher-order effects to be elaborated at a single location.
+These elaborations can be composed to construct elaborations for multiple effects as well. \textcite{bach_poulsen_hefty_2023} do this by introducing an operator which composes elaborations. However, that approach is limited because it requires all higher-order effects to be elaborated at a single location in the source code.
 
-This limitation can be worked around by defining all operations such that they do not have type \hs{Hefty h a}, but instead \hs{(Hefty h a -> Free f a) -> Free f a}. The idea is that every computation of that type is a partially elaborated computation, where the input is a function that specifies how to elaborate the remaining higher-order effects.
+This limitation can be worked around by defining all operations such that they do not have type \hs{Hefty h a}, but instead \hs{(Hefty h a -> Free f a) -> Free f a}. The idea here is that every computation of that type is a partially elaborated computation, where the input is a function that specifies how to elaborate the remaining higher-order effects.
 
 \begin{lst}{Haskell}
 type Comp h f a = (Hefty h a -> Free f a) -> Free f a

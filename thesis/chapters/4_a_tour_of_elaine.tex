@@ -172,7 +172,7 @@ let rec x = x;
 Using recursive definitions, we can build functions like \el{map}, \el{foldl} and \el{foldr} to operate on our previously defined \el{List} type. The implementation for \el{map} might look like the listing below.
 
 \begin{lst}{Elaine}
-let rec map = fn(f: f(a) b, list: List[a]) List[b] {
+let rec map = fn(f: fn(a) b, list: List[a]) List[b] {
     match list {
         Cons(a, as) => Cons(f(a), map(f, list)),
         Nil() => Nil(),
@@ -188,7 +188,7 @@ The \el{list} module provides the most common operations on lists. Such \el{head
 
 \section{Algebraic Effects}
 
-The programs in the previous sections are all pure and contain no effects. While a monadic approach is possible, Elaine provides first class support for algebraic effects and effect handlers to make working with effects more ergonomic. The design of effects in Elaine is heavily inspired by Koka \citationneeded.
+The programs in the previous sections are all pure and contain no effects. While a monadic approach is possible, Elaine provides first class support for algebraic effects and effect handlers to make working with effects more ergonomic. The design of effects in Elaine is heavily inspired by Koka \autocite{leijen_koka_2014}.
 
 An effect is declared with the \el{effect} keyword. An effect needs a name and a set of operations. Operations are the functions that are associated with the effect. They can have an arbitrary number of arguments and a return type. Only the signature of operations can be given in an effect declaration, the implementation must be provided via handlers (see \cref{sec:alghandlers}).
 
@@ -222,6 +222,7 @@ effect State {
 effect Write {
     write(String) (),
 }
+
         \end{lstlisting}
     \end{subfigure}
     \caption{Examples of algebraic effect declarations for some simple effects.}
