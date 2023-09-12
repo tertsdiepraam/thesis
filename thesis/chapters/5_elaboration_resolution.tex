@@ -1,6 +1,6 @@
 \chapter{Implicit Elaboration Resolution}\label{chap:elabres}
 
-With Elaine, we aim to explore further ergonomic improvements for programming with effects. We note that elaborations are often not parametrized and that there is often only one in scope at a time. Hence, when we encounter an \elab, there is only one possible elaboration that could be applied. Therefore, we propose that the language should be able to infer the elaborations. Take the example in the listing below, where we let Elaine infer the elaboration for us.
+With Elaine, we aim to explore further ergonomic improvements for programming with effects. We note that elaborations are often not parametrized and that there is often only one in scope at a time. Hence, when we encounter an \el{elab}, there is only one possible elaboration that could be applied. Therefore, we propose that the language should be able to infer the elaborations. Take the example in the listing below, where we let Elaine infer the elaboration for us.
 
 \example[firstline=20]{local_reader_implicit}
 
@@ -22,7 +22,7 @@ let main = handle[hAsk] elab { local!(double, ask!()) };
 #                          ^^^
 \end{lst}
 
-However, while useful, this feature only saves a few characters in the examples above. It becomes more important when multiple higher-order effects are involved: and \el{elab} without argument will elaborate all higher-order effects in the subcomputation. For instance, if elaborations for both \el{Exception} and \el{Reader} are in scope, the following program works.
+However, while useful, this feature only saves a few characters in the examples above. It becomes more important when multiple higher-order effects are involved: and \el{elab} without argument will elaborate all higher-order effects in the sub-computation. For instance, if elaborations for both \el{Exception} and \el{Reader} are in scope, the following program works.
 
 \begin{lst}{Elaine}
 let main = handle[hAsk(2)] handle[hThrow] elab {
