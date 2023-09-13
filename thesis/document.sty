@@ -338,15 +338,16 @@
 }
 
 % Insert an Elaine example with proper style and label
-\newcommandx{\example}[2][1=]{\myinputlisting{Elaine}{../elaine/examples/#2.elaine}{label={lst:#2},#1}}
-
-\newcommandx{\examplef}[3][1=]{
-    \begin{figure}[htbp]
-        \myinputlisting{Elaine}{../elaine/examples/#2.elaine}{#1}
-        \caption{#3}
-        \label{lst:#2}
-    \end{figure}
-}
+% \newcommandx{\example}[2][1=]{\myinputlisting{Elaine}{../elaine/examples/#2.elaine}{label={lst:#2},#1}}
+\newcommandx{\example}[2][1=]{}
+%\newcommandx{\examplef}[3][1=]{
+%    \begin{figure}[htbp]
+%        \myinputlisting{Elaine}{../elaine/examples /#2.elaine}{#1}
+%        \caption{#3}
+%        \label{lst:#2}
+%    \end{figure}
+%}
+\newcommandx{\examplef}[2][1=]{}
 
 \newcommand\code[1]{\lstinline{#1}}
 \newcommand\mcode[1]{\text{\lstinline{#1}}}
