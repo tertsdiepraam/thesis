@@ -183,24 +183,4 @@ This definition of \hs{elabReader} is modular, because it is a transformation of
 
 These elaborations can be composed to construct elaborations for multiple effects as well. \textcite{bach_poulsen_hefty_2023} do this by introducing an operator which composes elaborations. However, that approach is limited because it requires all higher-order effects to be elaborated at a single location in the source code.
 
-This limitation can be worked around by defining all operations such that they do not have type \hs{Hefty h a}, but instead \hs{(Hefty h a -> Free f a) -> Free f a}. The idea here is that every computation of that type is a partially elaborated computation, where the input is a function that specifies how to elaborate the remaining higher-order effects.
-
-\begin{lst}{Haskell}
-type Comp h f a = (Hefty h a -> Free f a) -> Free f a
-
-local :: Reader r < h
-      => (r -> r)
-      -> Comp h f a
-      -> Comp h f a
-
-elab :: (Hefty h a -> Free f a)
-     -> Comp (h + h') f a
-     -> Comp h' f a
-
-elabEnd :: Hefty End a -> Free End a
-
-run :: Comp End f a -> Free f a
-\end{lst}
-\TODO{Well this is turning out very ugly. It also requires \hs{handle} to work correctly and change the \hs{f} parameter. Alternatively, it would be to define elaborations more like handlers: (Hefty (h + h') a -> Hefty h' a), but that kind of deviates more from the hefty algebras paper? I'm not sure what's best. Otherwise we could make a more informal argument?}
-
-Therefore, it is sound to define semantics where higher-order effects can be elaborated one by one, instead of all at once in a single \hs{elab} call. This is one of the novel features that Elaine offers, as detailed in \cref{sec:hoeffects}.
+\TODO{State that this is a gap in research}

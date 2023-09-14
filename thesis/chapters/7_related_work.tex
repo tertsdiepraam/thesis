@@ -1,31 +1,20 @@
 \chapter{Related Work}\label{chap:related_work}
 
-Ever, since the definition of algebraic effects, it has been clear that not all effects could be encoded as algebraic effects \autocite{goos_adequacy_2001}. In the meantime, various theories have been proposed to overcome this limitation and solve the modularity problem for higher-order effects. This chapter discusses some of these theories and the libraries and languages that have been built with them.
-
-Additionally, this chapter details some other languages that support algebraic effects in different ways from Elaine.
-
-\feedback[inline]{Can be expanded. Provide context for this thesis. What have others done, what's missing, and what does this thesis add?}
-
-%\emph{Alright what do I want to say? This is not the only way to do (higher-order) effects. Of course, monad transformers exist. Scoped effects and latent effect exist. Scoped effects are particularly successful in Haskell libraries (I think).}
-
-%\emph{There is also related work in integrating effects into a language. Koka, Frank, Eff, OCaml. Also keyword generics in Rust. The question is also \emph{which} effects to consider important enough. Exceptions are an effect system, because handlers are a generalization of exception handlers. Daan Leijen has also implemented effects in C.}
+This chapter discusses some extensions to algebraic effects, some alternatives to algebraic effects. Additionally, we discuss some other languages with effects and the various alternative syntax and semantics.
 
 \section{Monad Transformers}\label{sec:monad_transformers}
 
-Monad transformers provide a way to compose monads \autocite{moggi_abstract_1989}. This makes them an alternative to the free monad. While monad transformers predate algebraic effects, they do support higher-order effects. 
+Monad transformers provide a way to compose monads \autocite{moggi_abstract_1989}. This makes them an alternative to the free monad. While monad transformers predate algebraic effects, they do support higher-order effects. A popular implementation of monad transformers is Haskell's mtl library. In the rest of this section, we adopt the terminology from that library.
 
 The goal of monad composition is to make the operations of all composed monads available to the computation. Given two monads \hs{A} and \hs{B}, a naive composition would result in the type \hs{A (B a)}. However, this type represents a computation using \hs{A} that returns a computation \hs{B a}, meaning that it is not possible to use operations of both monads.
 
-A monad transformer is a type constructor that takes some monad and returns a new monad. Usually, the transformation it performs is to add operations to the input monad. Composing \hs{A} and \hs{B} then requires some transformer \hs{AT} to be defined, such \hs{AT B} is a monad that provides the operations of both \hs{A} and \hs{B}. An arbitrary number of monad transformers can be composed this way. The representation of a monad then becomes much like that of a list of monad transformers. The \el{Identity} monad marks the end of the list, and it is defined as
+A monad transformer is a type constructor that takes some monad and returns a new monad. Usually, the transformation it performs is to add operations to the input monad. Composing \hs{A} and \hs{B} then requires some transformer \hs{AT} to be defined, such \hs{AT B} is a monad that provides the operations of both \hs{A} and \hs{B}. An arbitrary number of monad transformers can be composed this way. The representation of a monad then becomes much like that of a list of monad transformers. The \el{Identity} monad marks the end of the list, and it is defined as below.
+
 \begin{lst}{Haskell}
 newtype Identity a = Identity a
 \end{lst}
 
-A popular implementation of monad transformers is Haskell's mtl library. In the rest of this section, we adopt the terminology from that library.
-
-A neat property of monad transformers is that a monad can be easily obtained by applying the transformer to the identity monad. Haskell's mtl library, for instance, defines a monad transformer \hs{StateT} and then defines \hs{State} as \hs{StateT Identity}.
-
-The operations of the state effect are then not implemented on \hs{StateT} directly, but on are part of a type class \hs{MonadState}. The \hs{StateT} is then an instance of \hs{MonadState} class. Every other transformer is an instance of \hs{MonadState} if its input monad is an instance of \hs{MonadState}. For example, for the \hs{WriterT} instance, there is the following instance declaration.
+\noindent A neat property of monad transformers is that a monad can be easily obtained by applying the transformer to the identity monad. Haskell's mtl library, for instance, defines a monad transformer \hs{StateT} and then defines \hs{State} as \hs{StateT Identity}. The operations of the state effect are then not implemented on \hs{StateT} directly, but on are part of a type class \hs{MonadState}. The \hs{StateT} is then an instance of \hs{MonadState} class. Every other transformer is an instance of \hs{MonadState} if its input monad is an instance of \hs{MonadState}. For example, for the \hs{WriterT} instance, there is the following instance declaration.
 
 \begin{lst}{Haskell}
 instance MonadState s (StateT s m) where
@@ -35,52 +24,67 @@ instance MonadState s m => MonadState s (WriteT m) where
   -- definitions omitted
 \end{lst}
 
-A computation can then be generic over the monad transformers, requiring only that \hs{StateT} is present somewhere in the stack of monad transformers.
+\noindent A computation can then be generic over the monad transformers, requiring only that \hs{StateT} is present somewhere in the stack of monad transformers.
 
 \begin{lst}{Haskell}
 usesState :: MonadState Int m => Int -> m Int
 usesState a = get >>= \x -> put (x + a)
 \end{lst}
 
-This is analogous to the \hs{State s < f} constraint from the free monad encoding. However, there is a cost to this approach. For every effect, a new type class needs to be introduced and there need to be instance definitions on all existing monad transformers. The number of instance declarations therefore scales quadratically with the number of effects.
+\noindent This is analogous to the \hs{State s < f} constraint from the free monad encoding. However, there is a cost to this approach. For every effect, a new type class needs to be introduced and there need to be instance definitions on all existing monad transformers. The number of instance declarations therefore scales quadratically with the number of effects.
 
 Another downside to monad transformers is that the order in which the monads need to be evaluated is entirely fixed. In the free monad encoding and languages with algebraic effects, the effects in the effect row can be reordered. \fixme{The order of the monad transformers also determines the order in which they must be handled: the outermost monad transformer must be handled first}\feedback{translate handling to the context of monad transformers}.
 
-In practice, this model has turned out to work quite well, especially in combination with \el{do}-notation, which allowed for easier sequential execution of effectful computations.\feedback{Should be motivated}
-\TODO{Contextual vs parametric effect rows (see effects as capabilities paper). The paper fails to really connect the two: contextual is just parametric with implicit variables. However, it might be more convenient. The main difference is in the interpretation of purity (real vs contextual). In general, I'd like to have a full section on effect row semantics. In the capabilities paper effect rows are sets, which makes it possible to do stuff like \autocite{leijen_extensible_2005}.}
+\section{Other Solutions to the Modularity Problem}
 
-As the theoretical research around effects has progressed, new libraries and languages have emerged using the state-of-the-art effect theories. These frameworks can be divided into two categories: effects encoded in existing type systems and effects as first-class features.
+An alternative to hefty algebras for solving the modularity problem is the theory of \emph{scoped effects} \autocite{wu_effect_2014,pirog_syntax_2018,yang_structured_2022}. This theory replaces the free monad by a \hs{Prog} monad, which features one additional constructor called \hs{Enter}. Along with the continuation, this constructor takes a sub-computation. The return value of this sub-computation is passed to the continuation. In that sense, the \hs{Enter} constructor matches the \hs{>>=}, but without distributing the continuation over its sub-computation.
 
-These implementations provide ways to define, use and handle effectful operations. Additionally, many implementations provide type level information about effects via \emph{effect rows}. These are extensible lists of effects that are equivalent up to reordering. The rows might contain variables, which allows for \emph{effect row polymorphism}.
+Instead of defining evaluation as a single algebra, scoped effects requires two algebras: an endo-algebra for scoped operations and a base-algebra for the other operations. This is somewhat similar to the distinction between elaboration and handling for hefty algebras, however, in hefty algebras, the algebras are not applied at the same time.
 
-\section{Effects as Free Monads}
+Many higher-order effects, such as the exception and reader effects, can be expressed in this framework. However, it is less general than hefty algebras, because there are some higher-order effects that cannot be expressed as scoped effects. This concerns effects that defer some computation, such as the lambda abstraction \autocite{oh_latent_2021}. Hefty algebras are therefore more general than scoped effects \autocite{bach_poulsen_hefty_2023}.
 
-There are many libraries that implement the free monad in various forms in Haskell, including \lib{fused-effects}{https://github.com/fused-effects/fused-effects}, \lib{polysemy}{https://github.com/polysemy-research/polysemy}, \lib{freer-simple}{https://github.com/lexi-lambda/freer-simple} and \lib{eff}{https://github.com/hasura/eff}. Each of these libraries give the encoding of effects a slightly different spin in an effort to find the most ergonomic and performant representation. They are all not just based on the free monad, but on freer monads \autocite{kiselyov_freer_2016} and fused effects \autocite{hinze_fusion_2015} for better performance.
+The limitations of scoped effects can be seen when we emulate them in Elaine. We can emulate the endo-algebra with a \el{handle} in the elaboration. Since the result of the sub-computation is directly passed to the continuation, the elaboration contains only a \el{handle} and nothing else. Therefore, any higher-order effect that can be expressed as the elaboration below (up to renaming) can be defined as a scope effect.
 
-Effect rows are often constructed using the \emph{Data Types à la Carte} technique \autocite{swierstra_data_2008}, which requires a fairly robust type system. Hence, many languages cannot encode effects within the language itself. In some languages, it is possible to work around the limitations with metaprogramming, such as the Rust library \lib{effin-mad}{https://github.com/rosefromthedead/effing-mad}, though the result does not integrate well with the rest of language and its use in production is strongly discouraged by the author.
+\begin{lst}{Elaine}
+effect ScopedEffect! {
+    scoped_operation!(a) a
+}
 
-The programming language Idris \autocite{brady_programming_2013} also has an implementation of algebraic effects in its standard library. It is an interesting case study since Idris is a dependently typed language. Due to its dependent typing, it can distinguish multiple occurrences of a single effect in the same effect row by assigning them different \emph{labels}. This is similar to what \emph{named handlers} \autocite{xie_first-class_2022} aims to accomplish.
+let e = elaboration ScopedEffect! -> AlgebraicEffect {
+    scoped_operation!(a) {
+        handle[hAlg] a
+    }
+};
+\end{lst}
 
-Some of these libraries support \emph{scoped effects} \autocite{wu_effect_2014}, which is a limited but practical frameworks for higher-order effects. It can express the \olocal and \ocatch operations, but some higher-order effects are not supported.\todo{Add $\lambda$-abstraction as example.}
+\noindent Another alternative to hefty algebras are \emph{latent effects} \autocite{oh_latent_2021}, which supports the same set of effects as hefty algebras. \textcite{bach_poulsen_hefty_2023} argue that hefty algebras are a simpler model for higher-order effects than latent effects.
 
-\section{Prior Art for First-Class Effects}
+\section{Languages with First-Class Effects}
+\TODO{Define first-class effects much earlier in the thesis}
 
 The motivation of adding support for effects to a programming language is twofold. First, it enables effects to be implemented into languages with type systems in which effects cannot be encoded as a free monad or a similar model. Second, built-in effects allow for more ergonomic and performant implementations. Naturally, the ergonomics of any given implementation are subjective, but we undeniably have more control over the syntax by adding effects to the language.
 
-Notable examples of languages with first-class support for algebraic effects are Eff \autocite{bauer_programming_2015}, Koka \autocite{leijen_koka_2014}, OCaml\citationneeded, and Frank \autocite{lindley_be_2017}.
-
-In all of these languages, effect row variables can be used to abstract over effects. For example, the signature of the \el{map} function is in Koka is given below and is similar to the signature of \el{map} in Elaine.
+Notable examples of languages with first-class support for algebraic effects are Eff \autocite{bauer_programming_2015}, Koka \autocite{leijen_koka_2014}, OCaml\citationneeded, and Frank \autocite{lindley_be_2017}. In all of these languages, effect row variables can be used to abstract over effects. For example, the signature of the \el{map} function is in Koka is given below and is similar to the signature of \el{map} in Elaine.
+%
 \begin{lst}{Koka}
 fun map ( xs : list<a>, f : a -> e b ) : e list<b>
     ...
 \end{lst}
+%
 Other languages choose a more implicit syntax for effect polymorphism. Frank \autocite{lindley_be_2017} opts to have the empty effect row represent the \emph{ambient effects}. Any effect row then becomes not the exact set of effects that need to be handled, but the smallest set. The equivalent signature of \code{map} is then written as
+%
 \begin{lst}{Frank}
 map : {X -> []Y} -> List X -> []List Y
 \end{lst}
-
+%
 In contrast with Elaine, languages such as Koka and Frank do not have dedicated types for handlers and \el{handle} constructs. Instead, they represent handlers as functions that take computations as arguments. In Elaine, there are dedicated types and constructs for effect handlers so that they are symmetric with elaborations. That is, the counterpart of \el{elab} is \el{handle} and the counterpart of \el{elaboration} is \el{handler}.
 
+Koka implements several extensions to standard algebraic effects. First, it supports named handlers \autocite{xie_first-class_2022}, which provide a mechanism to distinguish between multiple occurrences of an effect in an effect row. Additionally, Koka features \emph{scoped handlers}, which are different from the previously mentioned scoped effects. Scoped handlers make it possible to associate types with handler instances \autocite{xie_first-class_2022}.
 
+\section{Effects as Free Monads}
 
-Several extensions to algebraic effects have been explored in the languages mentioned above. Koka supports scoped effects and named handlers \autocite{xie_first-class_2022}, which provides a mechanism to distinguish between multiple occurrences of an effect in an effect row. In Koka, scoped effects are effects for which a scope variable is created for every handler, which can be used to construct  types that can only be used within the handler and cannot escape it. Note that this notion of scoped effects is different from the notion of scoped effects by \textcite{wu_effect_2014,pirog_syntax_2018,yang_structured_2022}.
+There are many libraries that implement the free monad in various forms in Haskell, including \lib{fused-effects}{https://github.com/fused-effects/fused-effects}, \lib{polysemy}{https://github.com/polysemy-research/polysemy}, \lib{freer-simple}{https://github.com/lexi-lambda/freer-simple} and \lib{eff}{https://github.com/hasura/eff}. Each of these libraries give the encoding of effects a slightly different spin in an effort to find the most ergonomic and performant representation. They are all not just based on the free monad, but on freer monads \autocite{kiselyov_freer_2016} and fused effects \autocite{hinze_fusion_2015} for better performance. Some of these libraries support scoped effects as well, but apart from the work by \textcite{bach_poulsen_hefty_2023}, no libraries with support for hefty algebras have been published.
+
+Effect rows are often constructed using the \emph{Data Types à la Carte} technique \autocite{swierstra_data_2008}, which requires a fairly robust type system. Hence, many languages cannot encode effects within the language itself. In some languages, it is possible to work around the limitations with metaprogramming, such as the Rust library \lib{effin-mad}{https://github.com/rosefromthedead/effing-mad}, though the result does not integrate well with the rest of language and its use in production is strongly discouraged by the author.
+
+The programming language Idris \autocite{brady_programming_2013} also has an implementation of algebraic effects in its standard library. It is an interesting case study since Idris is a dependently typed language. Due to its dependent typing, it can distinguish multiple occurrences of a single effect in the same effect row by assigning them different \emph{labels}. This is similar to what \emph{named handlers} \autocite{xie_first-class_2022} aims to accomplish.

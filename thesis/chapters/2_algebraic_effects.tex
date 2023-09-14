@@ -202,7 +202,7 @@ data State s k = Put s k | Get (s -> k)
   deriving Functor
 \end{lst}
 
-The \hs{Maybe} monad can also be translated into a functor for the free monad. Recall that the \hs{Maybe} monad represents an effect that abruptly aborts the computation. This one requires a single operation: \hs{abort}. Therefore, the functor that encodes this effect in the free monad only needs a single constructor. We call this type and its constructor \hs{Abort}. The \hs{Abort} constructor does not use the continuation because it signals that evaluation should stop.
+Similarly we can apply the free monad to \hs{Maybe}. However, the \hs{Just} constructor of the \hs{Maybe} is already covered by the \hs{Pure} constructor of the free monad, so \hs{Maybe} can be simplified to a single constructor. We call this simplified type \hs{Abort}. The \hs{Abort} constructor does not use the continuation because it signals that evaluation should stop.
 
 \begin{lst}{Haskell}
 data Abort k = Abort
@@ -243,9 +243,9 @@ put s = Do $ inj $ Put $ Pure ()
 abort :: Abort < f => Free f ()
 abort = Do $ inj $ Abort
 \end{lst}
-
+%
 This makes it possible to construct a computation using all those operations. For example, a computation that checks the state, asserts that it is larger than 0 and then decrements the state by 1.
-
+%
 \begin{lst}{Haskell}
 decrement :: Free (State Int + Abort + End) Int
 decrement = get >>= \s ->
@@ -261,7 +261,7 @@ for every \hs{f} and finally a \hs{Free End a -> a} to reduce the free monad to 
     \item the return case, \hs{a -> Free f' b};
     \item and the case for handling \hs{f}: \hs{f (Free f' b) -> Free f' b}.
 \end{itemize}
-
+%
 \begin{lst}{Haskell}
 fold :: Functor f => (a -> b) -> (f b -> b) -> Free f a -> b
 fold gen _   (Pure x) = gen x
@@ -282,6 +282,7 @@ handleEnd (Pure a) = a
 
 handleAbort = handle (Pure . Just) (\Abort -> Nothing)
 \end{lst}
+%
 \TODO{State handler}
 \question{Is it possible to write the state handler without \hs{handle_} from Casper's blog post? I couldn't quite get the types to work, but that is basically what happens in Koka.}
 
@@ -351,15 +352,18 @@ val hAbort = handler
   ctl abort() Nothing
 
 fun hState(init, c)
-  val h = handler
-    return(x)  fn(s) x
-    ctl get()  fn(s) resume(s)(s)
-    ctl put(n) fn(s) resume(())(n)
-
-  fn() h(c)(init)
+  fun h(c')
+    with handler
+      return(x)  fn(s) (s, x)
+      ctl get()  fn(s) resume(s)(s)
+      ctl put(n) fn(_) resume(())(n)
+    c'()
+  
+  h(c)(init)
 \end{lst}
-
+\TODO{Note that Koka is more ``inspired'' by free monads, because the arbitrary return types are hard to do in Haskell.}
 \noindent This saves us from specifying some details, but the structure is largely the same as with the free monad encoding. The larger differences become apparent when we want to use the effects. A port of the decrement function is listed below.
+
 
 \begin{lst}{Koka}
 fun decrement(): <state<int>,abort> int
@@ -376,8 +380,8 @@ fun printMaybe(m: maybe<int>)
     Nothing -> println("nothing!")
 
 fun main()
-  printMaybe(hAbort(hState(3, foo))) // prints "2"
-  printMaybe(hAbort(hState(0, foo))) // prints "nothing!"
+  printMaybe(hAbort { hState(3, foo) } ) // prints "2"
+  printMaybe(hAbort { hState(0, foo) } ) // prints "nothing!"
 \end{lst}
 
 \noindent The \hs{>>=} operator is entirely implicit here. Therefore, it is similar to Haskell's do-notation. However, in do-notation, every effectful operation needs to be on a separate line. For example, if the state needs to be incremented by 1, this can be achieved in one line in Koka, but in Haskell using do-notation requires two lines.
