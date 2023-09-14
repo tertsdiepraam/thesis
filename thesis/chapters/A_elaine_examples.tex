@@ -10,4 +10,20 @@ This program is a naive brute-forcing SAT solver. We first define a \el{Yield} e
 
 \section{The Reader Effect}\label{sec:reader}
 
+\TODO{explain}
+
 \example{local_reader}
+
+\section{Structured Logging}
+
+\TODO{explain}
+
+\example{structured_logging}
+
+\section{Parser Combinators}
+
+Monadic parser combinators \autocite{hutton_monadic_1996} are a popular technique for constructing parsers. The parser for Elaine is also written using \lib{megaparsec}{https://github.com/mrkkrp/megaparsec}, which is a monadic parser combinator library for Haskell. Attempts have been made to implement parser combinators using algebraic effects. However, it requires higher-order combinators for a full feature set matching that of monadic parser combinators. For example, the \hs{alt} combinator takes two branches and attempts to parse the first branch and tries the second branch if the first one fails. This is remarkably similar to the catch operation of the exception effect and is indeed higher-order.
+
+Below is a full listing of a JSON parser written in Elaine using a variation on parser combinators using effects. It is implemented using a higher-order \el{Parse!} effect, which is elaborated into a state and an abort effect, which are imported from the standard library. The \el{try!} effect is a higher-order effect which takes an effectful computation as an argument.
+
+\example{parser_combinator}

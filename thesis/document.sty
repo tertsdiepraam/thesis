@@ -287,19 +287,19 @@
 \lstdefinestyle{fancy}{
     % backgroundcolor=\color{background},
     numbers=left,
-    numberstyle=\sffamily\small\color{gray},
+    numberstyle=\sffamily\footnotesize\color{gray},
     numbersep=10pt,
     frame=l,
     xleftmargin=22pt,
-    rulecolor=\color{darkgray},
+    rulecolor=\color{gray},
     framesep=4pt,
     % framextopmargin=8pt,
     % framexbottommargin=8pt,
 }
 
-
 \newtcblisting{lst}[1]{%
     enhanced,
+    after={\par\smallskip\noindent},
     listing only,
     boxrule=0pt,
     frame empty,
@@ -338,16 +338,14 @@
 }
 
 % Insert an Elaine example with proper style and label
-% \newcommandx{\example}[2][1=]{\myinputlisting{Elaine}{../elaine/examples/#2.elaine}{label={lst:#2},#1}}
-\newcommandx{\example}[2][1=]{}
-%\newcommandx{\examplef}[3][1=]{
-%    \begin{figure}[htbp]
-%        \myinputlisting{Elaine}{../elaine/examples /#2.elaine}{#1}
-%        \caption{#3}
-%        \label{lst:#2}
-%    \end{figure}
-%}
-\newcommandx{\examplef}[2][1=]{}
+\newcommandx{\example}[2][1=]{\myinputlisting{Elaine}{../elaine/examples/#2.elaine}{label={lst:#2},#1}}
+\newcommandx{\examplef}[3][1=]{
+   \begin{figure}[htbp]
+       \myinputlisting{Elaine}{../elaine/examples/#2.elaine}{#1}
+       \caption{#3}
+       \label{lst:#2}
+   \end{figure}
+}
 
 \newcommand\code[1]{\lstinline{#1}}
 \newcommand\mcode[1]{\text{\lstinline{#1}}}

@@ -21,7 +21,7 @@ use local;
 let main = handle[hAsk] elab { local!(double, ask!()) };
 #                          ^^^
 \end{lst}
-
+%
 However, while useful, this feature only saves a few characters in the examples above. It becomes more important when multiple higher-order effects are involved: and \el{elab} without argument will elaborate all higher-order effects in the sub-computation. For instance, if elaborations for both \el{Exception} and \el{Reader} are in scope, the following program works.
 
 \begin{lst}{Elaine}
@@ -35,7 +35,7 @@ let main = handle[hAsk(2)] handle[hThrow] elab {
     })
 }
 \end{lst}
-
+%
 This relies on the fact that the order in which elaboration are applied does not affect the semantics of the program as explained in \cref{sec:hefty_algebras}. To make the inference predictable, we require that an implicit elaboration must elaborate all higher-order effects in the sub-computation.
 
 A problem with this feature arises when multiple elaborations for a single effect are in scope; which one should then be used? To keep the result of the inference predictable and deterministic, the type checker should yield a type error in this case. Hence, if type checking succeeds, then the inference procedure has found exactly one elaboration to apply for each higher-order effect. If not, the elaboration cannot be inferred and must be written explicitly.
@@ -46,7 +46,7 @@ let eLocal2 = elaboration Local! -> <Ask> { ... };
 
 let main = elab { local!(double, ask!()) }; # Type error here!
 \end{lst}
-
+%
 The elaboration resolution consists of two parts: inference and transformation. The inference is done by the type checker and is hence type-directed, which records the inferred elaboration. After type checking the program is then transformed such that all implicit elaborations have been replaced by explicit elaborations.
 
 To infer the elaborations, the type checker first analyses the sub-expression. This will yield some computation type with an effect row containing both higher-order and algebraic effects: \el{<H1!, ..., HN!, A1, ..., AM>}. It then checks the type environment to look for elaborations \el{e1}, ..., \el{eN} which elaborate \el{H1!}, ..., \el{HN!}, respectively. Only elaborations that are directly in scope are considered, so if an elaboration resides in another module, it needs be imported first. For each higher-order effect, there must be exactly one elaboration.

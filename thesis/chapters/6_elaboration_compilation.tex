@@ -58,7 +58,7 @@ However, we cannot apply that technique in general. One example where it does no
 \begin{lst}{Elaine}
 elab[if cond { elab1 } else { elab2 }] c
 \end{lst}
-
+%
 Moreover, a single operation might need to be elaborated by different \el{elab} constructs, depending on run-time computations. In the listing below, there are two elaborations \el{eOne} and \el{eTwo} of an operation \el{a!()}. The \el{a!()} operation in \el{f} is elaborated where \el{f} is called. If the condition \el{k} evaluates to \el{true}, \el{f} is assigned to \el{g}, which is elaborated by \el{eOne}. However, if \el{k} evaluates to \el{false}, \el{f} is called in the inner \el{elab} and hence \el{a!()} is elaborated by \el{eTwo}.
 
 \begin{lst}{Elaine}
@@ -75,7 +75,7 @@ elab[eOne] {
     g()
 }
 \end{lst}
-
+%
 Therefore, the analysis of determining the elaboration that should be applied to an operation is non-local. The static substitution could be used as an optimization or simplification step, but it cannot guarantee that the transformed program will not contain higher-order effects.
 
 \section{Operations as Functions}
