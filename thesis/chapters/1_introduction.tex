@@ -1,59 +1,124 @@
 \chapter{Introduction}\label{chap:introduction}
 
-% Ok, time to start writing this out. First some requirements:
-%  - It needs to read like a funnel: broad to specific
-%  - It needs to be understandable for all CS master students
-%  - Structure overview:
-%    - Q: How do we know what a function is _doing_? What _effects_ does it have on the system?
-%    - pure computations
-%    - effects in general
-%    - failure to model effects in (imperative) languages
-%    - manually encoding effects in FP
-%    - monads as mathematical model for effects
-%    - monads as FP technique (Phil Wadler): We can make a PL out of this! (Haskell)
-%    - monads separate specification from implementation: modularity
-%    - algebraic effects: convenient and modular, yay! We can make a PL out of this! (Koka)
-%    - but wait! Higher-order effects don't fit and aren't modular...
-%    - New mathematical model: Hefty Algebras
-%    - Can we also make a PL out of this?
-%    - Yeah, that's what we did: Elaine
-%    - Contributions
-%    - Artefact
+In many programming languages, computations are allowed to have \emph{effects}. This means that they can perform operations besides producing output, and interact with their environment. A computation might, for instance, read or modify a global variable, write to a file, throw an exception or even exit the program.
 
-\TODO{Start: effects are a thing}
-\TODO{Examples in Koka throughout!}
+Historically, programming languages have supported effects in different ways. Some programming languages opt to give the programmer virtually unrestricted access to effectful operations. For instance, any part of a C program can interact with memory, the filesystem or the network. The program can even yield control to any location in program with the \code{goto} keyword, which has famously been criticized by \textcite{dijkstra_letters_1968}, who argues that \code{goto} breaks the structure of the code. The programmer then has to trace the execution of the program in their mind in order to understand it. The same reasoning extends to other effects: the more effects a function is allowed to exhibit, the harder it becomes to reason about.
 
-In many programming languages, computations are allowed to have \emph{effects}. This means that they can do things besides producing output and interact with their environment. It might, for instance, read or modify a global variable, write to a file, throw an exception or even exit the program altogether. These are all examples of effects.
+The ``anything goes'' approach to effects therefore puts a large burden of ensuring correct behaviour of a program on the programmer. If the language cannot provide any guarantees about what (a part of) a program can do, the programmer has to check instead. For instance, if a function somewhere in the code sets global variable to some incorrect value. This can then cause seemingly unrelated parts of the program to behave incorrectly. The programmer tasked with debugging this issue then has to examine the program as a whole to find where this modification takes place. In languages where this is possible, effectful operations therefore limit our ability to split the code into chucks to be examined separately.
 
-Historically, programming languages have supported effects in different ways. Some programming languages opt to give the programmer virtually unrestricted access to effectful operations. For instance, any part of a C program can interact with memory, the filesystem or the network. The program can even yield control to any location in program with the \code{goto} keyword, which has famously been criticized by \textcite{dijkstra_letters_1968}. This core of his argument is that \code{goto} breaks the structure of the code. The programmer then has to trace the execution of the program in their mind in order to understand it. The same reasoning extends to other effects too: the more effects a function is allowed to exhibit, the harder it becomes to reason about.
+A solution is to treat effects in a more structured manner. For example, instead of allowing \code{goto}, a language might provide exceptions. In a language like Java, checked exceptions are part of the type system, so that the type checker can verify that all exceptions are handled. However, with this approach, any effect must be backed by the language. That is, the language needs to have a dedicated feature for every effect that should be supported in this way and new effects cannot be created without adding a new feature to the language. This means that the support for various effects is limited to what the language designers have decided to add.
 
-The ``anything goes'' approach to effects therefore puts a large burden of ensuring correct behaviour of effects on the programmer. If the language cannot give any guarantees about what (a part of) a program can do, the programmer has to check instead. Say, for instance, that a function somewhere in the code is modifying some global variable to some invalid value. This can then make entirely different parts of the program behave incorrectly. The programmer tasked with debugging this issue then has to examine the program as a whole to find where this modification takes place, if they even realize that it is set incorrectly. In languages where this is possible, effectful operations therefore limit our ability to split the code into chucks to be examined separately.
+In contrast, languages adhering to the functional programming paradigm disallow effectful operations altogether.\footnote{Usually there are some escape hatches to this rule, such as Haskell's \hs{trace} function, which is built-in and effectful, but only supposed to be used for debugging.} Here, all functions are \emph{pure}, meaning that they are functions in the mathematical sense: only a mapping from inputs to output. Such a function is \emph{referentially transparent}, meaning that it always returns identical outputs for identical inputs and does not interact with the environment. By requiring that all functions are pure, a type signature of a function becomes almost a full specification of what the function can do.
 
-A solution is to treat certain effects in a more structured manner. For example, instead of allowing \code{goto}, a language might provide exceptions. In a language like Java, the exceptions are then also part of the type system, so that it is easier to track which functions are allowed to throw exceptions. However, this means that any effect must be backed by the language. That is, the language needs to have a dedicated feature for every effect that should be supported in this way and new effects cannot be created without adding a new feature to the language. This means that the support for various effects is always limited.
+However, sometimes effectful operations are still desired. Consider the following program written in Koka, a functional language where function need to be pure. In this program, there is a set of users that are considered administrators. The \code{all_admins} function checks whether all user ID's in a list are administrators.
 
-In contrast, languages adhering to the functional programming paradigm disallow effectful operations altogether.\footnote{Usually there are some escape hatches to this rule, such as Haskell's \hs{trace} function, which is built-in and effectful, but only supposed to be used for debugging.} Here, all functions are \emph{pure}, meaning that they are functions in the mathematical sense: only a mapping from inputs to output. Such a function is \emph{referentially transparent}, meaning that it always returns identical outputs for identical inputs. They also do not interact with their environment. By dictating that all functions are pure, a type signature of a function becomes almost a full specification of what the function can do. In that sense, the return type is an all-encompassing description of what a function might do.
+\begin{lst}{Koka}
+val admins = [0,1,2]
 
-\TODO{Example of manual state: checking balanced parentheses? Fibonacci? Reverse polish notation? Wadler \& Peyton Jones use IO, that's nice I guess.}
+fun is_admin(user_id: int): bool
+  admins.any(fn(x) x == user_id)
 
-\TODO{Pure means that the effect must be encoded in the return type of the function. We want types to be ``all-encompassing'', ``reliable''.}
+fun all_admins(l: list<int>): bool
+  l.map(is_admin).foldl(True, (&&))
 
-Yet this rule is quite limiting\feedback{vague}, since effects are often an important part of a computation. For instance, if we want to keep any mutable state \hs{a} in a Haskell program, \fixme{we have to encode that state in the inputs and outputs of the program}. Manually threading the state through the program quickly becomes laborious in larger programs. The same goes for encodings of other effects. A more practical method of dealing with effectful operations in functional languages is through the use of \emph{monads} \autocite{wadler_essence_1992,peyton_jones_imperative_1993}.
+val result = all_admins([0,1,2,3])    
+\end{lst}
+%
+This a fairly standard functional program where the result is a single boolean. However, the program does not tell us which users are not admins, which could be useful information to print. In an imperative language, we could just add a \code{print} call in \code{is_admin} to log any user that was not an admin and call it a day. But in a functional language, we cannot do this. Instead, each message we want to log needs to be returned \code{is_admin}. These messages then need to be concatenated to build up the string that should be printed.
 
-Monads were introduced as a mathematical model for effectful computation by \textcite{moggi_notions_1991}. A function returning a monad is not fully executed. Instead, it is evaluated until the first effectful operation is encountered. This partially evaluated result is only further evaluated when it is passed to a \emph{handler}. This handler decides what to do with this result and can resume the computation, which will again evaluate the until the next effectful operation and the cycle repeats. If we then wish to have some state in our Haskell program, we have to wrap all our stateful functions in the \hs{State} monad and pass it to the \hs{runState} handler.
+\begin{lst}{Koka}
+fun is_admin(user_id: int): (bool, string)
+  if admins.any(fn(x) x == user_id)
+  then (True, "")
+  else (False, "Denied " ++ show(user_id) ++ "\n")
 
-This split between the procedure and the handler provides some modularity.\feedback{modularity is about syntax AND semantics. Reason about individual effects and compose them. Modular handlers with different implementations. And we can create new ``syntax'} We can swap out the standard \hs{runState} handler for some other handler. We might for instance write a handler that does not just yield the final value of the state, but a list containing the history of all values that the state has been set to. Or, we create a handler where every \hs{get} operation increases the value of the state by one, such that every \hs{get} yields a unique value. This is all possible without changing the code using the \hs{State} monad.
+fun all_admins(list: list<int>): (bool, string)
+  match list
+    Nil() -> (True, "")
+    Cons(x, xs) ->
+      val (y, s) = is_admin(x)
+      val (ys, s') = all_admins(xs)
+      (y && ys, s ++ s')
 
-The limitations of the monad approach become apparent when we look at procedures that use multiple effects. The problem is that the composition of two monads does not yield a monad. This is a limitation that can be worked around with \emph{monad transformers}. A transformer can be applied to a monad to yield a new monad. In doing so, it adds more operations to the orignal monad. However, this yields complicated types which have to be taken into account while programming. Operations might need to be lifted from between monads. Additionally, monad transformers need \fixme{quadratic implementation stuffs}\feedback{$n\times n$ problem?}. Therefore, working with monad transformers is still quite laborious.
+val (result, log) = all_admins([1,2,3,4])
+\end{lst}
+%
+So, adding some logging made the program much more complicated. For larger programs, one might imagine that programming with effects in a functional language therefore quickly becomes laborious. Additionally, the functions above are adapted specifically to our logging effect; using any other effect would require a different implementation. Therefore, we should abstract over the effects in the computation.
 
-% Therefore, our goal is to design a programming language in which the function signature forms the full specification of all effects, which also allows new effects to be declared, while also being easy to work with. Luckily, the theory of \emph{algebraic effects} fulfils these requirements. First, it removes the distinction between monads and monad transformers. Second, it ignores the order of effects in types. In languages with algebraic effects, such as Koka \autocite{leijen_koka_2014}, Eff \autocite{bauer_programming_2015}, Frank \autocite{lindley_be_2017}, and Effekt \autocite{brachthauser_effects_2020}, effect handlers can be modularly defined within the language. The programmer can freely declare new effects and handlers. An effect here consists of a set of \emph{effect operations}. The operations yield control to their corresponding handler, which then performs the operation. The handler can resume the computation by calling the \emph{continuation}, which is a function that represents the rest of the computation. Moreover, these languages often feature type systems that can reason about the effects in each function.
+This abstraction can be found in the form of \emph{monads} \autocite{wadler_essence_1992,peyton_jones_imperative_1993}. A monad represents a computation with some effect. It is a type constructor that takes the return type of the computation as a parameter. For a type to be a monad, it needs to define two functions: \hs{return} and \hs{>>=}. The former wraps a value in the monad and the latter sequences 2 monadic computations. In Koka, we cannot call these functions \hs{return} and \hs{>>=}, so we call them \code{pure} and \code{bind}, respectively.
 
-\TODO{ADD EXAMPLES}
+\begin{lst}{Koka}
+alias log<a> = (v: a, msg: string)
 
-As it turns out, however, not all effects are algebraic. \emph{Higher-order effects} are effects with operations that take effectful computations as arguments that do not behave like continuations. The issue is that the handlers need be able to handle the effect and then let the rest of the computation evaluate, but that is not sufficient for higher-order effects.
+fun pure(v: a): log<a>
+  (v, "")
 
-% Several extensions and modifications to algebraic effects have been proposed to accommodate for higher-order effects \autocite{wu_effect_2014,oh_latent_2021}. One such extension is \emph{hefty algebras} by \textcite{bach_poulsen_hefty_2023}, which introduces elaborations to implement higher-order effects. This is a mechanism to define higher-order effects by defining a translation into a program with only algebraic effects. This means that evaluation of higher-order effects is a two-step process: first higher-order effects are elaborated into algebraic effects, which are then evaluated. Like handlers, elaborations are modular and it is possible to define multiple elaborations for a single effect.
+fun bind(m: log<a>, k: a -> log<b>): log<b>
+  val (a, s) = m
+  val (b, s') = k(a)
+  (b, s ++ s')
 
-In this thesis, we introduce a novel programming language called \emph{Elaine}. The core idea of Elaine is to define a language which features elaborations and higher-order effects as a first-class construct. This brings the theory of hefty algebras into practice. With Elaine, we aim to demonstrate the usefulness of elaborations as a language feature. Throughout this thesis, we present example programs with higher-order effects to argue that elaborations are a natural and easy representation of higher-order effects.
+fun log(msg: string): log<()>
+  ((), msg)
+\end{lst}
+%
+The \code{is_admin} and \code{all_admins} can then be written using these functions instead of dealing with the strings in the tuples directly. Hence, we have abstracted over the effect and could replace it with another. Specifically, we could change the effect that \code{is_admin} uses without changing \code{all_admins}.
+
+\begin{lst}{Koka}
+fun all_admins(list)
+  match list
+    Nil() -> pure(True)
+    Cons(x, xs) -> is_admin(x).bind fn(y)
+      all_admins(xs).bind fn(ys)
+        pure(y && ys)
+  
+fun is_admin(user_id: int): log<bool>
+  if admins.any(fn(x) x == user_id)
+  then pure(True)
+  else
+    log("Denied " ++ show(user_id) ++ "\n").bind fn(())
+      pure(False)
+\end{lst}
+%
+In fairness, Koka is not built for monadic operations and other languages provide more convenient syntax for monads. However, the structure of the same program in such a language would be roughly the same.
+
+Another limitation of the monad approach becomes apparent when we want to use multiple effects. The problem is that the composition of two monads does not yield a monad. This is a limitation that can be worked around with \emph{monad transformers}. A monad transformer takes a monad and adds operations to it. The operations of every effect then need to be implemented on every transformer. Adding a single effect therefore requires additional implementations of its operations every other monad transformer. The number of implementations therefore grows quadratically with the number of effects.
+
+To overcome these limitations, we instead turn to the theory of \emph{algebraic effects}, which allow effects to be defined modularly. In this theory, an effect consists of a set of \emph{effect operations}. A computation using an effect then needs to be wrapped in a \emph{handler}, which defines the semantics for the operations. These modular effects and handlers are based on the free monad. It is possible to encode the free monad in Haskell and use algebraic effects in Haskell that way.
+
+However, Koka supports algebraic effects as a first-class construct. This allows Koka to make the use of algebraic effects very easy. It is not the only language to do this; other examples include Frank \autocite{lindley_be_2017}, Effekt \autocite{bach_poulsen_hefty_2023}, Eff \autocite{bauer_programming_2015}, Helium \autocite{biernacki_abstracting_2019} and OCaml \autocite{sivaramakrishnan_retrofitting_2021}. In the listing below, we first declare the algebraic effect \code{log}. This effect has a single operation also called \code{log}, which takes the message to log as an argument. Then we define a handler \code{hLog} for the \code{log} effect. The handler transforms the effectful computation into a monad, which matches our tuple from before. Note that the \code{return} branch matches the \code{pure} function and that the \code{log} branch combines the \code{bind} and \code{log} functions in our monad implementation. The \code{is_admin} and \code{all_admin} functions then simply declare that they use the \code{log} effect, which allows them to use the \code{log} operation. This relies on the fact that Koka's \code{map} and \code{foldl} functions are generic over effects in the computation.
+
+\begin{lst}{Koka}
+effect log
+  ctl log(msg: string): ()
+  
+val hLog = handler
+  return(x) (x, "")
+  ctl log(msg)
+    val (x, msg') = resume(())
+    (x, msg ++ msg')
+  
+fun is_admin(user_id: int): <log> bool
+  val result = admins.any(fn(x) x == user_id)
+  if !result then
+    log("Denied " ++ show(user_id) ++ "\n")
+  result
+ 
+fun all_admins(l): <log> bool
+  l.map(is_admin).foldl(True, (&&))
+  
+val (result, log) = hLog { [1,2,3,4].all(is_admin) }
+\end{lst}
+%
+In the end, the implementation then looks very much like imperative code, but the type system still resembles the type system of functional languages. Effects are handled in a structured way, but are still convenient to use. There are several other advantages too. The effects are modular and can be combined easily. Additionally, the handlers are modular; any handler can be swapped out for another handler, changing the semantics of the effect. For example, we could write a handler that ignores all \code{log} calls or stores the logged messages in a list.
+
+However, some effects are not algebraic and can therefore not be represented as effects in a language like Koka. \emph{Higher-order effects} are effects with operations that take effectful computations as arguments, and they are not algebraic in general. As \textcite{castagna_handlers_2009} have shown, they can be written as handlers, but not as effect operations. This is known as the \emph{modularity problem} for higher-order effects \autocite{wu_effect_2014}. Several extensions to algebraic effects have been proposed to accommodate for higher-order effects \autocite{wu_effect_2014,oh_latent_2021}. One such extension is \emph{hefty algebras} by \textcite{bach_poulsen_hefty_2023}, which introduces elaborations to implement higher-order effects. Elaborations give semantics to higher-order effects by translating them into computations with only algebraic effects. This means that evaluation of a computation becomes a two-step process: first higher-order effects are elaborated into algebraic effects, which can then handled. Like handlers, elaborations are modular, and it is possible to define multiple elaborations for a single effect.
+
+Therefore, there currently exist languages with algebraic effects and there is a theory for hefty algebras, but there is no language yet based on hefty algebras. This is the gap in the research that this thesis aims to fill. The question we therefore wish to answer is:
+\begin{center}
+\textbf{How can we design a language with higher-order effects and elaborations with hefty algebras as underlying theory?}
+\end{center}
+In this thesis, we introduce a novel programming language called \emph{Elaine}. The core idea of Elaine is to define a language which features elaborations and higher-order effects as first-class constructs. This brings the theory of hefty algebras into practice. With Elaine, we aim to demonstrate the usefulness of elaborations as a language feature. Throughout this thesis, we present example programs with higher-order effects to argue that elaborations are a natural and easy representation of higher-order effects.
 
 Like handlers for algebraic effects, elaborations require the programmer to specify which elaboration should be applied. However, elaborations have several properties which make it likely that there is only one relevant possible elaboration. Hence, we argue that elaboration instead should often be implicit and inferred by the language. To this end, we introduce \emph{implicit elaboration resolution}, a novel feature that infers an elaboration from the variables in scope.
 
@@ -61,21 +126,19 @@ Additionally, we give transformations from higher-order effects to algebraic eff
 
 We present a specification for Elaine, including the syntax definition, typing judgments and semantics. Along with this specification, we provide a reference implementation written in Haskell in the artefact accompanying this thesis. This implementation includes a parser, type checker, interpreter, pretty printer, and the transformations mentioned above. Elaine opens up exploration for programming languages with higher-order effects. While not a viable general purpose language in its own right, it can serve as inspiration for future languages.
 
-\TODO{Overview of sections}
 
-\section{Contributions}
-
-The main contribution of this thesis is the specification and implementation of Elaine. This consists of several parts.
-
+\paragraph{Contributions} The main contribution of this thesis is the specification and implementation of Elaine. This consists of several parts.
 \begin{itemize}
     \item We define a syntax suitable for a language with both handlers and elaboration (\cref{sec:syntax}).
     \item We provide a set of examples for programming with higher-order effect operations.
-    \item We present a type system for a language with higher-order effects and elaborations, based on Hindley-Milner type inference and inspired by the Koka type system. This type system introduces a novel representation of effect rows as multiset which, though semantically equivalent to earlier representations, allows for a simple definition of effect row unification.
+    \item We present a type system for a language with higher-order effects and elaborations, based on Hindley-Milner type inference and inspired by Koka's type system. This type system introduces a novel representation of effect rows as multiset which, though semantically equivalent to earlier representations, allows for a simple definition of effect row unification.
     \item We propose that elaborations should be inferred in most cases and provide a type-directed procedure for this inference (\cref{chap:elabres}).
 \end{itemize}
+This thesis consists of the following parts. First, we give an overview of the relevant theory of algebraic effects in \cref{chap:algebraic_effects} and higher-order effects and hefty algebras in \cref{chap:higher_order}. Then, we present Elaine in \cref{chap:basics}. The implicit elaboration resolution is then discussed in \cref{chap:elabres}. Finally, we discuss related work in \cref{chap:related_work} and conclude in \cref{chap:conclusion}. The appendices contain additional examples of Elaine programs (\cref{chap:examples}) and a full specification of the language (\cref{chap:spec}).
 
-\section{Artefact}\label{sec:artefact}
+\paragraph{Artefact}
+The artefact accompanying this thesis contains a full prototype implementation for Elaine, written in Haskell. The \code{README.md} file contains instructions for building and executing the interpreter.\todo{Write that README.md}
 
-\TODO{Describe contents and structure of artefact}
+The source code of the parser, type checker, interpreter and other aspects of the implementation can be found in the \code{src/Elaine} directory. The \code{examples} directory contains various example programs written in Elaine, including implementations of the reader effect, exception effect, structured logging and a set of parser combinators. 
 
-The artefact is available online at \url{https://github.com/tertsdiepraam/thesis/elaine}.
+The artefact is available online at \url{https://github.com/tertsdiepraam/elaine}.

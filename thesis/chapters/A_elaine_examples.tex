@@ -26,4 +26,6 @@ Monadic parser combinators \autocite{hutton_monadic_1996} are a popular techniqu
 
 Below is a full listing of a JSON parser written in Elaine using a variation on parser combinators using effects. It is implemented using a higher-order \el{Parse!} effect, which is elaborated into a state and an abort effect, which are imported from the standard library. The \el{try!} effect is a higher-order effect which takes an effectful computation as an argument.
 
+Higher-order effects are convenient for parser combinators, but not necessary. There is a parsing effect in a more algebraic style written in Effekt available at \url{https://effekt-lang.org/docs/casestudies/parser} 
+
 \example{parser_combinator}

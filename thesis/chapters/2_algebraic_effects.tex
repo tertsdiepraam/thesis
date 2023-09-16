@@ -259,43 +259,62 @@ However, there is no way to evaluate this computation, because the free monad is
 for every \hs{f} and finally a \hs{Free End a -> a} to reduce the free monad to a final value. Following \textcite{castagna_handlers_2009}, these functions are called \emph{handlers}. Using a fold over the free monad, the definition of the handlers can be reduced to two smaller functions:
 \begin{itemize}
     \item the return case, \hs{a -> Free f' b};
-    \item and the case for handling \hs{f}: \hs{f (Free f' b) -> Free f' b}.
+    \item and the case for handling the operations: \hs{f (Free f' b) -> Free f' b}.
 \end{itemize}
+However, to generalize the handler, we add a parameter \hs{p} as well, which is a parameter that the handlers can access. This paremeter is used to thread state through the computation. Therefore, \hs{handle} is defined as follows.
 
 \begin{lst}{Haskell}
 fold :: Functor f => (a -> b) -> (f b -> b) -> Free f a -> b
 fold gen _   (Pure x) = gen x
 fold gen alg (Op f)   = alg (fmap (fold gen alg) f)
 
-handle :: (a -> Free f' b)
-          -> (f (Free f' b) -> Free f' b)
-          -> Free (f + f') a -> Free f' b
-handle ret hndl = fold ret $
+handle :: (Functor f, Functor f')
+       => (a -> p -> Free f' b)
+       -> (f (p -> Free f' b) -> p -> Free f' b)
+       -> Free (f + f') a -> p -> Free f' b
+handle ret f = fold ret $
   \case
-    L x -> hndl x
-    R x -> Do x
+    L x -> f x
+    R x -> \p -> Do $ fmap (\m -> m p) x
+\end{lst}
+%
+Handlers for the various effects can then be constructed using \hs{handle}. For each computation, we need a handler for each effect and finally we reduce the free monad with only the \hs{End} functor to the final value. So, \hs{decrement} requires handlers for state and abort.
 
+\begin{lst}{Haskell}
 -- The Do case does not need to be handled since End cannot be
 -- constructed
 handleEnd :: Free End a -> a
 handleEnd (Pure a) = a
 
-handleAbort = handle (Pure . Just) (\Abort -> Nothing)
+handleAbort :: Functor f => Free (Abort + f) a -> Free f (Maybe a)
+handleAbort c = handle
+  (\a _ -> Pure $ Just a)
+  (\Abort () -> Pure Nothing) 
+  c ()
+  
+handleState :: Functor f => s -> Free (State s + f) a -> Free f (s, a)
+handleState = flip $ handle
+  (\x s -> pure (s, x))
+  (\x s -> case x of
+      Put s' k -> k s'
+      Get k -> k s s)
+
+result :: (Int, Maybe Int)
+result = handleEnd $ handleState (0::Int) $ handleAbort decrement  
 \end{lst}
 %
-\TODO{State handler}
-\question{Is it possible to write the state handler without \hs{handle_} from Casper's blog post? I couldn't quite get the types to work, but that is basically what happens in Koka.}
+This finally allows us to use the abort and state effects together, while providing a handler per effect. Note that the order in which the handlers are applied matters for the return type of the result. If abort is handled first and state second, the final type is \hs{(Int, Maybe Int)}. If state is handled first, is \hs{Maybe (Int, Int)}.
 
-This finally allows us to use the abort and state effects together, while providing a handler per effect. While the plumbing needed for a free monad is extensive, it is worth considering what it provides. First, we can combine multiple functors in our type signatures. Second, we can define operations that work for any effect composition that contains an effect. Third, we can provide modular handlers that handle a single effect from the composed functors. If all effects are defined in this way, then effect is automatically compatible with all other effects.
+While the plumbing needed for a free monad is extensive, it is worth considering what it provides. First, we can combine multiple functors in our type signatures. Second, we can define operations that work for any effect composition that contains an effect. Third, we can provide modular handlers that handle a single effect from the composed functors. If all effects are defined in this way, then effect is automatically compatible with all other effects.
 
-Finally, we have not only gained modularity for the effects themselves, but also for the handlers. The effects have become a specification of the syntax, while the handlers provide the semantics. Within this framework, the type and definition of the computation then does not need to be changed, only the handler. There is nothing preventing different implementations of the handlers. It is, for example, possible to define a state handler in which \hs{put} operations are ignored and the state is constant.
+Finally, we have not only gained modularity for the effects themselves, but also for the handlers. The effects have become a specification of the syntax, while the handlers provide the semantics. Within this framework, the type and definition of the computation then does not need to be changed, only the handler. There is nothing preventing different implementations of the handlers. It is, for example, possible to define a state handler in which \hs{put} operations are ignored, keeping the state is constant.
 
 \section{Algebraic Effects}
 
 The free monad encoding in the previous section is an implementation of algebraic effects in Haskell. The term ``algebraic'' comes from the fact that this method works for effects that can be described as algebraic theories \autocite{goos_adequacy_2001}. Later, \textcite{plotkin_algebraic_2003} showed that this is only possible for effects that satisfy the \emph{algebraicity property}.
 
 The algebraicity property states that the \hs{>>=} operation distributes over the computation parameters of an operation. This means that if there is some operation \hs{op} that has some parameter of type \hs{k} then the following computations should be equivalent:
-\[ (op k) >>= k'  =   op (k >>= k') \] 
+\[ \mcode{(op k) >>= k'}\quad==\quad\mcode{op (k >>= k')} \] 
 By construction, this holds for any effect we have defined in the previous section. This can be derived from the definitions of \hs{>>=} on \hs{Free} and \hs{fmap} for the effects. For example, we can apply the definitions to \hs{Free (State s)}.
 
 \begin{lst}{Haskell}

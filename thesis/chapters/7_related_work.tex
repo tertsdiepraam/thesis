@@ -64,7 +64,7 @@ Scoped effects have been generalized by \textcite{oh_latent_2021} to \emph{laten
 
 The motivation of adding support for effects to a programming language is twofold. First, it enables effects to be implemented into languages with type systems in which effects cannot be encoded as a free monad or a similar model. Second, built-in effects allow for more ergonomic and performant implementations. Naturally, the ergonomics of any given implementation are subjective, but we undeniably have more control over the syntax by adding effects to the language.
 
-Notable examples of languages with first-class support for algebraic effects are Eff \autocite{bauer_programming_2015}, Koka \autocite{leijen_koka_2014}, OCaml\citationneeded, and Frank \autocite{lindley_be_2017}. In all of these languages, effect row variables can be used to abstract over effects. For example, the signature of the \el{map} function is in Koka is given below and is similar to the signature of \el{map} in Elaine.
+Notable examples of languages with first-class support for algebraic effects are Koka \autocite{leijen_koka_2014}, Frank \autocite{lindley_be_2017}, Effekt \autocite{bach_poulsen_hefty_2023}, Eff \autocite{bauer_programming_2015}, Helium \autocite{biernacki_abstracting_2019} and OCaml \autocite{sivaramakrishnan_retrofitting_2021}. In all of these languages, effect row variables can be used to abstract over effects. For example, the signature of the \el{map} function is in Koka is given below and is similar to the signature of \el{map} in Elaine.
 
 \begin{lst}{Koka}
 fun map ( xs : list<a>, f : a -> e b ) : e list<b>

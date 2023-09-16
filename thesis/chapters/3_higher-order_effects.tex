@@ -96,7 +96,7 @@ An algebraic effect can have a modular implementation: a computation can be reus
 
 \section{Hefty Algebras}\label{sec:hefty_algebras}
 
-Several solutions to the modularity problem have been proposed \autocite{wu_effect_2014,oh_latent_2021}. Most recently, \textcite{bach_poulsen_hefty_2023} introduced hefty algebras. The idea behind hefty algebras is that there is an additional layer of modularity, specifically for higher-order effects.
+Several solutions to the modularity problem have been proposed \autocite{wu_effect_2014,oh_latent_2021}. Most recently, \textcite{bach_poulsen_hefty_2023} introduced a solution called hefty algebras. The idea behind hefty algebras is that there is an additional layer of modularity, specifically for higher-order effects.
 
 For a full treatment of hefty algebras, we refer to \textcite{bach_poulsen_hefty_2023}. In addition, the encoding of hefty algebras is explained in more detail by \textcite{bach_poulsen_algebras_2023}.
 
@@ -170,7 +170,7 @@ elabLift :: g < f => Lift g (Free f) (Free f a) -> Free f a
 elabLift (Lift x) = Op (inj x)
 \end{lst}
 %
-Applying \hs{elabLift} to \hs{elab} then gives a function that elaborates \hs{Hefty (Lift f) a} to \hs{Free f a} for any functor \hs{f}. The more interesting case is that of higher-order effects. For example, the \hs{local} operation of the \hs{Reader} effect can be mapped to a computation using the free monad as well, resembling the definition of \hs{local} as a function.
+Applying \hs{elabLift} to \hs{elab} then gives a function which elaborates \hs{Hefty (Lift f) a} to \hs{Free f a} for any functor \hs{f}. The more interesting case is that of higher-order effects. For example, the \hs{local} operation of the \hs{Reader} effect can be mapped to a computation using the free monad as well, resembling the definition of \hs{local} as a function.
 
 \begin{lst}{Haskell}
 data Reader r k = Local r k k
@@ -185,4 +185,18 @@ This definition of \hs{elabReader} is modular, because it is a transformation of
 
 These elaborations can be composed to construct elaborations for multiple effects as well. \textcite{bach_poulsen_hefty_2023} do this by introducing an operator which composes elaborations. The composed elaborations are then applied all at once.
 
-Elaine's model for higher-order effects, which is explained in \cref{sec:hoeffects}, ignores this constraint. Instead, Elaine allows for elaboration of single higher-order effects at a time, much like handlers in algebraic effects. We believe this to be semantically equivalent to hefty algebras. In the prototype, this variation has also not presented any problems. However, we do not have a formal argument to show that this is equivalent to hefty algebras as described above. This is a gap in theory that future research can fill.
+Elaine's model for higher-order effects, which is explained in \cref{sec:hoeffects}, ignores this constraint. Instead, Elaine allows for elaboration of single higher-order effects at a time. This means that elaboration cannot return \hs{Free} directly, because \hs{Free} cannot contain higher-order effects. Instead, we need to work with some other type that encodes both higher-order effects and the algebraic effects they elaborated into. We will call this type \hs{Comp} for ``computation''. A \hs{Comp h f a} is then semantically equivalent to \hs{Hefty (h + Lift f) a}. The signature of an elaboration for a higher-order effect \hs{h} would then become the following.
+
+\begin{lst}{Haskell}
+handleA :: Free (f + f') a
+        -> Free f' a
+
+elabH   :: Comp (h + h') f a
+        -> Comp h' f a
+\end{lst}
+%
+What this type \hs{Comp} would be exactly and how this change impacts the rest of the encoding, is an open question. It is a question we do not need to be concerned with in the design of Elaine, because we can define semantics that work this way. Nevertheless, it is important to note, because defining this type correctly, would cement the theory that Elaine is based on. It is also necessary for writing a formal encoding of its semantics in a language like Agda. Therefore, it is a gap that future research can fill.
+
+We believe this variation to be semantically equivalent to hefty algebras, because higher-order effects cannot be elaborated into other higher-order effects. Therefore, the elaborations do not meaningfully interact with each other. In the prototype, this variation has also not presented any problems.
+
+Otherwise, Elaine follows the framework of hefty algebras closely. This concludes the theory that Elaine relies on. Without further ado then, we will dive into the design of Elaine in the next chapter.
