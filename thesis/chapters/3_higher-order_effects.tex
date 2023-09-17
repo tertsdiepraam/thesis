@@ -2,6 +2,7 @@
 
 In the previous chapter, we explained the concept of algebraic effects; effects that satisfy the algebraicity property. We also mentioned that not all effects are algebraic. To be more specific, the effects that are not algebraic are higher-order effects: effects that take effectful computations as parameters. As a result, it is not possible to give modular implementations for these operations, like we can with algebraic effects. This chapter details the difficulties around higher-order effects and discusses hefty algebras, the theory that Elaine is based on.
 
+
 \section{Computation Parameters}
 
 Recall that an effect in the free monad encoding is a functor over some \hs{k} with some constructors. The type \hs{k} represents the continuation of the computation. Naturally, it is possible to write a constructor with multiple parameters of type \hs{k}. For example, we could make a \hs{Branch} functor which takes a boolean and two computations and selects the branch to take based on the boolean. It is essentially an \hs{if-else} expression expressed as an effect.
@@ -103,11 +104,11 @@ For a full treatment of hefty algebras, we refer to \textcite{bach_poulsen_hefty
 At the core of hefty algebras are the hefty tree. A hefty tree is a generalization of the free monad to higher-order functors, which will write \hs{HOFunctor}. In the listing below, we also repeat the definition of a functor from the previous chapter for comparison.
 
 \begin{lst}{Haskell}
--- A regular functor
+-- a regular functor
 class Functor f where
   fmap :: (a -> b) -> f a -> f b
 
--- An higher-order functor
+-- a higher-order functor
 class (forall f. Functor (h f)) => HOFunctor h where
   hmap :: (f a -> g a) -> (h f a -> h g a)
 \end{lst}
@@ -184,6 +185,8 @@ elabReader (Local f m k) = ask >>= \r -> handle (hAsk (f r)) m >>= k
 This definition of \hs{elabReader} is modular, because it is a transformation of the computation. Even if the computation is fixed, the elaboration gives the \hs{local} operation its meaning. Hence, hefty algebras solve the modularity problem.
 
 These elaborations can be composed to construct elaborations for multiple effects as well. \textcite{bach_poulsen_hefty_2023} do this by introducing an operator which composes elaborations. The composed elaborations are then applied all at once.
+
+\TODO{Mention that the order of elaborations does not matter}
 
 Elaine's model for higher-order effects, which is explained in \cref{sec:hoeffects}, ignores this constraint. Instead, Elaine allows for elaboration of single higher-order effects at a time. This means that elaboration cannot return \hs{Free} directly, because \hs{Free} cannot contain higher-order effects. Instead, we need to work with some other type that encodes both higher-order effects and the algebraic effects they elaborated into. We will call this type \hs{Comp} for ``computation''. A \hs{Comp h f a} is then semantically equivalent to \hs{Hefty (h + Lift f) a}. The signature of an elaboration for a higher-order effect \hs{h} would then become the following.
 

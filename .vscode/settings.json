@@ -1,11 +1,16 @@
 {
     "cSpell.words": [
         "Agda",
+        "algebraicity",
         "castagna",
         "effectful",
         "Effekt",
+        "hfold",
+        "hmap",
+        "Incs",
         "Koka",
         "multiset",
+        "plotkin",
         "poulsen"
     ]
 }
