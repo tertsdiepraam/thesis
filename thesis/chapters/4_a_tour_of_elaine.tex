@@ -6,11 +6,11 @@ The language designed for this thesis is called ``Elaine''. The distinguishing f
 
 At its core, Elaine is based on the lambda calculus, extended with algebraic and higher-order effects. The feature set has been chosen to be comprehensive enough for fairly extensive programs, which are given in \cref{chap:examples}.
 
-Elaine's is mostly inspired by Koka \autocite{leijen_koka_2014,leijen_type_2017} and Rust \autocite{matsakis_rust_2014}. The keywords of the language will be particularly familiar to Rust programmers. It is designed to be relatively simple to parse, which is most clearly reflected in the fact that whitespace is ignored and that there are no infix operators. As a result, Elaine requires semicolons at the end of each statement and requires computations consisting of multiple statements to be wrapped in braces.
+Elaine's syntax is mostly inspired by Koka \autocite{leijen_koka_2014,leijen_type_2017} and Rust \autocite{matsakis_rust_2014}. The keywords of the language will be particularly familiar to Rust programmers. It is designed to be relatively simple to parse, which is most clearly reflected in the fact that whitespace is ignored and that there are no infix operators. As a result, Elaine requires semicolons at the end of each statement and requires computations consisting of multiple statements to be wrapped in braces.
 
-All expressions in Elaine are statically and strongly types with s type system based on Hindley-Milner style type inference \autocite{hindley_principal_1969,milner_theory_1978}. The type system has a special treatment for effect rows similar to Koka's approach. In most cases, types can be completely inferred and do not need to be specified. Additionally, algebraic data types and tuples are supported for modelling complex data.
+All expressions in Elaine are statically and strongly typed with a type system based on Hindley-Milner style type inference \autocite{hindley_principal_1969,milner_theory_1978}. The type system has a special treatment for effect rows similar to Koka's approach. In most cases, types can be completely inferred and do not need to be specified. Additionally, algebraic data types and tuples are supported for modelling complex data.
 
-Like Koka, Elaine has strict semantics. This means that effects can only occur during function application \autocite{leijen_koka_2014}. Additionally, the order in which effects are performed is very clear in this model. We believe this makes effects easier to reason about than in a language with lazy evaluation. Naturally, lazy evaluation can still be encoded into a strict language \autocite{wadler_lazy_1996}. It also matches the more imperative style Elaine programs are written in. Second, there is currently no way for Elaine programs to interact with the operating system; there is no equivalent to the \hs{IO} monad from Haskell or the \code{console} and \code{fsys} effects from Koka.
+Like Koka, Elaine has strict semantics. This means that effects can only occur during function application \autocite{leijen_koka_2014}. Additionally, the order in which effects are performed is very clear in this model. We believe this makes effects easier to reason about than in a language with lazy evaluation. Naturally, lazy evaluation can still be encoded into a strict language \autocite{wadler_lazy_1996}. It also matches the more imperative style Elaine programs are written in. There is currently no way for Elaine programs to interact with the operating system; there is no equivalent to the \hs{IO} monad from Haskell or the \code{console} and \code{fsys} effects from Koka.
 
 The source code for the Elaine prototype and additional examples are included in the artefact accompanying this thesis. The full specification for Elaine, including typing judgements and reduction semantics are given in \cref{chap:spec}.
 
@@ -32,7 +32,7 @@ use std;
 let main = add(mul(5, 2), 3);
 \end{lst}
 %
-The \el{std} module contains functions for boolean and integer arithmetic, comparison of values and more. The full list of functions is given in \cref{sec:std}. To show off some more functions, below is a program that returns a boolean indicating whether $2^5$ is greater than $- (25 \cdot -30)$, which is true. Note that \el{-} is allowed as part of an integer literal, but not as an operator.
+The \el{std} module contains functions for boolean and integer arithmetic, comparison of values and more. The full list of functions is given in \cref{sec:std}. To show off some more functions, below is a program that compares the results of two calculations. Note that \el{-} is allowed as part of an integer literal, but not as an operator. The functions used here are ``greater than'' (\el{gt}), exponentiation (\el{pow}), negation (\el{neg}) and multiplication (\el{mul}).
 
 \begin{lst}{Elaine}
 use std;
@@ -112,7 +112,7 @@ Complex programs often require custom data types. That is what the \el{type} con
 
 A type declaration consists of a list of constructors each with a list of parameters. These constructors can be used as functions. A type can have type parameters, which are declared with \el{[]} after the type name. It is not possible to put constraints on type parameters.
 
-Data types can be deconstructed with the \el{match} construct. The \el{match} construct looks like Rust's \rs{match} or Haskell's \hs{case}, but is more limited. It can only be used for custom data types and only matches on the outer constructor. For example, it is not possible to match on \el{Just(5)}, but only on \el{Just(x)}. Since the \el{Maybe} type is very common, it is provided in the standard library under the \el{maybe} module.
+Data types can be deconstructed with the \el{match} construct. The \el{match} construct looks like Rust's \rs{match} or Haskell's \hs{case}, but is more limited. It can only be used for custom data types and only matches on the outer constructor. For example, it is not possible to match on \el{Just(5)}, but only on \el{Just(x)}. Since the \el{Maybe} type is very common, it is provided in the standard library is the \el{maybe} module.
 
 \begin{lst}{Elaine}
 use std;
@@ -322,7 +322,8 @@ for \el{e} and \el{f}. To do so, a fresh variable \el{g} is introduced which rep
 \caption{Examples of effect row unification.}
 \label{table:unification}
 \end{table}
-
+%
+\section{Functions Generic over Effects}
 We can use extensions to ensure equivalence between effect rows without specifying the full rows. For example, the following function uses the \el{Abort} effect if the called function returns false, while retaining the effects of the wrapped function.
 
 \begin{lst}{Elaine}
@@ -338,8 +339,6 @@ let main: <> Maybe[()] = handle[hAbort] {
     abort_on_false(fn() { false })
 };
 \end{lst}
-%
-\section{Functions Generic over Effects}
 
 Recall the definition of \el{map} in \cref{sec:recursion}, which was written without any effects in its signature. Adding the effects yields the following definition.
 
@@ -390,7 +389,7 @@ The elaborated operations differ from other functions and algebraic operations b
 
 Just like we have the \el{handler} and \el{handle} keywords to create and apply handlers for algebraic effects, we can create and apply elaborations with the \el{elaboration} and \el{elab} keywords. Unlike handlers, elaborations do not get access to the \el{resume} function, because they always resume exactly once.
 
-An illustrative example of this feature is the \el{Reader} effect with a \el{local} operation, shown in \cref{lst:local_reader}. This effect enhances the previously introduced \el{Ask} effect with a \el{local} operation that modifies the value returned by \el{ask}. To motivate the implementation in \cref{lst:local_reader}, let us first imagine how to emulate the behaviour of \el{local}. Our goal is to make the following snippet return the value \el{15}.
+An illustrative example of this feature is the \el{Reader} effect with a \el{local} operation. This effect enhances the previously introduced \el{Ask} effect with a \el{local} operation that modifies the value returned by \el{ask}. To motivate the implementation, let us first imagine how to emulate the behaviour of \el{local}. Our goal is to make the following snippet return the value \el{15}.
 
 \begin{lst}{Elaine}
 let main = handle[hAsk(5)] {

@@ -53,15 +53,15 @@ To show why the \hs{local} operation breaks algebraicity, consider the following
 local (* 2) ask >>= \x -> ask >>= \y -> pure x + y
 \end{lst}
 %
-Only the first \hs{get} operation is inside the \hs{local} operation and should therefore be doubled. If the \hs{Reader} effect was algebraic, we should be able to distribute the \hs{>>=} operator again without changing the semantics of the program. However, do that yield the following computation.
+Only the first \hs{ask} operation is inside the \hs{local} operation and should therefore be doubled. If the \hs{Reader} effect was algebraic, we should be able to distribute the \hs{>>=} operator again without changing the semantics of the program. However, doing so yields the following computation.
 
 \begin{lst}{Haskell}
 local (* 2) (ask >>= \x -> ask >>= \y -> pure x + y)
 \end{lst}
 %
-Now, both \hs{get} operations are inside the \hs{local} operation, so both values will be doubled. For example, if we had installed a handler that makes \hs{ask} return 1, the first computation would return $2 + 1 = 3$ and the second $2 + 2 = 4$. Therefore, we have shown with a counterexample that the \hs{Reader} effect cannot be algebraic.
+Now, both \hs{ask} operations are inside the \hs{local} operation, so both values will be doubled. For example, if we had installed a handler that makes \hs{ask} return 1, the first computation would return $2 + 1 = 3$ and the second $2 + 2 = 4$. Therefore, we have shown with a counterexample that the \hs{Reader} effect cannot be algebraic.
 
-A similar argument holds for the \hs{Except} effect, which also has two operations: \hs{catch} and \hs{throw}. In the simplest form, \hs{throw} resembles the \hs{abort} effect, but it takes a parameter that can, for example, represent an error message. The \hs{catch} operation should then evaluate its first parameter and jump to the second if it fails, much like the try-catch constructs of languages with effects.
+A similar argument holds for the \hs{Except} effect, which also has two operations: \hs{catch} and \hs{throw}. In the simplest form, \hs{throw} resembles the \hs{abort} effect, but it takes a parameter that can, for example, represent an error message. The \hs{catch} operation evaluates its first parameter and jump to the second if it fails, much like the try-catch constructs of languages with effects.
 
 \begin{lst}{Haskell}
 data Except a k = Throw a | Catch k k
@@ -82,7 +82,7 @@ Before distributing the \hs{>>=} operator the computation should throw \hs{False
 
 \section{The Modularity Problem}
 
-Taking a step back from effects, defining a function for exception catching is possible. Recall that the \hs{throw} operation is algebraic, therefore, a handler for it can be defined. If we assume some handler for it called \hs{handleThrow} with returns an \hs{Either} where \hs{Left} is the value from \hs{throw} and \hs{Right} is the value from a completed computation, we can define \hs{catch} in terms of that function.
+Taking a step back from effects, defining a function for exception catching is possible. Recall that the \hs{throw} operation is algebraic, therefore, a handler for it can be defined. If we assume some handler for it called \hs{handleThrow} returns an \hs{Either} where \hs{Left} is the value from \hs{throw} and \hs{Right} is the value from a completed computation, we can define \hs{catch} in terms of that function.
 
 \begin{lst}{Haskell}
 catch c1 c2 =
@@ -101,7 +101,7 @@ Several solutions to the modularity problem have been proposed \autocite{wu_effe
 
 For a full treatment of hefty algebras, we refer to \textcite{bach_poulsen_hefty_2023}. In addition, the encoding of hefty algebras is explained in more detail by \textcite{bach_poulsen_algebras_2023}.
 
-At the core of hefty algebras are the hefty tree. A hefty tree is a generalization of the free monad to higher-order functors, which will write \hs{HOFunctor}. In the listing below, we also repeat the definition of a functor from the previous chapter for comparison.
+At the core of hefty algebras are hefty trees. A hefty tree is a generalization of the free monad to higher-order functors, which will write \hs{HOFunctor}. In the listing below, we also repeat the definition of a functor from the previous chapter for comparison.
 
 \begin{lst}{Haskell}
 -- a regular functor
@@ -182,13 +182,13 @@ elabReader :: Ask r < f
 elabReader (Local f m k) = ask >>= \r -> handle (hAsk (f r)) m >>= k
 \end{lst}
 %
-This definition of \hs{elabReader} is modular, because it is a transformation of the computation. Even if the computation is fixed, the elaboration gives the \hs{local} operation its meaning. Hence, hefty algebras solve the modularity problem.
+This definition of \hs{elabReader} is modular, because it is a transformation of the computation.\feedback{Casper: Explain why.} Even if the computation is fixed, the elaboration gives the \hs{local} operation its meaning. Hence, hefty algebras solve the modularity problem.
 
-These elaborations can be composed to construct elaborations for multiple effects as well. \textcite{bach_poulsen_hefty_2023} do this by introducing an operator which composes elaborations. The composed elaborations are then applied all at once.
+These elaborations can be composed to construct elaborations for multiple effects as well. \textcite{bach_poulsen_hefty_2023} do this by introducing an operator which composes elaborations. The composed elaborations are then applied all at once.\feedback{Casper: clarify implications.}
 
 \TODO{Mention that the order of elaborations does not matter}
 
-Elaine's model for higher-order effects, which is explained in \cref{sec:hoeffects}, ignores this constraint. Instead, Elaine allows for elaboration of single higher-order effects at a time. This means that elaboration cannot return \hs{Free} directly, because \hs{Free} cannot contain higher-order effects. Instead, we need to work with some other type that encodes both higher-order effects and the algebraic effects they elaborated into. We will call this type \hs{Comp} for ``computation''. A \hs{Comp h f a} is then semantically equivalent to \hs{Hefty (h + Lift f) a}. The signature of an elaboration for a higher-order effect \hs{h} would then become the following.
+Elaine's model for higher-order effects, which is explained in \cref{sec:hoeffects}, ignores this constraint. Instead, Elaine allows for elaboration of single higher-order effects at a time. This means that elaboration cannot return \hs{Free} directly, because \hs{Free} cannot contain higher-order effects. Instead, we need to work with some other type that encodes both higher-order effects and the algebraic effects they elaborated into. We will call this type \hs{Comp} for ``computation''. A \hs{Comp h f a} is then equivalent to \hs{Hefty (h + Lift f) a}. The signature of an elaboration for a higher-order effect \hs{h} would then become the following.
 
 \begin{lst}{Haskell}
 handleA :: Free (f + f') a
@@ -200,6 +200,8 @@ elabH   :: Comp (h + h') f a
 %
 What this type \hs{Comp} would be exactly and how this change impacts the rest of the encoding, is an open question. It is a question we do not need to be concerned with in the design of Elaine, because we can define semantics that work this way. Nevertheless, it is important to note, because defining this type correctly, would cement the theory that Elaine is based on. It is also necessary for writing a formal encoding of its semantics in a language like Agda. Therefore, it is a gap that future research can fill.
 
-We believe this variation to be semantically equivalent to hefty algebras, because higher-order effects cannot be elaborated into other higher-order effects. Therefore, the elaborations do not meaningfully interact with each other. In the prototype, this variation has also not presented any problems.
+We believe this variation to be equivalent to hefty algebras, because higher-order effects cannot be elaborated into other higher-order effects. Therefore, the elaborations do not meaningfully interact with each other. In the prototype, this variation has also not presented any problems.
+
+\TODO{Explain why order of elaborations does not matter}
 
 Otherwise, Elaine follows the framework of hefty algebras closely. This concludes the theory that Elaine relies on. Without further ado then, we will dive into the design of Elaine in the next chapter.
