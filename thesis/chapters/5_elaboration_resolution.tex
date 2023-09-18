@@ -22,7 +22,7 @@ let main = handle[hAsk] elab { local!(double, ask!()) };
 #                          ^^^
 \end{lst}
 %
-However, while useful, this feature only saves a few characters in the examples above. It becomes more important when multiple higher-order effects are involved: and \el{elab} without argument will elaborate all higher-order effects in the sub-computation. For instance, if elaborations for both \el{Exception} and \el{Reader} are in scope, the following program works.
+However, while useful, this feature only saves a few characters in the examples above. It becomes more important when multiple higher-order effects are involved: an \el{elab} without argument will elaborate all higher-order effects in the sub-computation. For instance, if elaborations for both \el{Exception} and \el{Reader} are in scope, the following program works.
 
 \begin{lst}{Elaine}
 let main = handle[hAsk(2)] handle[hThrow] elab {

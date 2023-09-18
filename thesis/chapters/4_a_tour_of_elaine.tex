@@ -23,7 +23,7 @@ As is tradition with introductions to programming languages, we start with a pro
 let main = "Hello, world!";
 \end{lst}
 %
-This example highlights several aspects of Elaine. Comments start with \el{#} and continue until the end of the line. We bind variables with the \el{let} keyword. The \el{main} variable is required and the value assigned to it is printed at the end of execution. In contrast with other languages, \el{main} is not a function in \el{Elaine}. Note that statements are required to end with a semicolon.
+This example highlights several aspects of Elaine. Comments start with \el{#} and continue until the end of the line. We bind variables with the \el{let} keyword. The \el{main} variable is required, and the value assigned to it is printed at the end of execution. In contrast with other languages, \el{main} is not a function in \el{Elaine}. Note that statements are required to end with a semicolon.
 
 In addition to strings, Elaine features integers and booleans as built-in types. To operate on these types, we need functions to perform the operations. By default, there are no functions in scope, however, we can bring them in scope by importing the functions from the \el{std} module with the \el{use} keyword. For example, we can write a program that computes $5 \cdot 2 + 3$:
 
@@ -32,7 +32,7 @@ use std;
 let main = add(mul(5, 2), 3);
 \end{lst}
 %
-The \el{std} module contains functions for boolean and integer arithmetic, comparison of values and more. The full list of functions is given in \cref{sec:std}. To show off some more functions, below is a program that compares the results of two calculations. Note that \el{-} is allowed as part of an integer literal, but not as an operator. The functions used here are ``greater than'' (\el{gt}), exponentiation (\el{pow}), negation (\el{neg}) and multiplication (\el{mul}).
+The \el{std} module contains functions for boolean and integer arithmetic, comparison of values, and more. The full list of functions is given in \cref{sec:std}. To show off some more functions, below is a program that compares the results of two calculations. Note that \el{-} is allowed as part of an integer literal, but not as an operator. The functions used here are ``greater than'' (\el{gt}), exponentiation (\el{pow}), negation (\el{neg}), and multiplication (\el{mul}).
 
 \begin{lst}{Elaine}
 use std;
@@ -78,9 +78,9 @@ Additionally, Elaine features \el{if} expressions. The language does not support
 
 \section{Types}
 
-Elaine is strongly typed with Hindley-Milner style type inference. Let bindings, function arguments and function return types can be given explicit types. By convention, we will write variables and modules in lowercase and capitalize types.
+Elaine is strongly typed with Hindley-Milner style type inference. Let bindings, function arguments, and function return types can be given explicit types. By convention, we will write variables and modules in lowercase. Types and type constructors are capitalized.
 
-The primitive types are \el{String}, \el{Bool} and \el{Int} for strings, booleans and integers respectively. The types for let bindings, function arguments and return types can be explicitly specified.
+The primitive types are \el{String}, \el{Bool}, and \el{Int} for strings, booleans, and integers respectively.
 
 \begin{lst}{Elaine}
 let x: Int = 5;       # ok!
@@ -177,7 +177,7 @@ let rec f = fn(x) { f(x) };
 let rec x = x;
 \end{lst}
 %
-Using recursive definitions, we can build functions like \el{map}, \el{foldl} and \el{foldr} to operate on our previously defined \el{List} type. The implementation for \el{map} might look like the listing below. Note that, in contrast with Haskell, Elaine evaluates these functions eagerly; there is no lazy evaluation.
+Using recursive definitions, we can build functions like \el{map}, \el{foldl}, and \el{foldr} to operate on our previously defined \el{List} type. The implementation for \el{map} might look like the listing below. Note that, in contrast with Haskell, Elaine evaluates these functions eagerly; there is no lazy evaluation.
 
 \begin{lst}{Elaine}
 let rec map = fn(f: fn(a) b, list: List[a]) List[b] {
@@ -190,7 +190,7 @@ let rec map = fn(f: fn(a) b, list: List[a]) List[b] {
 let doubled = map(fn(x) { mul(2, x) }, [1, 2, 3]); # -> [2, 4, 6]
 \end{lst}
 %
-The \el{list} module provides the most common operations on lists. Such \el{head}, \el{concat_list}, \el{range}, \el{map}, \el{foldl} and \el{foldr}. It also provides a \el{sum} function for lists of integers and a \el{join} function for lists of strings.
+The \el{list} module provides the most common operations on lists. Such \el{head}, \el{concat_list}, \el{range}, \el{map}, \el{foldl}, and \el{foldr}. It also provides a \el{sum} function for lists of integers and a \el{join} function for lists of strings.
 
 \section{Algebraic Effects}
 
@@ -198,7 +198,7 @@ The programs in the previous sections are all pure and contain no effects. While
 
 An effect is declared with the \el{effect} keyword. An effect needs a name and a set of operations. Operations are the functions that are associated with the effect. They can have an arbitrary number of arguments and a return type. Only the signature of operations can be given in an effect declaration, the implementation must be provided via handlers (see \cref{sec:alghandlers}).
 
-\Cref{fig:effect_decls} lists examples of effect declarations for the \el{Abort}, \el{Ask}, \el{State} and \el{Write} effects. We will refer to those declarations throughout this section. For the listings in this section, one can assume that these declarations are used. The \el{Abort} effect is meant to exit the computation. \el{Ask} provides some integer value to the computation, much like a global constant. \el{State} corresponds to the \hs{State} monad in Haskell. Finally, \el{Write} allows us to write some string value somewhere. We will be using this to provide a substitute for writing to standard output.
+\Cref{fig:effect_decls} lists examples of effect declarations for the \el{Abort}, \el{Ask}, \el{State}, and \el{Write} effects. We will refer to those declarations throughout this section. For the listings in this section, one can assume that these declarations are used. The \el{Abort} effect is meant to exit the computation. \el{Ask} provides some integer value to the computation, much like a global constant. \el{State} corresponds to the \hs{State} monad in Haskell. Finally, \el{Write} allows us to write some string value somewhere. We will be using this to provide a substitute for writing to standard output.
 
 \begin{figure}[htbp]
     \begin{subfigure}{0.5\textwidth}
@@ -360,7 +360,7 @@ let ask_added = handle[hAsk(5)] map(fn(x) { add(ask() x) }, [1,2,3]);
 %
 If we were two write the same expressions in Haskell instead, we would need two different implementations of \el{map}: one for applying pure functions (\hs{map}) and another for applying monadic functions (\hs{mapM}). Our definition of \el{map} is therefore more general than Haskell's \hs{map} function. The same reasoning can be applied to other functions like \el{foldl} and \el{foldr} or indeed any higher-order function.
 
-Functional languages like Haskell usually do not feature a construct for looping. This is partly because folds, maps and recursion are preferred to loops, but also because a looping construct relies on effects. In Koka and Elaine, we can define a \el{while} function which is generic over effects. This enables both functional and imperative styles of programming.
+Functional languages like Haskell usually do not feature a construct for looping. This is partly because folds, maps, and recursion are preferred to loops, but also because a looping construct relies on effects. In Koka and Elaine, we can define a \el{while} function which is generic over effects. This enables both functional and imperative styles of programming.
 
 \TODO{Check}
 \begin{lst}{Elaine}
@@ -519,4 +519,4 @@ let eExceptIgnoreCatch = elaboration Exception! -> <Throw> {
 }
 \end{lst}
 %
-What these examples illustrate is that elaborations provide a great deal of flexibility, with which we can define and alter the functionality of the \el{Exception!} effect. We can change it temporarily for debugging purposes or apply another elaboration to a part of a computation. We can also define more \el{Exception}-like effects and use multiple at the same time.
+What these examples illustrate is that elaborations provide a great deal of flexibility, with which we can define and alter the functionality of the \el{Exception!} effect. We can change it temporarily for debugging purposes or apply another elaboration to a part of a computation. We can also define more \el{Exception}-like effects and use multiple versions at the same time.

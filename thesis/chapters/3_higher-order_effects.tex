@@ -5,7 +5,7 @@ In the previous chapter, we explained the concept of algebraic effects; effects 
 
 \section{Computation Parameters}
 
-Recall that an effect in the free monad encoding is a functor over some \hs{k} with some constructors. The type \hs{k} represents the continuation of the computation. Naturally, it is possible to write a constructor with multiple parameters of type \hs{k}. For example, we could make a \hs{Branch} functor which takes a boolean and two computations and selects the branch to take based on the boolean. It is essentially an \hs{if-else} expression expressed as an effect.
+Recall that an effect in the free monad encoding is a functor over some \hs{k} with some constructors. The type \hs{k} represents the continuation of the computation. Naturally, it is possible to write a constructor with multiple parameters of type \hs{k}. For example, we could make a \hs{Branch} functor which takes a boolean and two computations. Based on the boolean value, it selects the branch to evaluate. It is essentially an \hs{if-else} expression expressed as an effect.
 
 \begin{lst}{Haskell}
 data Branch k = Branch Bool k k
@@ -38,7 +38,7 @@ This is what we mean by saying that the parameters are computation-like: the con
 
 For other effects, however, the intended semantics are not such that the computation parameters are continuation-like. These effects are called higher-order effects \citationneeded.
 
-One such effect is the \hs{Reader} effect. Traditionally, the \hs{Reader} monad has two operations: \hs{local} and \hs{ask}. The latter functions much like the \hs{get} operation from the state effect and is therefore algebraic on its own. However, the \hs{local} operation is more complex. It takes two parameters, a function \hs{f} and a computation \hs{c}. The intended semantics are then that whenever \hs{ask} is used within \hs{c}, the function \hs{f} is applied to the returned value.
+One such effect is the \hs{Reader} effect. Traditionally, the \hs{Reader} monad has two operations: \hs{local} and \hs{ask}. The latter functions much like the \hs{get} operation from the state effect and is algebraic. However, the \hs{local} operation is more complex. It takes two parameters, a function \hs{f} and a computation \hs{c}. The intended semantics are then that whenever \hs{ask} is used within \hs{c}, the function \hs{f} is applied to the returned value.
 
 \begin{lst}{Haskell}
 data Reader a k = Ask (a -> k) | Local (a -> a) k k
@@ -61,7 +61,7 @@ local (* 2) (ask >>= \x -> ask >>= \y -> pure x + y)
 %
 Now, both \hs{ask} operations are inside the \hs{local} operation, so both values will be doubled. For example, if we had installed a handler that makes \hs{ask} return 1, the first computation would return $2 + 1 = 3$ and the second $2 + 2 = 4$. Therefore, we have shown with a counterexample that the \hs{Reader} effect cannot be algebraic.
 
-A similar argument holds for the \hs{Except} effect, which also has two operations: \hs{catch} and \hs{throw}. In the simplest form, \hs{throw} resembles the \hs{abort} effect, but it takes a parameter that can, for example, represent an error message. The \hs{catch} operation evaluates its first parameter and jump to the second if it fails, much like the try-catch constructs of languages with effects.
+A similar argument holds for the \hs{Except} effect, which also has two operations: \hs{catch} and \hs{throw}. In the simplest form, \hs{throw} resembles the \hs{abort} effect, but it takes a parameter that represents an error message. The \hs{catch} operation evaluates its first parameter and jump to the second if it fails, much like the try-catch constructs of languages with effects.
 
 \begin{lst}{Haskell}
 data Except a k = Throw a | Catch k k

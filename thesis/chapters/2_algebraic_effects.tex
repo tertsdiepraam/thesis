@@ -216,7 +216,7 @@ data End k
 The \hs{End} functor has the property that it does not add any operations. Therefore, we have that
 \code{Free (f + End)} is functionally the same as \code{Free f} and that \code{Free End a} is equivalent to \hs{a}. We can then make monads for any combination of the functors we have defined, such as \hs{Free (State s + End)}, \hs{Free (Abort + End)} or \hs{Free (State s + Abort + End)}. In general, we can construct a monad for any set of functors.
 
-However, we have no way to use any of the effect operations for this functor. For example, if we have \hs{Free (State s + Abort + End)}, how would we use the \hs{get} operation that we expect from the state monad? The solution is to give a definition for \hs{get} for the free monad if and only if \hs{State} is one of the composed functors. We do this with a type class relation \hs{<}, which defines an injection from a functor \hs{f} to any composed functor \hs{g} that contains \hs{f}. We can use this injection to define \hs{get}, \hs{put} and \hs{abort}. These convenience functions are called \emph{smart constructors}.
+However, we have no way to use any of the effect operations for this functor. For example, if we have \hs{Free (State s + Abort + End)}, how would we use the \hs{get} operation that we expect from the state monad? The solution is to give a definition for \hs{get} for the free monad if and only if \hs{State} is one of the composed functors. We do this with a type class relation \hs{<}, which defines an injection from a functor \hs{f} to any composed functor \hs{g} that contains \hs{f}. We can use this injection to define \hs{get}, \hs{put}, and \hs{abort}. These convenience functions are called \emph{smart constructors}.
 
 \TODO{Parts of this might not be important}
 \begin{lst}{Haskell}
@@ -237,7 +237,7 @@ abort :: Abort < f => Free f ()
 abort = Do $ inj $ Abort
 \end{lst}
 %
-This makes it possible to construct a computation using all those operations. For example, a computation that checks the state, asserts that it is larger than 0 and then decrements the state by 1.
+This makes it possible to construct a computation using all those operations. For example, a computation that checks the state, asserts that it is larger than 0, and then decrements the state by 1.
 
 \begin{lst}{Haskell}
 decrement :: Free (State Int + Abort + End) Int
@@ -249,7 +249,7 @@ decrement = get >>= \s ->
 %
 However, there is no way to evaluate this computation, because the free monad is just a syntactic representation of the computation. Hence, we need to define an algebra for the \hs{Free} data type. To do that, there needs to be a function with the type
 \[\mcode{Free (f + f') a -> Free f' b}\]
-for every \hs{f} and finally a \hs{Free End a -> a} to reduce the free monad to a final value. Following \textcite{castagna_handlers_2009}, these functions are called \emph{handlers}. In general, any handler operating on \hs{Free} needs two take two cases into account, since \hs{Free} has two constructors: \hs{Pure} and \hs{Do}. By using a fold over \hs{Free} we can define a handler in terms of two smaller functions:
+for every \hs{f} and finally a function \hs{Free End a -> a} to reduce the free monad to a final value. Following \textcite{castagna_handlers_2009}, these functions are called \emph{handlers}. In general, any handler operating on \hs{Free} needs two take two cases into account, since \hs{Free} has two constructors: \hs{Pure} and \hs{Do}. By using a fold over \hs{Free} we can define a handler in terms of two smaller functions:
 \begin{itemize}
     \item the return case, \hs{a -> Free f' b};
     \item and the case for handling the operations: \hs{f (Free f' b) -> Free f' b}.
