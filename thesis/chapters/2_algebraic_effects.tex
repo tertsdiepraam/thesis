@@ -2,14 +2,9 @@
 
 The theory of algebraic effects is intended to make working with effectful operations easier by making effects composable. It achieves this goal for many important effects, but, crucially, does not cover higher-order effects; effect operations that take other effectful computations as arguments. The theory of hefty algebras extends the theory of algebraic effects with higher-order effects. How this is achieved is discussed in \cref{chap:higher_order}. Since Elaine is based on the theory of hefty algebras, the theory of algebraic effects also applies to Elaine. In this chapter, we give an introduction to algebraic effects. In the next chapter, we discuss its limitations regarding higher-order effects and describe how hefty algebras overcome those limitations.
 
-\feedback{Lucas: Say that it requires some familiarity with functional programming syntax at least}
-
 \section{Monads}
 
-\TODO{Some more background and citations on monads}
-\TODO{Who are we basing this on?}
-
-We will build up the notion of algebraic effects from monads. Monads are an abstraction over effectful computation commonly used in functional programming. \citationneeded
+We will build up the notion of algebraic effects from monads. Monads were introduced as an abstraction for effectful computation by \textcite{moggi_abstract_1989,moggi_computational_1989}. Later, this model was popularized as a technique for writing effectful programs in pure languages \autocite{wadler_essence_1992,peyton_jones_imperative_1993}.
 
 While many descriptions of monads using category theory and various analogies can be employed in explaining them, for our purposes, a monad is a type constructor \hs{m} with two associated functions: \hs{return} and \hs{>>=}, with the latter pronounced ``bind''. In Haskell, this concept is easily encoded in a type class, which is listed below.
 
@@ -171,10 +166,7 @@ While it is technically possible to define such a monad, we would need to define
 
 \section{Effect Composition with the Free Monad}
 
-\TODO{Cite Casper's blog or a more academic version of it from somewhere. http://casperbp.net/posts/2023-07-algebraic-effects/index.html}
-
-\TODO{Give this description another go}
-The free monad is a monad that encodes the structure of a program without imposing semantics \citationneeded. The free monad takes a functor \hs{f} as an argument. The free monad then gives a syntactic description of the operations given by that functor. It is therefore the trivial monad parametrized by the operations of \hs{f}. In Haskell, the free monad is implemented as the \hs{Free} data type.
+The free monad is a monad that encodes the structure of a program without imposing semantics \autocite{swierstra_data_2008}. The free monad takes a functor \hs{f} as an argument. The free monad then gives a syntactic description of the operations given by that functor. It is therefore the trivial monad parametrized by the operations of \hs{f}. In Haskell, the free monad is implemented as the \hs{Free} data type. The definitions in this section are based on the implementation by \textcite{kammar_handlers_2013} and the encoding of the free monad by \textcite{bach_poulsen_hefty_2023}.
 
 \begin{lst}{Haskell}
 data Free f a
@@ -194,8 +186,7 @@ data State s k = Put s k | Get (s -> k)
   deriving Functor
 \end{lst}
 %
-\feedback{We only need constructors for operations, hence only one constructor for one operation}
-Similarly, we can apply the free monad to \hs{Maybe}. However, the \hs{Just} constructor of the \hs{Maybe} is already covered by the \hs{Pure} constructor of the free monad, so \hs{Maybe} can be simplified to a single constructor. We call this simplified type \hs{Abort}. The \hs{Abort} constructor does not use the continuation because it signals that evaluation should stop.
+Similarly, we can write the abort effect as a free monad, which we previously implemented using the \hs{Maybe} monad. Recall that there is only one operation for this effect: \hs{abort}. Hence, the \hs{Abort} functor only needs a single constructor, which we also call \hs{Abort}. The \hs{Abort} constructor does not use the continuation because it signals that evaluation should stop.
 
 \begin{lst}{Haskell}
 data Abort k = Abort
@@ -216,9 +207,8 @@ data End k
 The \hs{End} functor has the property that it does not add any operations. Therefore, we have that
 \code{Free (f + End)} is functionally the same as \code{Free f} and that \code{Free End a} is equivalent to \hs{a}. We can then make monads for any combination of the functors we have defined, such as \hs{Free (State s + End)}, \hs{Free (Abort + End)} or \hs{Free (State s + Abort + End)}. In general, we can construct a monad for any set of functors.
 
-However, we have no way to use any of the effect operations for this functor. For example, if we have \hs{Free (State s + Abort + End)}, how would we use the \hs{get} operation that we expect from the state monad? The solution is to give a definition for \hs{get} for the free monad if and only if \hs{State} is one of the composed functors. We do this with a type class relation \hs{<}, which defines an injection from a functor \hs{f} to any composed functor \hs{g} that contains \hs{f}. We can use this injection to define \hs{get}, \hs{put}, and \hs{abort}. These convenience functions are called \emph{smart constructors}.
+However, we have no way to use any of the effect operations for this functor. For example, if we have \hs{Free (State s + Abort + End)}, how would we use the \hs{get} operation that we expect from the state monad? The solution is to give a definition for \hs{get} for the free monad if and only if \hs{State} is one of the composed functors. We do this with a type class relation \hs{<}, which defines an injection from a functor \hs{f} to any composed functor \hs{g} that contains \hs{f}. We can use this injection to define the \hs{get}, \hs{put}, and \hs{abort} functions. These functions are called \emph{smart constructors}.
 
-\TODO{Parts of this might not be important}
 \begin{lst}{Haskell}
 class f < g where
   inj :: f k -> g k

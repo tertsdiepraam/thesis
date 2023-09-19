@@ -23,3 +23,6 @@ overapproximation
 Desugaring
 impredicativity
 desugaring
+coproduct
+artifact
+Artifact

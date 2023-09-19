@@ -1,7 +1,6 @@
 \chapter{Higher-Order Effects}\label{chap:higher_order}
 
-In the previous chapter, we explained the concept of algebraic effects; effects that satisfy the algebraicity property. We also mentioned that not all effects are algebraic. To be more specific, the effects that are not algebraic are higher-order effects: effects that take effectful computations as parameters. As a result, it is not possible to give modular implementations for these operations, like we can with algebraic effects. This chapter details the difficulties around higher-order effects and discusses hefty algebras, the theory that Elaine is based on.
-
+In the previous chapter, we explained the concept of algebraic effects. Any effect that satisfies the algebraicity property is algebraic. However, many \emph{higher-order effects} are not algebraic. An effect is higher-order if one of its operations takes effectful computations as parameters \autocite{bach_poulsen_hefty_2023}. As a result, it is not possible to give modular implementations for these operations using effect handlers, like we can do for algebraic operations. This chapter details the difficulties around higher-order effects and discusses hefty algebras, the theory that Elaine is based on.
 
 \section{Computation Parameters}
 
@@ -32,11 +31,11 @@ branch b (pure 1) (pure 2)
 %
 This computation has the same intended semantics as the original. The distribution of \hs{>>=} therefore does not change the semantics and hence the effect is algebraic. Therefore, there would be no problem encoding this effect in Haskell using the encoding in the previous chapter and, by extension, in Koka.
 
-This is what we mean by saying that the parameters are computation-like: the continuation can be appended to it without changing the semantics of the effect.
+This is what we mean by saying that the parameters are computation-like: the continuation can be appended to the parameters without changing the semantics of the effect.
 
 \section{Breaking Algebraicity}
 
-For other effects, however, the intended semantics are not such that the computation parameters are continuation-like. These effects are called higher-order effects \citationneeded.
+For other effects, however, the intended semantics are not such that the computation parameters are continuation-like.
 
 One such effect is the \hs{Reader} effect. Traditionally, the \hs{Reader} monad has two operations: \hs{local} and \hs{ask}. The latter functions much like the \hs{get} operation from the state effect and is algebraic. However, the \hs{local} operation is more complex. It takes two parameters, a function \hs{f} and a computation \hs{c}. The intended semantics are then that whenever \hs{ask} is used within \hs{c}, the function \hs{f} is applied to the returned value.
 
@@ -47,7 +46,7 @@ ask       = Do $ inj $ Get Pure
 local f c = Do $ inj $ Local f c (Pure ())
 \end{lst}
 %
-To show why the \hs{local} operation breaks algebraicity, consider the following computation.
+To see why the \hs{local} operation breaks algebraicity, consider the following computation.
 
 \begin{lst}{Haskell}
 local (* 2) ask >>= \x -> ask >>= \y -> pure x + y
@@ -73,9 +72,13 @@ catch a b = Do $ inj $ Catch a b
 Again, we take a simple example program to show that \hs{Except} violates algebraicity.
 
 \begin{lst}{Haskell}
-catch (pure False)  (pure True)  >>= throw -- -> throw False
+catch (pure False)  (pure True) >>= throw -- -> throws False
 -- then distributing >>= yields
-catch (throw False) (throw True)           -- -> throw True
+catch
+  (pure False >>= throw)
+  (pure True >>= throw)
+-- which simplifies to
+catch (throw False) (throw True)          -- -> throws True
 \end{lst}
 %
 Before distributing the \hs{>>=} operator the computation should throw \hs{False}, but after it should throw \hs{True}. So, again, the semantics have changed by distributing the \hs{>>=} and therefore \hs{Except} is not algebraic.
@@ -182,26 +185,50 @@ elabReader :: Ask r < f
 elabReader (Local f m k) = ask >>= \r -> handle (hAsk (f r)) m >>= k
 \end{lst}
 %
-This definition of \hs{elabReader} is modular, because it is a transformation of the computation.\feedback{Casper: Explain why.} Even if the computation is fixed, the elaboration gives the \hs{local} operation its meaning. Hence, hefty algebras solve the modularity problem.
+The \hs{elabReader} elaboration can then be used to elaborate higher-order effects in a computation. This makes the \hs{local} operation modular, because we can define different elaborations to apply to different sub-computations. This applies to any higher-order effect we define and that is how hefty algebras solve the modularity problem.
 
-These elaborations can be composed to construct elaborations for multiple effects as well. \textcite{bach_poulsen_hefty_2023} do this by introducing an operator which composes elaborations. The composed elaborations are then applied all at once.\feedback{Casper: clarify implications.}
+These elaborations can be composed to construct elaborations for multiple effects as well. \textcite{bach_poulsen_hefty_2023} do this by introducing an operator \hs{^} which composes elaborations. This operator is commutative and associative. The composed elaborations are then applied all at once. 
 
-\TODO{Mention that the order of elaborations does not matter}
+Moreover, all elaborations must be applied at once, because elaboration transforms a \hs{Hefty h a} to a \hs{Free f a} and a \hs{Free f a} cannot contain any higher-order effects. Therefore, there cannot be any higher-order effects left in the computation after elaboration.
 
-Elaine's model for higher-order effects, which is explained in \cref{sec:hoeffects}, ignores this constraint. Instead, Elaine allows for elaboration of single higher-order effects at a time. This means that elaboration cannot return \hs{Free} directly, because \hs{Free} cannot contain higher-order effects. Instead, we need to work with some other type that encodes both higher-order effects and the algebraic effects they elaborated into. We will call this type \hs{Comp} for ``computation''. A \hs{Comp h f a} is then equivalent to \hs{Hefty (h + Lift f) a}. The signature of an elaboration for a higher-order effect \hs{h} would then become the following.
+We found this constraint to be limiting in practice. Imagine a program with elaborations \hs{eCatch} and \hs{eReader}, for the catch and reader effect, respectively. If \hs{a} and \hs{b} and both computations that use both effects, these elaborations can be applied as follows.
 
 \begin{lst}{Haskell}
-handleA :: Free (f + f') a
-        -> Free f' a
-
-elabH   :: Comp (h + h') f a
-        -> Comp h' f a
+main = handleThrow $ handleAsk 0 $
+  elab (eCatch ^ eReader) (a >>= b)
 \end{lst}
 %
-What this type \hs{Comp} would be exactly and how this change impacts the rest of the encoding, is an open question. It is a question we do not need to be concerned with in the design of Elaine, because we can define semantics that work this way. Nevertheless, it is important to note, because defining this type correctly, would cement the theory that Elaine is based on. It is also necessary for writing a formal encoding of its semantics in a language like Agda. Therefore, it is a gap that future research can fill.
+Now, we introduce a second elaboration \hs{eCatch'}, which we want to apply to \hs{b}, but not to \hs{a}. Therefore, we might be tempted to write some like this:
 
-We believe this variation to be equivalent to hefty algebras, because higher-order effects cannot be elaborated into other higher-order effects. Therefore, the elaborations do not meaningfully interact with each other. In the prototype, this variation has also not presented any problems.
+\begin{lst}{Haskell}
+-- Not valid in hefty algebras!
+main = handleThrow $ handleAsk 0 $
+  elab eReader $
+    (elab eCatch a) >>= (elab eCatch' b)
+\end{lst}
+%
+However, this does not work, because the argument for the reader elaboration should be a hefty tree, not a free monad. Therefore, the only way hefty algebras allow us to do so is by elaborating the reader effect in \hs{a} and \hs{b} separately.
 
-\TODO{Explain why order of elaborations does not matter}
+\begin{lst}{Haskell}
+main = handleThrow $ handleAsk 0 $
+  (elab (eCatch ^ eReader) a)
+    >>= (elab (eCatch' ^ eReader) b)
+\end{lst}
+%
+However, now the elaboration for the reader effect needs to be repeated. With algebraic effects, handlers can be applied for each effect individually, which can be convenient for applying different handlers to different effects.
 
-Otherwise, Elaine follows the framework of hefty algebras closely. This concludes the theory that Elaine relies on. Without further ado then, we will dive into the design of Elaine in the next chapter.
+Because applying single elaborations is so useful, Elaine's type checker and interpreter do allow it. We conjecture that these semantics still correspond to hefty algebras. However, a proof of this conjecture is left to future work. Apart from this deviation, Elaine follows the framework of hefty algebras closely.
+
+\section{Effect Rows from Hefty Trees}
+
+Recall that Koka has a syntax for effect rows which corresponds to the free monad:
+\[\mcode{() -> e a}\qquad\sim\qquad\mcode{() -> Free e a}.\]
+To represent effect rows in Elaine, this concept has be generalized to hefty trees. Therefore, Elaine's effect rows correspond to higher-order functors:
+\[\mcode{() -> e a}\qquad\sim\qquad\mcode{() -> Hefty e a}.\]
+However, any algebraic effect needs to be lifted to be represented in a hefty tree. So, to make it easier to mix algebraic and higher-order effects, we therefore lift algebraic effects implicitly. In Elaine, all higher-order effects are suffixed with \hs{!}, so all effects without a \el{!} suffix are lifted. Consequently, for some higher-order effect \el{H!} and algebraic effect \el{A}, we have the following correspondence:
+\[\mcode{() -> <A,H!> b}\qquad\sim\qquad\mcode{() -> Hefty (Lift A + H) b}.\]
+Like the effect rows for algebraic effects, extensions are supported as well. Conceptually the extension operator corresponds to the \hs{+} for higher-order effects:
+\[\mcode{() -> <A|e> b}\qquad\sim\qquad\mcode{() -> Hefty (Lift A + e) b}.\]
+This is an unambiguous yet concise representation of the effect row containing any combination of algebraic and higher-order effects. This notation for effect rows is used for Elaine's types. 
+
+\TODO{Effect row with only algebraic effects is Free but implicitly lifted to Hefty whenever necessary?}

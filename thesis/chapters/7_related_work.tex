@@ -33,7 +33,7 @@ usesState a = get >>= \x -> put (x + a)
 %
 This is analogous to the \hs{State s < f} constraint from the free monad encoding. However, there is a cost to this approach. For every effect, a new type class needs to be introduced and there need to be instance definitions on all existing monad transformers. The number of instance declarations therefore scales quadratically with the number of effects.
 
-Another downside to monad transformers is that the order in which the monads need to be evaluated is entirely fixed. In the free monad encoding and languages with algebraic effects, the effects in the effect row can be reordered. \fixme{The order of the monad transformers also determines the order in which they must be handled: the outermost monad transformer must be handled first}\feedback{translate handling to the context of monad transformers}.
+Another downside to monad transformers is that the order in which the monads need to be evaluated is entirely fixed. In the free monad encoding and languages with algebraic effects, the effects in the effect row can be reordered. To evaluate a computation with monad transformers, the transformers need to be run one at a time. The order of the monad transformers determines the order in which they must be run: the outermost monad transformer must be run first. This is in contrast with algebraic effects, which can be handled in any order.
 
 \section{Other Solutions to the Modularity Problem}
 

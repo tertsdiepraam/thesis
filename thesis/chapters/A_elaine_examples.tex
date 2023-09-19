@@ -8,19 +8,25 @@ This program is a naive brute-forcing SAT solver. We first define a \el{Yield} e
 
 \example{logic}
 
-\section{The Reader Effect}\label{sec:reader}
+\section{Reader Effect}\label{sec:reader}
 
-\TODO{explain}
+The implementation of the reader effect is a standard application for higher-order effects. We start with a higher-order \hs{Reader!} effect with an operation \hs{local!} and an algebraic \hs{Ask} effect. The \hs{local!} operation is elaborated into a computation that handles the \hs{Ask} with the modified value.
+
+This effect corresponds to the \hs{Reader} monad as defined by Haskell's mtl library.
 
 \example{local_reader}
 
-\section{The Writer Effect}\label{sec:writer}
+\section{Writer Effect}\label{sec:writer}
+
+The implementation of the writer effect is similar to the implementation of the reader effect. Again, we elaborate a higher-order effect, \hs{Writer!}, into an algebraic effect, \hs{Out}, with a subset of the operations. The higher-order \hs{censor!} operation handles the algebraic effect to access the output and applies the censoring function to it.
+
+This effect corresponds to the \hs{Writer} monad as defined by Haskell's mtl library.
 
 \example{writer_censor}
 
 \section{Structured Logging}
 
-\TODO{explain}
+Since higher-order effects are suitable for delimiting the scope of effects, we can make an effect for structured logging. The idea is that every \hs{log} call appends a message to the output, but the message is prefixed with some context. This context start out as the empty string, but within every \hs{context!} call, a string is added to this context.
 
 \example{structured_logging}
 
@@ -28,8 +34,8 @@ This program is a naive brute-forcing SAT solver. We first define a \el{Yield} e
 
 Monadic parser combinators \autocite{hutton_monadic_1996} are a popular technique for constructing parsers. The parser for Elaine is also written using \lib{megaparsec}{https://github.com/mrkkrp/megaparsec}, which is a monadic parser combinator library for Haskell. Attempts have been made to implement parser combinators using algebraic effects. However, it requires higher-order combinators for a full feature set matching that of monadic parser combinators. For example, the \hs{alt} combinator takes two branches and attempts to parse the first branch and tries the second branch if the first one fails. This is remarkably similar to the catch operation of the exception effect and is indeed higher-order.
 
-Below is a full listing of a JSON parser written in Elaine using a variation on parser combinators using effects. It is implemented using a higher-order \el{Parse!} effect, which is elaborated into a state and an abort effect, which are imported from the standard library. The \el{try!} effect is a higher-order effect which takes an effectful computation as an argument.
+Below is a full listing of a JSON parser written in Elaine using a variation on parser combinators using effects. It is implemented using a higher-order \el{Parse!} effect, which is elaborated into a state and an abort effect, which are imported from the standard library. The \el{try!} effect is a higher-order effect which takes an effectful computation as an argument. It applies the computation and returns its value if it succeeds, otherwise it will reset the state and return \el{Nothing()}.
 
-Higher-order effects are convenient for parser combinators, but not necessary. There is a parsing effect in a more algebraic style written in Effekt available at \url{https://effekt-lang.org/docs/casestudies/parser} 
+Higher-order effects are convenient for parser combinators, but not necessary. Instead of the \hs{try!} operation, the non-determinism effect can be used to write a backtracking parser. An implementation of that technique in Effekt available at \url{https://effekt-lang.org/docs/casestudies/parser}.
 
 \example{parser_combinator}

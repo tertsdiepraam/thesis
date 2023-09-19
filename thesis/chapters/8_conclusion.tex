@@ -8,7 +8,9 @@ The specification shows how the theory of hefty algebras maps to the syntax and 
 
 The examples throughout this thesis and in \cref{chap:examples} also motivate why support for higher-order effects can be a useful, since we can easily define modular operations that languages without higher-order effects can only express as functions.
 
-The semantics of Elaine are slightly different from the theory of hefty algebras, since Elaine does not require all elaborations to be applied at once. We believe this is sound\feedback{Casper: What is sound?}, and it has not presented any problems in the prototype. However, there is no formal argument for this claim. Future work could fill this gap by generalizing hefty algebras such that it allows for multiple separate elaborations.
+\section{Future Work}
+
+The semantics of Elaine are slightly different from the theory of hefty algebras, since Elaine does not require all elaborations to be applied at once. We conjecture this to correspond to hefty algebras, and it has not presented any problems in the prototype. However, there is no formal argument for this claim. Future work could fill this gap by generalizing hefty algebras such that it allows for multiple separate elaborations.
 
 A missing feature in Elaine is type parameters for effects. In Koka, for example, the state effect \code{state<s>} is parametrized by a type \code{s}. We believe Elaine could be extended to support this, however, both the specification and the prototype do not include this feature yet. Another omission are IO operations. An Elaine program cannot write to files, accept input or print text apart from the value it returns. Furthermore, Elaine does not include any extensions of algebraic effects, such as named handlers.
 

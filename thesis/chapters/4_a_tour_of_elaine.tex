@@ -12,7 +12,7 @@ All expressions in Elaine are statically and strongly typed with a type system b
 
 Like Koka, Elaine has strict semantics. This means that effects can only occur during function application \autocite{leijen_koka_2014}. Additionally, the order in which effects are performed is very clear in this model. We believe this makes effects easier to reason about than in a language with lazy evaluation. Naturally, lazy evaluation can still be encoded into a strict language \autocite{wadler_lazy_1996}. It also matches the more imperative style Elaine programs are written in. There is currently no way for Elaine programs to interact with the operating system; there is no equivalent to the \hs{IO} monad from Haskell or the \code{console} and \code{fsys} effects from Koka.
 
-The source code for the Elaine prototype and additional examples are included in the artefact accompanying this thesis. The full specification for Elaine, including typing judgements and reduction semantics are given in \cref{chap:spec}.
+The source code for the Elaine prototype and additional examples are included in the artifact accompanying this thesis. The full specification for Elaine, including typing judgements and reduction semantics are given in \cref{chap:spec}.
 
 \section{Basics}
 
@@ -299,11 +299,12 @@ let square = fn(x: <> Int) <> Int {
 };
 \end{lst}
 %
-Simple effect rows consist of a list of effect names separated by commas. The return type of a function that returns an integer and uses the \el{Ask} and \el{State} effects has type \el{<Ask,State> Int} or, equivalently \el{<State,Ask> Int}. The order of effects in effect rows is irrelevant. However, the multiplicity is important, that is, the effect rows \el{<State,State>} and \el{<State>} are not equivalent. To capture the equivalence between effect rows, we therefore model them as multisets.
+Simple effect rows consist of a list of effect names separated by commas. The return type of a function that returns an integer and uses the \el{Ask} and \el{State} effects has type \el{<Ask,State> Int} or, equivalently \el{<State,Ask> Int}. The order of effects in effect rows is irrelevant. However, the multiplicity is important, that is, the effect rows \el{<State,State>} and \el{<State>} are not equivalent. To capture the equivalence between effect rows, we model them as multisets.
 
-Additionally, we can extend effect rows with other effect rows. This is denoted with the \el{|} at the end of the effect row: \el{<A,B|e>} means that the effect row contains \el{A}, \el{B} and some (possibly empty) set of remaining effects. We called a row without extension \emph{closed} and a row with extension \emph{open}.
+Like in Koka, we can extend effect rows with other effect rows. This is denoted with the \el{|} at the end of the effect row: \el{<A,B|e>} means that the effect row contains \el{A}, \el{B} and some (possibly empty) set of remaining effects. We call a row without extension \emph{closed} and a row with extension \emph{open}.
 
-Like types, effect rows are unified in the type checker. For unification any closed row is first opened by introducing a new expansion variable. Then unification solves for the equation
+
+Like value types, effect rows are unified in the type checker. For unification, any closed row is first opened by introducing a new expansion variable. Then unification solves for the equation
 \[ \el{<A1,...,AN|e>} = \el{<B1,...,BM|f>}, \]
 for \el{e} and \el{f}. To do so, a fresh variable \el{g} is introduced which represents the intersection of \el{e} and \el{f}. The unified row then becomes \el{<A1,...,AN,B1,...,BN|g>}. \Cref{table:unification} provides some more examples of effect row unification. The full procedure for unification is detailed in \cref{sec:effectrows}.
 
@@ -323,6 +324,8 @@ for \el{e} and \el{f}. To do so, a fresh variable \el{g} is introduced which rep
 \label{table:unification}
 \end{table}
 %
+\TODO{Give implications of this algo}
+
 \section{Functions Generic over Effects}
 We can use extensions to ensure equivalence between effect rows without specifying the full rows. For example, the following function uses the \el{Abort} effect if the called function returns false, while retaining the effects of the wrapped function.
 
