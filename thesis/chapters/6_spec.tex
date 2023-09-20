@@ -1,18 +1,16 @@
 \chapter{Elaine Specification}\label{chap:spec}
 
-\TODO{Custom type declarations are in the language but not explained in this chapter yet.}
-
-This chapter contains the detailed specification for Elaine: the syntax, semantics, type inference rules, and the functions provided by the standard library.
+This chapter contains the specification for Elaine. This specification includes the syntax definition, type inference rules, reduction semantics, and the functions provided by the standard library.
 
 \section{Syntax Definition}\label{sec:syntax}
 
-The Elaine syntax was designed to be relatively easy to parse. The grammar is white-space insensitive and most constructs are unambiguously identified with keywords at the start.
+The Elaine syntax was designed to be easy to parse. The grammar is not white-space sensitive and most constructs are unambiguously identified with keywords at the start.
 
-Based on the previous chapters, the \tok{elab} without an elaboration might be surprising. The use of that syntax is explained in \cref{chap:elabres}.
-
-The full syntax definition is given in \cref{fig:syntax}. For convenience, we use several extensions to BNF:
+The full syntax definition is given in \cref{fig:syntax} as a context-free grammar. In this grammar, $x$ represents an identifier. We use the following notation for the grammar:
 \begin{itemize}
-    \item tokens are written in \tok{monospace font}, this includes the tokens \tok{[]}, \tok{<>}, \tok{|}, and \tok{!}, which might be confused with the syntax of BNF,
+    \item a sort is declared with $::=$,
+    \item the alternatives of a sort are separated by $|$,
+    \item tokens are written in \tok{monospace font},
     \item $\opt{p}$ indicates that the sort $p$ is optional,
     \item $\rep{p}$ indicates that the sort $p$ can be repeated zero or more times, and
     \item $\csep{p}$ indicates that the sort $p$ can be repeated zero or more times, separated by commas.
@@ -28,26 +26,27 @@ The full syntax definition is given in \cref{fig:syntax}. For convenience, we us
         \OR & \opt{\tok{pub}}\ \tok{use}\ x\tok{;}\\
         \OR & \opt{\tok{pub}}\ \tok{let}\ \opt{\tok{rec}}\ p\ \tok{=}\ e\tok{;}\\
         \OR & \opt{\tok{pub}}\ \tok{effect}\ \phi\ \tok{\{} \csep{s} \tok{\}}\\
-        \OR & \opt{\tok{pub}}\ \tok{type}\ x\ \tok{\{} \csep{s} \tok{\}}\\
+        \OR & \opt{\tok{pub}}\ \tok{type}\ x\ \tok{\{} \csep{c} \tok{\}}\\
     \\
     \text{block}\ b
         \IS & \tok{\{}\ es\ \tok{\}}\\
     \text{expression list}\ es
-        \IS & e\tok{;}\ es\\
+        \IS & e\\
+        \OR & e\tok{;}\ es\\
         \OR & \tok{let}\ \opt{\tok{rec}}\ p\ \tok{=}\ e\tok{;}\ es\\
-        \OR & e\\
     \text{expression}\ e
         \IS & x\\
-        \OR & \tok{()} \OR \tok{true} \OR \tok{false} \OR number \OR string \\
+        \OR & \tok{()} \OR \tok{true} \OR \tok{false} \OR integer \OR string \\
         \OR & \tok{(} \csep{e} \tok{)} \\
-        \OR & \tok{fn} \tok{(} \csep{p} \kw{)}\ [T]\ b \\
+        \OR & \tok{fn} \tok{(} \csep{p} \kw{)}\ \opt{T}\ b \\
         \OR & \tok{if}\ e\ b\ \tok{else}\ b\\
         \OR & e\tok{(} \csep{e} \tok{)} \OR \phi\tok{(} \csep{e} \tok{)} \\
+        \OR & \tok{handler}\ \tok{\{} \csep{o} \tok{\}}\\
         \OR & \tok{handler}\ \tok{\{} \tok{return} \tok{(}x\tok{)}\ b \tok{,}\ \csep{o} \tok{\}}\\
         \OR & \tok{handle}\tok{[}e\tok{]}\ e \\
         \OR & \tok{elaboration}\ x\tok{!}\ \tok{->}\ \Delta\ \tok{\{} \csep{o} \tok{\}}\\
         \OR & \tok{elab}\tok{[} e \tok{]}\ e \OR \tok{elab}\ e \\
-        \OR & es\\
+        \OR & b\\
     \\
     \text{annotatable variable}\ p
         \IS & x\ \tok{:}\ T \OR x\\
@@ -55,6 +54,8 @@ The full syntax definition is given in \cref{fig:syntax}. For convenience, we us
         \IS & x \tok{(} \csep{T} \tok{)}\ T\\
     \text{effect clause}\ o
         \IS & x \tok{(} \csep{x} \tok{)}\ b\\
+    \text{constructor}\ c
+        \IS & x \tok{(} \csep{T} \tok{)}\\
     \\
     \text{type}\ T
         \IS & \Delta\ \tau \OR \tau\\
@@ -62,20 +63,22 @@ The full syntax definition is given in \cref{fig:syntax}. For convenience, we us
         \IS & x \\ 
         \OR & \tok{()} \OR \tok{Bool} \OR \tok{Int} \OR \tok{String}\\
         \OR & \tok{fn} \tok{(} \csep{T} \tok{)}\ T \\
-        \OR & \tok{handler}\ x\ \tau\ \tau \\
-        \OR & \tok{elaboration}\ x!\ \Delta \\
+        \OR & \tok{Handler}\tok{[}x\tok{,}\tau\tok{,}\tau\tok{]} \\
+        \OR & \tok{Elab}\tok{[}x!\tok{,}\Delta\tok{]} \\
+        \OR & x\tok{[}\csep{\tau}\tok{]} \\
     \text{effect row}\ \Delta
-        \IS & \tok{<} \csep{\phi} \opt{\tok{|} x} \tok{>} \\
+        \IS & \tok{<} \csep{\phi} \tok{>}
+        \OR \tok{<} \csep{\phi} \tok{|} x \tok{>} \\
     \text{effect}\ \phi \IS & x \OR x\tok{!}
 \end{align*}
 \caption{Syntax definition of Elaine}
 \label{fig:syntax}
 \end{figure}
 
-\section{Effect row semantics}\label{sec:effectrows}
+\section{Effect Row Semantics}\label{sec:effectrows}
 
+\TODO{Rewrite entirely}
 Elaine's type checker uses multisets to model effect rows, meaning that the row $\row{A, B, B, C}$ is represented by the multiset $\S{A, B, B, C}$. This yields a semantics where the multiplicity of effects is significant, but the order is not.
-
 
 Since the effect row of a computation must match the effect row of the context in which it is used, the effect row of the computation is an overapproximation of the effects that are necessary. Therefore, we should allow effect row polymorphism, so that the same expression can be used within multiple contexts.
 
@@ -96,7 +99,7 @@ Then we get the following equality relation between effect rows $A$ and $B$:
 \[ A \cong B \iff \set(A) = \set(B). \]
 In typing judgments, the effect row is an overapproximation of the effects that actually used by the expression. We freely use set operations in the typing judgments, implicitly calling the $\set$ function on the operands where required. An omitted effect row is treated as an empty effect row ($\row{}$).
 
-Any effect prefixed with a $!$ is a higher-order effect, which must elaborated instead of handled. Due to this distinction, we define the operations $H(R)$ and $A(R)$ representing the higher-order and first-order subsets of the effect rows, respectively. The same operators are applied as predicates on individual effects, so the operations on rows are defined as:
+Any effect prefixed with a $!$ is a higher-order effect, which must elaborated instead of handled. Due to this distinction, we define the operations $H(R)$ and $A(R)$ representing the higher-order and algebraic subsets of the effect rows, respectively. The same operators are applied as predicates on individual effects, so the operations on rows are defined as:
 \[ 
     H(\Delta) = \S{ \phi \in \Delta \given H(\phi) }
     \qquad
@@ -104,8 +107,6 @@ Any effect prefixed with a $!$ is a higher-order effect, which must elaborated i
     \qquad
     A(\Delta) = \S{ \phi \in \Delta \given A(\phi) }.
 \]
-
-\TODO{Talk about \autocite{leijen_extensible_2005,leijen_koka_2014}.}
 
 During type checking effect rows are represented as a pair consisting of a multiset of effects and an optional extension variable. In this section we will use a more explicit notation than the syntax of Elaine by using the multiset representation directly. Hence, a row $\row{A_1,\dots,A_n|e_A}$ is represented as the multiset $\{A_1,\dots,A_n\} + e_A$.
 
@@ -126,315 +127,324 @@ In this case, unification is always possible, because both rows can be extended 
 \end{align*}
 In other words, $A$ is extended with the effects that are in $B$ but not in $A$ and, similarly, $B$ is extended with the effects in $A$ but not in $A$.
 
-\TODO{Formalize this here and move some stuff to the tour chapter.}
+\section{Type System}
 
-\section{Typing judgments}
+We give a declarative specification of the type system of Elaine. This specification consists of two parts: inference rules for expressions and inference rules for declarations.
 
-The context $\Gamma = (\Gamma_M, \Gamma_V, \Gamma_E, \Gamma_\Phi)$ consists of the following parts:
+The context $\Gamma = (\Gamma_M; \Gamma_V; \Gamma_E; \Gamma_\Phi)$ consists of the following parts:
 \begin{align*}
-    \Gamma_M &: x \to (\Gamma_V, \Gamma_E, \Gamma_\Phi) & \text{module to context}\\
-    \Gamma_V &: x \to \sigma & \text{variable to type scheme}\\
-    \Gamma_T &: x \to T & \text{identifier to custom type}
-    \Gamma_\Phi &: x \to \S{s_1,\dots,s_n} & \text{effect to operation signatures}
+    \Gamma_M &: x \to \Gamma&& \text{module to context}\\
+    \Gamma_V &: x \to \sigma && \text{variable to type scheme}\\
+    \Gamma_T &: x \to T && \text{identifier to custom type}\\
+    \Gamma_\Phi &: x \to \S{s_1,\dots,s_n} && \text{effect to operation signatures}
 \end{align*}
-
-\info{A $\Gamma_T$ for data types might be added.}
-
-Whenever one of these is extended, the others are implicitly passed on too, but when declared separately, they not implicitly passed. For example, $\Gamma''$ is empty except for the single $x: T$, whereas $\Gamma'$ implicitly contains $\Gamma_M$, $\Gamma_E$ \& $\Gamma_\Phi$.
-\[ \Gamma'_V = \Gamma_V, x: T \qquad \Gamma''_V = x: T \]
-
-If the following invariants are violated there should be a type error:
-
-\begin{itemize}
-    \item The operations of all effects in scope must be disjoint.
-    \item Module names are unique in every scope.
-    \item Effect names are unique in every scope.
-\end{itemize}
-
-\subsection{Type inference}
-
-We have the usual generalize and instantiate rules. But, the ``generalize'' rule requires an empty effect row.
-
+In the typing judgments, we often need to extend just one of these sub-contexts. Therefore, if we extend one, the rest is implicitly passed to. For example, the following expressions are equivalent:
 \begin{gather*}
-    \infer{
-        \Gamma \vdash e : \forall \alpha. \sigma
-    }{
+    \Gamma'_V = \Gamma_V, x: T \\
+    \Gamma' = (\Gamma_M\ ;\ \Gamma_V, x: T\ ;\ \Gamma_E\ ;\ \Gamma_\Phi)
+\end{gather*}
+
+In the typing judgments below, we assume that all types are explicitly specified. Hindley-Milner type inference can be used to infer the types if missing. This is also done in the Elaine prototype.
+
+In addition to the typing judgments, we assert that all effects, effect operations and modules have unique names within any scope.
+
+The typing judgments for expressions inductively define a ternary relation
+\[ \Gamma \vdash e : \Delta\tau, \]
+where $\Gamma$ ranges over contexts, $e$ ranges over expressions and $\Delta\;\tau$ ranges over pair of effect rows and value types. This relation should be read as ``in the context $\Gamma$, the expression $e$ has type $\Delta\tau$''. This relation is fairly standard, apart from the inclusion of the effect row. Note that in this specification, the effect row is an overapproximation of the effect which are present. This means, for example, that the boolean value \el{true} has the type $\Delta\Bool$ for every effect row $\Delta$, as rule \textsc{E-True} shows. A common pattern in the judgments is that many expressions that are evaluated in sequence all have the same effect row. This can be seen clearly in the \textsc{E-If} and \textsc{E-Tuple} rules. A function application (\textsc{E-App}) has an effect row that matches the same effect row on the return type of the called function. 
+
+Handlers have the type \lstinline[mathescape]{Handler[$\phi$,$\tau$,$\tau'$]}. In this type, the $\phi$ variable represents the effect that it handles, $\tau$ is the type of the sub-computation and $\tau'$ is the type of the \el{handle} that handles a computation with type $\tau$. The $\tau$ and $\tau'$ types may be related. For example, a handler for the abort effect might be represented by the type scheme
+\[ \forall \alpha.\ \kw{Handler[Abort,}\alpha\kw{,Maybe[}\alpha\kw{]]}. \]
+If no \el{return} branch is specified, it is assumed to be the identity function and hence $\tau$ is equal to $\tau'$ in that case, as written in rule \textsc{E-Handler}.
+
+Elaborations have a similar type to handlers: \lstinline[mathescape]{Elab[$\phi$,$\Delta$]}. Here, $\phi$ again represents the effect this elaboration is for. The effect row $\Delta$ is the set of algebraic effects it elaborates into. Therefore, \textsc{E-Elaboration} asserts that $\Delta$ is algebraic. When an elaboration is applied (\textsc{E-Elab}), this effect row must be unifiable with the effect row for the return type of of \el{elab}.
+
+Rule \textsc{E-ImplicitElab} is different from \textsc{E-Elab}, because it elaborates all higher-order effects. Therefore, it requires that exactly one elaboration is in scope for each higher-order effect. In this rule, $A(\Delta')$ represents the algebraic subset of the effects in $\Delta'$. The uniqueness is important here to keep the implicit elaboration resolution predictable as explained in \cref{chap:elabres}.
+
+The inference rules for declarations define a different relation
+\[ \Gamma \vdash d \Rightarrow (\Gamma_{\text{priv}}, \Gamma_{\text{pub}}), \]
+where $\Gamma$ again ranges over contexts and $d$ ranges over declarations and sequences of declarations. The pair of contexts represent the private and public context that $d$ generates. The relation should be read as ``in the context $\Gamma$, the declaration $d$ generates the bindings in $\Gamma_{\text{priv}}$ and exposes the bindings in $\Gamma_{\text{pub}}$.'' Both contexts only contain new bindings; they are not additive. The private context is always a subset of the public context.
+
+All declarations generate only private bindings with an empty context for public bindings, written $\varepsilon$. The \textsc{D-Pub} rule then ensures that this private context is duplicated to the public context. Therefore, if the declarations in a module generate $(\Gamma_{\text{priv}};\Gamma_{\text{pub}})$, then only $\Gamma_{\text{pub}}$ should be stored in $\Gamma_M$, which is specified by the \textsc{D-Mod} rule.
+
+The \textsc{D-Type} ensures two things: it adds the type to the type context $\Gamma_T$ and adds all constructors as functions to the variable context $\Gamma_V$. Because all constructors are modelled as functions, we do not need special rules for constructors in the expression inference rules. The \textsc{D-AlgebraicEffect} and \textsc{D-HigherOrderEffect} are split to ensure that all higher-order operations have an \el{!} suffix. Apart from that difference, these rules are identical.
+
+\setlength{\fboxsep}{2\fboxsep}
+
+\begin{figure}[p]
+\vspace*{-2em}
+\begin{mathpar}
+    \hfill\boxed{\Gamma \vdash e : T}\\
+    \inferrule[E-Gen]{
         \Gamma \vdash e : \sigma
         \qquad
         \alpha \not\in \ftv(\Gamma)
-    }
-    \qquad
-    \infer{
-        \Gamma \vdash e : \sigma[\alpha \mapsto T']
     }{
         \Gamma \vdash e : \forall \alpha. \sigma
     }
-\end{gather*}
-
-Where $\ftv$ refers to the free type variables in the context.
-
-\subsection{Expressions}
-The typing rules for expressions are given below. The rules for handlers and elaborations are worth considering separately and are listed in \cref{sec:spechandler,sec:specelabs}.
-
-\begin{gather*}
-    \infer{
-        \Gamma \vdash x : \Delta\;\tau
-    }{
+    \and
+    \inferrule[E-Inst]{
+        \Gamma \vdash e : \forall \alpha. \sigma
+        }{
+        \Gamma \vdash e : \sigma[\alpha \mapsto T']
+    }
+    \and
+    \inferrule[E-Var]{
         \Gamma_V(x) = \Delta\;\tau
+        }{
+        \Gamma \vdash x : \Delta\;\tau
     }
-    \qquad
-    \infer{
-        \Gamma \vdash \S{e} : \Delta\;\tau
+    \and
+    \inferrule[E-Block]{
+        \Gamma \vdash es : \Delta\;\tau
     }{
-        \Gamma \vdash e : \Delta\;\tau
+        \Gamma \vdash \tok{\{}es\tok{\}} : \Delta\;\tau
     }
-    \qquad
-    \infer{
+    \and
+    \inferrule[E-Unit]{ }{
         \Gamma \vdash \unit: \Delta\;\unit
-    }{}
-    \qquad
-    \infer{
-        \Gamma \vdash number : \Delta\;\mcode{Int}
-    }{}
-    \\\\
-    \qquad
-    \infer{\Gamma \vdash \true : \Delta\;\Bool}{}
-    \qquad
-    \infer{\Gamma \vdash \false : \Delta\;\Bool}{}
-    \qquad
-    \infer{
-        \Gamma \vdash string : \Delta\;\mcode{String}
-    }{}
-    \\\\
-    \infer{
-        \Gamma \vdash \tok{(} e_1\tok{,} \dots\tok{,} e_n\tok{)} : (T_1, \dots, T_n)
-    }{
-        \left[ \Gamma \vdash e_i : T_i \right]_{1\leq i\leq n}
     }
-    \qquad
-    \infer{
-        \Gamma \vdash e\tok{(}e_1\tok{,} \dots\tok{,} e_n\tok{)}: \Delta\;\tau
+    \and
+    \inferrule[E-Int]{ }{
+        \Gamma \vdash i : \Delta\;\kw{Int}
+    }
+    \and
+    \inferrule[E-True]{ }{\Gamma \vdash \true : \Delta\;\Bool}
+    \and
+    \inferrule[E-False]{ }{\Gamma \vdash \false : \Delta\;\Bool}
+    \and
+    \inferrule[E-String]{ }{
+        \Gamma \vdash s : \Delta\;\kw{String}
+    }
+    \and
+    \inferrule[E-Tuple]{
+        \left[ \Gamma \vdash e_i : \Delta \tau_i \right]_{1\leq i\leq n}
+        }{
+        \Gamma \vdash \tok{(} e_1\tok{,} \dots\tok{,} e_n\tok{)} : \Delta\;(\tau_1, \dots, \tau_n)
+    }
+    \and
+    \inferrule[E-Seq]{
+        \Gamma \vdash e : \Delta\;\tau
+        \\
+        \Gamma \vdash es : \Delta\;\tau'
     }{
+        \Gamma \vdash e; es : \Delta\;\tau'
+    }
+    \and
+    \inferrule[E-Let]{
+        \Gamma \vdash e : \Delta\;\tau
+        \\
+        \Gamma_V, x: \tau \vdash es : \Delta\;\tau'
+        }{
+        \Gamma \vdash \kw{let}\;x\;\tok{=}\;e\tok{;}\;es : \Delta\;\tau'
+    }
+    \and
+    \inferrule[E-LetRec]{
+        \Gamma_V, x: \tau \vdash e : \Delta\;\tau_1
+        \\
+        \Gamma_V, x: \tau \vdash es : \Delta\;\tau_2
+    }{
+        \Gamma \vdash \kw{let}\;\kw{rec}\;x\;\tok{=}\;e\tok{;}\;es : \Delta\;\tau_2
+    }
+
+    \and
+    \inferrule[E-FuncDef]{
+        \Gamma_V, x_1: \row{}\tau_1, \dots, x_n: \row{}\tau_n \vdash b : T
+    }{
+        \Gamma \vdash \fn\tok{(}x_1\tok{:}\;\tau_1\tok{,}\;\dots\tok{,}\;x_n\tok{:}\;\tau_n\tok{)}\;T\; b: \Delta\;(\tau_1,\dots, \tau_n) \to T
+    }
+    \and
+    \inferrule[E-App]{
         \Gamma \vdash e: (\tau_1, \dots, \tau_n) \to \Delta\;\tau
-        \qquad
-        \Gamma \vdash e_i : \Delta\;\tau_i
-    }
-    \\\\
-    \infer{
-        \Gamma \vdash \fn\tok{(}x_1\tok{:}\;\tau_1\tok{,}\;\dots\tok{,}\;x_n\tok{:}\;\tau_n\tok{)}\;T\; \{e\}: \Delta\;(\tau_1,\dots, \tau_n) \to T
+        \\\\
+        [\Gamma \vdash e_i : \Delta\;\tau_i]_{1\leq i\leq n}
     }{
-        \Gamma_V, x_1: \row{}\tau_1, \dots, x_n: \row{}\tau_n \vdash c : T
+        \Gamma \vdash e\tok{(}e_1\tok{,} \dots\tok{,} e_n\tok{)}: \Delta\;\tau
     }
-    \\\\
-    \infer{
-        \Gamma \vdash \cond{e_1}{e_2}{e_3} : \Delta\;\tau
+    \and
+    \inferrule[E-If]{
+        \Gamma \vdash e : \Delta\;\Bool
+        \\\\
+        \Gamma \vdash b_1 : \Delta\;\tau
+        \\\\
+        \Gamma \vdash b_2 : \Delta\;\tau
     }{
-        \Gamma \vdash e_1 : \Delta\;\Bool
-        \qquad
-        \Gamma \vdash e_2 : \Delta\;\tau
-        \qquad
-        \Gamma \vdash e_3 : \Delta\;\tau
+        \Gamma \vdash \kw{if}\ e\ b_1\ \kw{else}\ b_2 : \Delta\;\tau
     }
-    \\\\
-    \infer{
-        \Gamma \vdash \kw{let}\;x\;\tok{=}\;e_1\tok{;}\;e_2 : \Delta\;\tau'
-    }{
-        \Gamma \vdash e_1 : \Delta\;\tau
-        \qquad
-        \Gamma_V, x: \tau \vdash e_2 : \Delta\;\tau'
-    }
-    \qquad
-    \infer{
-        \Gamma \vdash \kw{let}\;\kw{rec}\;x\;\tok{=}\;e_1\tok{;}\;e_2 : \Delta\;\tau_2
-    }{
-        \Gamma_V, x: \tau \vdash e_1 : \Delta\;\tau_1
-        \qquad
-        \Gamma_V, x: \tau \vdash e_2 : \Delta\;\tau_2
-    }
-    \\\\
-    \infer{
-        \Gamma \vdash \kw{match}\;e\;\tok{\{}\;p_1\;\kw{=>}\; e_1\tok{,}\dots\tok{,} p_n\;\kw{=>}\;e_n\;\tok{\}} : \Delta\tau
-    }{
-        \Gamma \vdash e: \Delta x \qquad C_1,\dots,C_n = \Gamma_T(x)\\
+    \and
+    \inferrule[E-Match] {
+        \Gamma \vdash e: \Delta\;\tau \\ \S{c_1,\dots,c_n} = \Gamma_T(\tau) \\\\
         \left[
-            \begin{gathered}
-                c_i\tok{(}x_{i,1}\tok{,} \dots\tok{,} x_{i,m_i}\tok{)} = p_i\qquad c_i(\tau_{i,1}, \dots, \tau_{i,m_i}) = C_i
+            { \begin{gathered}
+                x_i\tok{(}x_{i,1}\tok{,} \dots\tok{,} x_{i,m_i}\tok{)} = p_i\qquad x_i(\tau_{i,1}, \dots, \tau_{i,m_i}) = c_i
                 \\
-                \Gamma, x_{i,1} : \tau_{i,1}, \dots, x_{i,m_i} : \tau_{i,m_i} \vdash e_i : \Delta\tau
-            \end{gathered}
+                \Gamma, x_{i,1} : \tau_{i,1}, \dots, x_{i,m_i} : \tau_{i,m_i} \vdash e_i : \Delta\tau'
+            \end{gathered} }
         \right]_{1\leq i\leq n}
-    }
-\end{gather*}
-
-\subsection{Declarations and Modules}
-
-The modules are gathered into $\Gamma_M$ and the variables that are in scope are gathered in $\Gamma_V$. The $\Rightarrow$ relation specifies the bindings that a declaration generates. The right-hand side of this relation is a public with the private and public declarations. Without modifier, the public declarations are empty, but with the \kw{pub} keyword, the private bindings are copied into the public declarations.
-
-\begin{gather*}
-    \infer{
-        \Gamma \vdash d_1 \dots d_n \Rightarrow (\Gamma_n; \Gamma)
     }{
-        \Gamma_{i-1} \vdash d_i \Rightarrow (\Gamma'_i; \Gamma'_{\text{pub}, i})
-        \qquad
-        \Gamma_i = \Gamma_{i-1}, \Gamma'_i
-        \qquad
-        \Gamma \vdash \Gamma'_{\text{pub},1}, \dots, \Gamma'_{\text{pub},n}
+        \Gamma \vdash \kw{match}\;e\;\tok{\{}\;p_1\;\kw{=>}\; e_1\tok{,}\dots\tok{,} p_n\;\kw{=>}\;e_n\;\tok{\}} : \Delta\tau'
     }
-    \\\\
+    \and
+    \inferrule[E-Handle]{
+        \Gamma \vdash e_h : \Delta\;\kw{Handler}[\phi,\tau,\tau']
+        \\\\
+        \Gamma \vdash e_c : \row{\phi | \Delta}\;\tau
+    }{
+        \Gamma \vdash \handle\tok{[}e_h\tok{]}\;e_c : \Delta\;\tau'
+    }
+    \and
+    % Implicit Elab
+    \inferrule[E-ImplicitElab]{
+        \big[
+            \exists!\ x.\ \Gamma_V(x) = \kw{Elab}[\phi,\Delta]
+        \big]_{\phi \in H(\Delta')}
+        \\\\
+        \Gamma \vdash e : \Delta'\;\tau
+        \\
+        \Delta = A(\Delta')
+    }{
+        \Gamma \vdash \elab\;e : \Delta\;\tau
+    }
+    \and
+    % Elab
+    \inferrule[E-Elab]{
+        \Gamma \vdash e_E : \Delta\;\kw{Elab}[x!, \Delta]
+        \\\\
+        \Gamma \vdash e_c : \row{x!|\Delta}\;\tau
+    }{
+        \Gamma \vdash \elab\tok{[}e_E\tok{]}\;e_c: \Delta\tau
+    }
+    \and
+    \inferrule[E-HandlerNoRet]{
+        \Gamma \vdash \handler\;\tok{\{} \return\tok{(}x\tok{)} \tok{\{} x \tok{\}}\tok{,} o_1\tok{,} \dots\tok{,} o_n \tok{\}}
+        : \kw{Handler}[\phi,\tau,\tau]
+    }{
+        \Gamma \vdash \handler\;\tok{\{} o_1\tok{,} \dots\tok{,} o_n \tok{\}}
+        : \kw{Handler}[\phi,\tau,\tau]
+    }
+    \and
+    \inferrule[E-Handler]{
+        \Gamma_\Phi(\phi) = \S{s_1, \dots, s_n }
+        \\
+        \Gamma, x: \tau \vdash e_{\text{ret}} : \tau' 
+        \\\\
+        \left[
+            { \begin{gathered}
+                s_i = x_i\tok{(}\tau_{i,1}\tok{,} \dots\tok{,} \tau_{i,m_i}\tok{)} \to \tau_i
+                \qquad
+                o_i = x_i\tok{(}x_{i,1}\tok{,} \dots\tok{,} x_{i,m_i}\tok{)}\;\tok{\{} e_i \tok{\}}
+                \\
+                \Gamma_V, \kw{resume}\;: (\tau_i) \to \tau', x_{i,1}: \tau_{i,1}, \dots, x_{i,m_i}: \tau_{i,m_i}
+                \vdash e_i: \tau'
+            \end{gathered} }
+        \right]_{1\leq i\leq n}
+    }{
+        \Gamma \vdash \handler\;\tok{\{} \return\tok{(}x\tok{)} \tok{\{} e_{\text{ret}} \tok{\}}\tok{,} o_1\tok{,} \dots\tok{,} o_n \tok{\}}
+        : \kw{Handler}[\phi,\tau,\tau']
+    }
+    \and
+    % Elaboration
+    \inferrule[E-Elaboration]{
+        \Gamma_\Phi(x!) = \S{s_1, \dots, s_n}
+        \\
+        \Delta \text{ is algebraic}
+        \\\\
+        \left[
+            { \begin{gathered}
+                s_i = x_i\tok{!}\tok{(}\tau_{i,1}\tok{,} \dots\tok{,} \tau_{i,m_i}\tok{)}\;\tau_i \qquad o_i = x_i!\tok{(}x_{i,1}\tok{,} \dots\tok{,} x_{i,m_i}\tok{)} \tok{\{} e_i \tok{\}}
+                \\
+                \Gamma,x_{i,1}: \Delta\;\tau_{i,1},\dots,x_{i,m_i}: \Delta\;\tau_{i,m_i} \vdash 
+                e_i : \Delta\;\tau_i
+            \end{gathered} }
+        \right]_{1\leq i \leq n}
+    }{
+        \Gamma \vdash \elaboration\;x! \to \Delta\;\S{o_1, \dots, o_n} : \kw{Elab}[x!, \Delta]
+    }
+\end{mathpar}
+\caption{Inference rules for expressions.}
+\end{figure}
+
+\begin{figure}[p]
+\begin{mathpar}
+    \hfill\boxed{\Gamma \vdash d \Rightarrow (\Gamma_{\text{priv}};\Gamma_{\text{pub}})}\\
+    \inferrule[D-Seq]{
+        \Gamma \vdash d_1 \Rightarrow (\Gamma_{\text{priv},1},\Gamma_{\text{pub,1}})
+        \\
+        \Gamma,\Gamma_{\text{priv},1} \vdash d_2\dots d_n \Rightarrow (\Gamma_{\text{priv},n},\Gamma_{\text{pub,n}})
+    }{
+        \Gamma \vdash d_1 \dots d_n \Rightarrow (\Gamma_{\text{priv},1},\Gamma_{\text{priv},n};\ \Gamma_{\text{pub},1},\Gamma_{\text{pub},n})
+    }
+    \and
     % module
-    \infer{
-        \Gamma \vdash \kw{mod}\;x\;\S{ d_1 \dots d_n } \Rightarrow (\Gamma_{M,x}; \epsilon)
-    }{
-        \Gamma \vdash d_1 \dots s_n \Rightarrow (\Gamma_{\text{priv}};\Gamma_{\text{pub}})
-        \qquad
+    \inferrule[D-Mod]{
+        \Gamma \vdash d_1 \dots d_n \Rightarrow (\Gamma_{\text{priv}};\Gamma_{\text{pub}})
+        \\
         \Gamma_{M,x} = x : \Gamma_{\text{pub}}
+    }{
+        \Gamma \vdash \kw{mod}\;x\;\tok{\{} d_1 \dots d_n \tok{\}} \Rightarrow (\Gamma_{M,x}; \varepsilon)
     }
-    \\\\
-    \qquad
+    \and
     % public declaration
-    \infer{
+    \inferrule[D-Pub]{
+        \Gamma \vdash d \Rightarrow (\Gamma'; \varepsilon)
+    }{
         \Gamma \vdash \kw{pub}\;d \Rightarrow (\Gamma'; \Gamma')
-    }{
-        \Gamma \vdash d \Rightarrow (\Gamma', \epsilon)
     }
-    \qquad
+    \and
     % Import
-    \infer{
-        \Gamma \vdash \kw{use}\;x\tok{;} \Rightarrow (\Gamma_M(x), \epsilon)
-    }{}
-    \\\\
-    % Type declaration
-    \infer{
-        \Gamma \vdash \type\;x \;
-        \{ x_1(\tau_{1,1}, \dots, \tau_{1,n_1}), \dots, x_m(\tau_{m,1}, \dots, \tau_{m,n_m}) \} \Rightarrow (\Gamma', \epsilon)
+    \inferrule[D-Use]{ }{
+        \Gamma \vdash \kw{use}\;x\tok{;} \Rightarrow (\Gamma_M(x); \varepsilon)
+    }
+    \and
+    % Global value
+    \inferrule[D-Let]{
+        \Gamma \vdash e : \tau
+        \qquad
+        \Gamma'_V = x : \tau
     }{
+        \Gamma \vdash \kw{let}\;x\;\tok{=}\;e\tok{;} \Rightarrow (\Gamma'; \varepsilon)
+    }
+    \and
+    \inferrule[D-LetRec]{
+        \Gamma, x: \tau \vdash e : \tau
+        \qquad
+        \Gamma'_V = x : \tau
+    }{
+        \Gamma \vdash \kw{let}\;\kw{rec}\;x\;\tok{=}\;e\tok{;} \Rightarrow (\Gamma'; \varepsilon)
+    }
+    \and
+    % Type declaration
+    \inferrule[D-Type]{
         f_i = \forall \alpha. (\tau_{i,1}, \dots, \tau_{i,n_i}) \to \alpha\;x
         \\
         \Gamma'_V = x_1: f_1,\dots,x_m: f_m
         \qquad
         \Gamma'_T = x: \{x_1(\tau_{1,1}, \dots, \tau_{1,n_1}), \dots, x_m(\tau_{m,1}, \dots, \tau_{m,n_m})\}
-    }
-    \\\\
-    % Global value
-    \infer{
-        \Gamma \vdash \kw{let}\;x\;\tok{=}\;e\tok{;} \Rightarrow (\Gamma', \epsilon)
     }{
-        \Gamma \vdash e : \tau
-        \qquad
-        \Gamma'_V = x : \tau
+        \Gamma \vdash \type\;x \;
+        \tok{\{} x_1\tok{(}\tau_{1,1}\tok{,} \dots\tok{,} \tau_{1,n_1}\tok{)}\tok{,} \dots\tok{,} x_m\tok{(}\tau_{m,1}\tok{,} \dots\tok{,} \tau_{m,n_m}\tok{)} \tok{\}} \Rightarrow (\Gamma'; \varepsilon)
     }
-    \qquad
-    \infer{
-        \Gamma \vdash \kw{let}\;\kw{rec}\;x\;\tok{=}\;e\tok{;} \Rightarrow (\Gamma'; \epsilon)
+    
+    \and
+    % algebraic effect
+    \inferrule[D-AlgebraicEffect]{
+        s_i = op_i\tok{(}\tau_{i,1}\tok{,}\dots\tok{,} \tau_{i,n_i}\tok{)}: \tau_i
+        \qquad
+        \Gamma'_\Phi(x) = \tok{\{}s_1\tok{,} \dots\tok{,} s_n\tok{\}}
     }{
-        \Gamma, x: \tau \vdash e : \tau
-        \qquad
-        \Gamma'_V = x : \tau
+        \Gamma \vdash \kw{effect}\;x\;\tok{\{}s_1\tok{,} \dots\tok{,} s_n\tok{\}}: (\Gamma'; \varepsilon)
     }
-\end{gather*}
-
-\subsection{Algebraic Effects and Handlers}\label{ssec:spechandler}
-Effects are declared with the \kw{effect} keyword. The signatures of the operations are stored in $\Gamma_\Phi$. The types of the arguments and resumption must all have no effects.
-
-A handler must have operations of the same signatures as one of the effects in the context. The names must match up, as well as the number of arguments and the return type of the expression, given the types of the arguments and the resumption. The handler type then includes the handled effect $\phi$, an ``input'' type $\tau$, and an ``output'' type $\tau'$. In most cases, these will be at least partially generic.
-
-The handle expression will simply add the handled effect to the effect row of the inner expression \fixme{and use the input and output type}.
-
-\begin{gather*}
-    % first-order (algebraic) effect
-    \infer{
-        \Gamma \vdash \kw{effect}\;x\;\S{s_1, \dots, s_n}: \Gamma'
-    }{
-        s_i = op_i(\tau_{i,1},\dots, \tau_{i,n_i}): \tau_i
-        \qquad
-        \Gamma'_\Phi(x) = \S{s_1, \dots, s_n}
-    }
-    \\\\
-    \infer{
-        \Gamma \vdash \handle\;e_h\;e_c : \Delta\;\tau'
-    }{
-        \Gamma \vdash e_h : \handler\;\phi\;\tau\;\tau'
-        \qquad
-        \Gamma \vdash e_c : \row{\phi | \Delta}\;\tau
-    }
-    \\\\
-    \infer{
-        \Gamma \vdash \handler\;\S{ \return(x) \S{ e_{\text{ret}} }, o_1, \dots, o_n }
-        : \handler\;\phi\;\tau\;\tau'
-    }{
-        A(\phi)
-        \qquad
-        \Gamma_\Phi(\phi) = \S{ s_1, \dots, s_n }
-        \qquad
-        \Gamma, x: \tau \vdash e_{\text{ret}} : \tau' 
-        \\
-        \left[
-            \begin{gathered}
-                s_i = x_i(\tau_{i,1}, \dots, \tau_{i,m_i}) \to \tau_i
-                \qquad
-                o_i = x_i(x_{i,1}, \dots, x_{i,m_i})\;\S{ e_i }
-                \\
-                \Gamma_V, resume : (\tau_i) \to \tau', x_{i,1}: \tau_{i,1}, \dots, x_{i,i_m}: \tau_{i,i_m} 
-                \vdash e_i: \tau'
-            \end{gathered}
-        \right]_{1\leq i\leq n}
-    }
-\end{gather*}
-
-\subsection{Higher-Order Effects and Elaborations}\label{ssec:specelabs}
-
-The declaration of higher-order effects is similar to first-order effects, but with exclamation marks after the effect name and all operations. This will help distinguish them from first-order effects.
-
-Elaborations are of course similar to handlers, but we explicitly state the higher-order effect $x!$ they elaborate and which first-order effects $\Delta$ they elaborate into. The operations do not get a continuation, so the type checking is a bit different there. As arguments, they take the effectless types they specified along with the effect row $\Delta$. Elaborations are not added to the value context, but to a special elaboration context mapping the effect identifier to the row of effects to elaborate into.
-\\
-\info{Later, we could add more precise syntax for which effects need to be present in the arguments of the elaboration operations.}
-
-The \el{elab} expression then checks that an elaboration for all higher-order effects in the inner expression are in scope and that all effects they elaborate into are handled.
-\\
-\info{It is not possible to elaborate only some higher-order effects. We could change the behaviour to allow this later.}
-
-\begin{gather*}
+    \and
     % higher-order effect
-    \infer{
-        \Gamma \vdash \kw{effect}\;x!\;\S{s_1, \dots, s_n}: \Gamma'
-    }{
-        s_i = op_i!(\tau_{i,1}, \dots, \tau_{i,n_i}): \tau_i
+    \inferrule[D-HigherOrderEffect]{
+        s_i = op_i\tok{!}\tok{(}\tau_{i,1}\tok{,} \dots\tok{,} \tau_{i,n_i}\tok{)}: \tau_i
         \qquad
         \Gamma'_\Phi(x!) = \S{s_1, \dots, s_n}
-    }
-    \\\\
-    % Elaboration
-    \infer{
-        \Gamma \vdash \elaboration\;x! \to \Delta\;\S{o_1, \dots, o_n} : \Gamma'
     }{
-        \Gamma_\Phi(x!) = \S{s_1, \dots, s_n}
-        \qquad
-        \Gamma'_E(x!) = \Delta
-        \\
-        \left[
-            \begin{gathered}
-                s_i = x_i!(\tau_{i,1}, \dots, \tau_{i,m_i})\;\tau_i \qquad o_i = x_i!(x_{i,1}, \dots, x_{i,m_i}) \S{ e_i }
-                \\
-                \Gamma,x_{i,1}: \Delta\;\tau_{i,1},\dots,x_{i,n_i}: \Delta\;\tau_{i,n_i} \vdash 
-                e_i : \Delta\;\tau_i
-            \end{gathered}
-        \right]_{1\leq i \leq n}
-            }
-    \\\\
-    % Elab
-    \infer{
-        \Gamma \vdash \elab\;e : \Delta\;\tau
-    }{
-        \big[
-            \Gamma_E(\phi) \subseteq \Delta
-        \big]_{\phi \in H(\Delta')}
-        \qquad
-        \Gamma \vdash e : \Delta'\;\tau
-        \qquad
-        \Delta = A(\Delta')
+        \Gamma \vdash \kw{effect}\;x\tok{!}\;\tok{\{}s_1\tok{,} \dots\tok{,} s_n\tok{\}}: (\Gamma'; \varepsilon)
     }
-    \\\\
-\end{gather*}
+\end{mathpar}
+\caption{Inference rules for declarations.}
+\end{figure}
 
 \section{Desugaring}
 To simplify the reduction rules, we simplify the AST by desugaring some constructs. This transform is given by a fold over the syntax tree with the following operation:
@@ -447,59 +457,71 @@ To simplify the reduction rules, we simplify the AST by desugaring some construc
 \end{align*}
 
 \section{Semantics}\label{sec:semantics}
+\newcommand{\reduce}{\quad\longrightarrow\quad}
 
-The semantics of Elaine are defined as reduction semantics.
+The reduction semantics for Elaine are given in \cref{fig:reductionsemantics}. It is given in the form of two contexts $E$ and $X_{op}$ and a reduction relation $\longrightarrow$.
 
-We use two separate contexts to evaluate expressions. The $E$ context is for all constructs except effect operations, such as \code{if}, \code{let}, and function applications. The $X_{op}$ context is the context in which a handler can reduce an operation $op$.
+The $E$ context is used for all reduction rules except effect operations, such as \code{if}, \code{let}, and function applications. The $X_{op}$ context is the context in which a handler can reduce an operation $op$. The two contexts are mostly equivalent, except for the fact that an $X_{op}$ cannot enter the sub-computation of a \el{handle} or \el{elab} construct. This is important to ensure correct behaviour for when there are multiple nested handlers for a single effect. In that case, only the innermost handler should be able to handle said effect. The same reasoning applies to elaborations. We use the $\not\in$ symbol to mean that an operation is not handled by a handler, or elaborated by an elaboration.
 
+The figure with semantics does not include semantics for declarations and modules. A sequence of declarations is evaluated in order. The bindings from each declaration get substituted in the remainder of the program. If the declarations are inside a module declaration, then the public bindings get collected. These bindings are substituted when a module is imported with the \el{use} declaration.
+
+In this semantics, we assume that all elaborations are explicit. If they are implicit, they first need to be transformed according to the procedure from \cref{chap:elabres}.
+
+\begin{figure}[p]
 \begin{align*}
     E
         \IS & [] \OR E(e_1,\dots, e_n) \OR v(v_1,\dots,v_n,E,e_1,\dots,e_m) \\
-        \OR & \cond{E}{e}{e} \\
+        \OR & \cond{E}{e_1}{e_2} \\
+        \OR & \kw{match}\;E\;\tok{\{}\;p_1\;\tok{=>}\;e_1\tok{,}\dots\tok{,}\;p_n\;\tok{=>}\;e_n\;\tok{\}} \\
         \OR & \kw{let}\;x = E;\;e \OR E;\;e\\
-        \OR & \kw{handle}[E]\;e \OR \kw{handle}[v]\;E \\
-        \OR & \kw{elab}[E]\;e \OR \kw{elab}[v]\;E\\
+        \OR & \kw{handle}\tok{[}E\tok{]}\;e \OR \kw{handle}\tok{[}v\tok{]}\;E \\
+        \OR & \kw{elab}\tok{[}E\tok{]}\;e \OR \kw{elab}\tok{[}v\tok{]}\;E\\
     \\
     X_{op}
         \IS & [] \OR X_{op}(e_1, \dots, e_n) \OR v(v_1, \dots, v_n, X_{op}, e_1, \dots, e_m) \\
         \OR & \cond{X_{op}}{e_1}{e_2} \\
+        \OR & \kw{match}\;X_{op}\;\tok{\{}\;p_1\;\tok{=>}\;e_1\tok{,}\dots\tok{,}\;p_n\;\tok{=>}\;e_n\;\tok{\}} \\
         \OR & \kw{let}\;x = X_{op};\;e \OR X_{op};\;e \\
-        \OR & \kw{handle}[X_{op}]\;e \OR \kw{handle}[h]\;{X_{op}} \text{ if } op\not\in h \\
-        \OR & \elab[X_{op}]\;e \OR \kw{elab}[\epsilon]\;X_{op} \text{ if } op! \not\in e
+        \OR & \kw{handle}\tok{[}X_{op}\tok{]}\;e \OR \kw{handle}\tok{[}h\tok{]}\;{X_{op}} \text{ if } op\not\in h \\
+        \OR & \elab\tok{[}X_{op}\tok{]}\;e \OR \kw{elab}\tok{[}\epsilon\tok{]}\;X_{op} \text{ if } op \not\in \epsilon
 \end{align*}
-
-\TODO{Add some explanation}
-
-\newcommand{\reduce}{\quad\longrightarrow\quad}
 \begin{align*}
-    c(v_1, \dots, v_n) \reduce& \delta(c, v_1, \dots, v_n) \\
-    &\qquad\text{if } \delta(c, v_1, \dots, v_n) \text{ defined}\\
     (\lambda x_1, \dots, x_n . e) (v_1, \dots, v_n) \reduce& e[x_1 \mapsto v_1, \dots, x_n \mapsto v_n] \\
     \cond{\true}{e_1}{e_2} \reduce& e_1 \\
     \cond{\false}{e_1}{e_2} \reduce& e_2 \\
+    \begin{aligned}
+    &\kw{match}\;c(v_1,\dots, v_n)\;\tok{\{}\\
+    &\qquad\dots\\
+    &\qquad c(x_1, \dots, x_n)\;\tok{=>}\;e\\
+    &\qquad\dots\\
+    &\tok{\}}
+    \end{aligned}
+    \reduce& e[x_1 \mapsto v_1, \dots, x_n \mapsto v_n]
     \\
-    \kw{handle}[h]\;v \reduce& e[x\mapsto v] \\
-    &\qquad\text{where } \return(x) \S{ e } \in H\\
-    \kw{handle}[h]\;X_{op}[op(v_1, \dots, v_n)] \reduce& e[x_1\mapsto v_1, \dots, x_n\mapsto v_n, resume \mapsto k] \\
+    \kw{handle}\tok{[}h\tok{]}\;v \reduce& e[x\mapsto v] \\
+    &\qquad\text{where } \return(x) \S{ e } \in h\\
+    \kw{handle}\tok{[}h\tok{]}\;X_{op}[op(v_1, \dots, v_n)] \reduce& e[x_1\mapsto v_1, \dots, x_n\mapsto v_n, \kw{resume} \mapsto k] \\
     &\qquad \text{where } \begin{aligned}[t]
         & op(x_1, \dots, x_n) \S{e} \in h\\
-        & k = \lam{y}{\kw{handle}[h]\;
+        & k = \lam{y}{\kw{handle}\tok{[}h\tok{]}\;
         X_{op}[y]}
     \end{aligned}\\
-    \kw{elab}[\epsilon]\;v \reduce& v\\
-    \kw{elab}[\epsilon]\;X_{op!}[op!(e_1, \dots, e_n)] \reduce& \kw{elab}[\epsilon]\;X_{op!}[e[x_1 \mapsto e_1, \dots, x_n \mapsto e_n]] \\
+    \kw{elab}\tok{[}\epsilon\tok{]}\;v \reduce& v\\
+    \kw{elab}\tok{[}\epsilon\tok{]}\;X_{op!}[op!(e_1, \dots, e_n)] \reduce& \kw{elab}\tok{[}\epsilon\tok{]}\;X_{op!}[e[x_1 \mapsto e_1, \dots, x_n \mapsto e_n]] \\
     &\qquad \text{where } op!(x_1, \dots, x_n) \S{e} \in \epsilon \\
 \end{align*}
+\label{fig:reductionsemantics}
+\caption{Reduction semantics for Elaine.}
+\end{figure}
 
 \section{Standard Library}\label{sec:std}
 
-Elaine does not include any operators. This choice was made to simplify parsing of the language. For the lack of operators, any manipulation of primitives needs to be done via the standard library of built-in functions.
+To simplify parsing, Elaine does not include any operators. For the lack of operators, any manipulation of primitives needs to be done via the standard library of built-in functions. These functions reside in the \el{std} module, which can be imported like any other module with the \el{use} statement to bring its contents into scope.
 
-These functions reside in the \el{std} module, which can be imported like any other module with the \el{use} statement to bring its contents into scope.
-
-The full list of functions available in the \el{std} module, along with their signatures and descriptions, is given in \cref{fig:std}.
+The full list of functions available in the \el{std} module, along with their signatures and descriptions, is given in \cref{fig:std}. The \el{std} module also contains several other modules that can be imported. These modules are all written in Elaine itself. An overview of these modules is given in \cref{fig:submods} with the signatures of the functions and types they contain.
 
 \begin{figure}[htbp]
+\begin{subfigure}{\textwidth}
 \begin{tabular}{lllll}
 & Name & Type signature &  & Description \\
 \hline
@@ -527,13 +549,58 @@ Boolean operations
 \hline
 String operations
 & \code{concat} & \code{fn(Bool, Bool)} & \code{Bool} & string concatenation \\
+& \code{is_prefix} & \code{fn(String, String)} & \code{Bool} & is prefix of \\
+& \code{str_eq} & \code{fn(String, String)} & \code{Bool} & string equality \\
+& \code{drop} & \code{fn(Int, String)} & \code{String} & drop characters \\
+& \code{take} & \code{fn(Int, String)} & \code{String} & take characters \\
+& \code{length} & \code{fn(String)} & \code{Int} & string length \\
 \hline
 Conversions
 & \code{show_int} & \code{fn(Int)} & \code{String} & integer to string \\
 & \code{show_bool} & \code{fn(Bool)} & \code{String} & integer to string \\
 \end{tabular}
-\caption{Overview of the functions in the \el{std} module in Elaine.}
+\caption{The built-in functions in the \el{std} module in Elaine.}
 \label{fig:std}
+\end{subfigure}
+\begin{subfigure}{\textwidth}
+    \vspace{3em}
+    \centering
+    \begin{tabular}{lll}
+    Module & Item & Type signature \\
+    \hline
+    \code{loop}
+    & \code{while} & \code{fn(fn() <|e> Bool, fn() <|e> ()) <|e> ()} \\ 
+    & \code{repeat} & \code{fn(Int, fn(Int) <|e> ()) <|e> ()} \\
+    \hline
+    \code{maybe}
+    & \code{Maybe[a]} & \code{type Maybe[a] \{ Just(a), Nothing() \}} \\
+    \hline
+    \code{abort}
+    & \code{abort} & \code{effect Abort \{ abort() a \}} \\
+    & \code{hAbort} & \code{Handler Abort a Maybe[a]}\\
+    \hline
+    \code{list}
+    & \code{List} & \code{type List[a] \{ Cons(a, List[a]), Nil() \}} \\
+    & \code{head} & \code{fn(List[a]) Maybe[a]} \\
+    & \code{concat_list} & \code{fn(List[a], List[a]) List[a]} \\
+    & \code{range} & \code{fn(Int, Int) List[Int]} \\
+    & \code{map} & \code{fn(fn(a) <|e> b, List[a]) <|e> List[b]} \\
+    & \code{foldl} & \code{fn(fn(a, b) <|e> b, b, List[a]) <|e> List[b]} \\
+    & \code{foldr} & \code{fn(fn(a, b) <|e> b, b, List[a]) <|e> List[b]} \\
+    & \code{sum} & \code{fn(List[Int]) Int} \\
+    & \code{join} & \code{fn(List[String]) String} \\
+    & \code{explode} & \code{fn(String) List[String]} \\
+    \hline
+    \code{state}
+    & \code{State} & \code{effect State \{ get() Int, put(Int) () \}} \\
+    & \code{hState} & \code{Handler[State,a,fn(Int) a]} \\
+    \hline
+    \code{state_str}
+    & \code{State} & \code{effect State \{ get() String, put(String) () \}} \\
+    & \code{hState} & \code{Handler[State,a,fn(String) a]}
+    \end{tabular}
+    \label{fig:submods}
+    \caption{Sub-modules of \el{std}}
+\end{subfigure}
+\caption{Overview of Elaine's standard library.}
 \end{figure}
-
-\TODO{Add all the other things I added to the standard library here too}

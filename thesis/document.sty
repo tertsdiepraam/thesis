@@ -4,6 +4,7 @@
 % Requirements
 \RequireXeTeX{}
 
+\let\oldsmash\smash
 % Graphics
 \usepackage{xargs}
 \usepackage[dvips]{graphicx}
@@ -35,6 +36,7 @@
 % Math Symbols
 % \usepackage{mathabx}
 \usepackage{amsmath, amssymb, amsthm}
+\usepackage{mathpartir}
 \usepackage{thmtools} % correct autorefnames with shared theorem counter
 \usepackage{mathtools}
 \usepackage{physics}
@@ -316,7 +318,7 @@
     top=0mm,
     right=1mm,
     bottom=0mm,
-    boxsep=0mm,
+    boxsep=0mm
 }
 
 \newtcbinputlisting{\myinputlisting}[3]{%
@@ -425,7 +427,7 @@
 \newcommand{\seq}{;\ }
 
 \newcommand\tok[1]{\text{\texttt{#1}}}
-\newcommand\opt[1]{[#1]}
+\newcommand\opt[1]{#1^?}
 \newcommand\rep[1]{#1 \dots #1}
 \newcommand\csep[1]{#1\tok{,} \dots \tok{,}\ #1}
 

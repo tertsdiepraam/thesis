@@ -220,15 +220,41 @@ However, now the elaboration for the reader effect needs to be repeated. With al
 Because applying single elaborations is so useful, Elaine's type checker and interpreter do allow it. We conjecture that these semantics still correspond to hefty algebras. However, a proof of this conjecture is left to future work. Apart from this deviation, Elaine follows the framework of hefty algebras closely.
 
 \section{Effect Rows from Hefty Trees}
+\newcommand\BB[1]{\left\llbracket\mcode{#1}\right\rrbracket}
 
 Recall that Koka has a syntax for effect rows which corresponds to the free monad:
-\[\mcode{() -> e a}\qquad\sim\qquad\mcode{() -> Free e a}.\]
+\[
+  \BB{() -> e a}
+  \qquad=\qquad
+  \mcode{() -> Free}\ \BB{e}\ \BB{a}.
+\]
 To represent effect rows in Elaine, this concept has be generalized to hefty trees. Therefore, Elaine's effect rows correspond to higher-order functors:
-\[\mcode{() -> e a}\qquad\sim\qquad\mcode{() -> Hefty e a}.\]
+\[
+  \BB{() -> e a}
+  \qquad\sim\qquad
+  \mcode{() -> Hefty}\ \BB{e}\ \BB{a}.
+\]
 However, any algebraic effect needs to be lifted to be represented in a hefty tree. So, to make it easier to mix algebraic and higher-order effects, we therefore lift algebraic effects implicitly. In Elaine, all higher-order effects are suffixed with \hs{!}, so all effects without a \el{!} suffix are lifted. Consequently, for some higher-order effect \el{H!} and algebraic effect \el{A}, we have the following correspondence:
-\[\mcode{() -> <A,H!> b}\qquad\sim\qquad\mcode{() -> Hefty (Lift A + H) b}.\]
+\[
+  \BB{() -> <A,H!> b}
+  \qquad\sim\qquad
+  \mcode{() -> Hefty (Lift}
+    \ \BB{A}
+    \ \mcode{+}
+    \ \BB{H}
+    \mcode{)}
+    \ \BB{b}.
+\]
 Like the effect rows for algebraic effects, extensions are supported as well. Conceptually the extension operator corresponds to the \hs{+} for higher-order effects:
-\[\mcode{() -> <A|e> b}\qquad\sim\qquad\mcode{() -> Hefty (Lift A + e) b}.\]
+\[
+  \BB{() -> <A|e> b}
+  \qquad=\qquad
+  \mcode{() -> Hefty (Lift}
+    \ \BB{A}
+    \ \mcode{+}
+    \ \BB{e}\mcode{)}
+    \ \BB{b}.
+\]
 This is an unambiguous yet concise representation of the effect row containing any combination of algebraic and higher-order effects. This notation for effect rows is used for Elaine's types. 
 
 \TODO{Effect row with only algebraic effects is Free but implicitly lifted to Hefty whenever necessary?}
