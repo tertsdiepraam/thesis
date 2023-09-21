@@ -299,7 +299,7 @@ let square = fn(x: <> Int) <> Int {
 };
 \end{lst}
 %
-Simple effect rows consist of a list of effect names separated by commas. The return type of a function that returns an integer and uses the \el{Ask} and \el{State} effects has type \el{<Ask,State> Int} or, equivalently \el{<State,Ask> Int}. The order of effects in effect rows is irrelevant. However, the multiplicity is important, that is, the effect rows \el{<State,State>} and \el{<State>} are not equivalent. To capture the equivalence between effect rows, we model them as multisets.
+Simple effect rows consist of a list of effect names separated by commas. The return type of a function that returns an integer and uses the \el{Ask} and \el{State} effects has type \el{<Ask,State> Int} or, equivalently \el{<State,Ask> Int}. The order of effects in effect rows is irrelevant. However, the multiplicity is important, that is, the effect rows \el{<State,State>} and \el{<State>} are not equivalent.
 
 Like in Koka, we can extend effect rows with other effect rows. This is denoted with the \el{|} at the end of the effect row: \el{<A,B|e>} means that the effect row contains \el{A}, \el{B} and some (possibly empty) set of remaining effects. We call a row without extension \emph{closed} and a row with extension \emph{open}.
 
