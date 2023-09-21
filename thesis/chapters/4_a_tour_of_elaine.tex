@@ -365,17 +365,16 @@ If we were two write the same expressions in Haskell instead, we would need two 
 
 Functional languages like Haskell usually do not feature a construct for looping. This is partly because folds, maps, and recursion are preferred to loops, but also because a looping construct relies on effects. In Koka and Elaine, we can define a \el{while} function which is generic over effects. This enables both functional and imperative styles of programming.
 
-\TODO{Check}
 \begin{lst}{Elaine}
 let rec while = fn(
     predicate: fn() <|e> Bool,
     body: fn() <|e> ()
-) <|e> (){
+) <|e> () {
     if predicate() {
-        ()
-    } else {
-        body()
+        body();
         while(predicate, body)
+    } else {
+        ()
     }
 };
 \end{lst}
@@ -384,7 +383,7 @@ let rec while = fn(
 
 Higher-order effects in Elaine are supported via elaborations, as proposed by \textcite{bach_poulsen_hefty_2023} and explained in \cref{sec:hefty_algebras}. In this framework, higher-order effects are elaborated into a computation using only algebraic effects. They are not handled directly. This means that we cannot write handlers for them as we did for algebraic effects in the previous section.
 
-To distinguish higher-order effects and operations from algebraic effects and operations, we write them with a \el{!} suffix. For example, a higher-order \el{Exception!} effect is written \el{Exception!}, and its \el{catch} operations is written \el{catch!}.
+To distinguish higher-order effects and operations from algebraic effects and operations, we write them with an \el{!} suffix. For example, a higher-order \el{Except!} effect is written \el{Except!}, and its \el{catch} operations is written \el{catch!}.
 
 Higher-order effects are treated exactly like algebraic effects in the effect rows. The order of effects still does not matter, and we can create effect rows with arbitrary combinations of algebraic and higher-order effects.
 
@@ -440,7 +439,7 @@ let main = handle[hAsk(5)] elab[eLocal] {
 %
 That is the full implementation for the higher-order \el{Reader!} effect in Elaine. \Cref{sec:reader} contains a listing of all these pieces put together in a single example.
 
-Another example is the \el{Exception!} effect. This effect should allow us to use the \el{catch!} operation to recover from a \el{throw}. The latter is an algebraic, so we can start there.
+Another example is the \el{Except!} effect. This effect should allow us to use the \el{catch!} operation to recover from a \el{throw}. The latter is an algebraic, so we can start there.
 
 \begin{lst}{Elaine}
 type Result[a, b] {
@@ -458,19 +457,19 @@ let hThrow = handler {
 };
 \end{lst}
 %
-We assume here that we want to throw some string with an error message, but we could put a different type in there as well. The \el{throw} operation has a return type \el{a}, which is impossible to construct in general, so it cannot return. The higher-order \el{Exception!} effect should then look like this:
+We assume here that we want to throw some string with an error message, but we could put a different type in there as well. The \el{throw} operation has a return type \el{a}, which is impossible to construct in general, so it cannot return. The higher-order \el{Except!} effect should then look like this:
 
 \begin{lst}{Elaine}
-effect Exception! {
+effect Except! {
     throw!(String) a
     catch!(a, a) a
 }
 \end{lst}
 %
-In contrast with the \el{Reader!} effect above, we alias the operation of the underlying algebraic effect here. This makes no functional difference, except that it allows us to write functions with explicit effect rows with \el{Exception!} and without \el{Throw}. We might even choose to elaborate to a different effect than \el{Throw}. The downside is that it requires us to provide the elaboration for the \el{throw!} operation.
+In contrast with the \el{Reader!} effect above, we alias the operation of the underlying algebraic effect here. This makes no functional difference, except that it allows us to write functions with explicit effect rows with \el{Except!} and without \el{Throw}. We might even choose to elaborate to a different effect than \el{Throw}. The downside is that it requires us to provide the elaboration for the \el{throw!} operation.
 
 \begin{lst}{Elaine}
-let eExcept = elaboration Exception! -> <Throw> {
+let eExcept = elaboration Except! -> <Throw> {
     throw!(s) { throw(s) }
     catch!(a, b) {
         match handle[hThrow] a {
@@ -481,7 +480,7 @@ let eExcept = elaboration Exception! -> <Throw> {
 };
 \end{lst}
 %
-We can then use the \el{Exception!} effect like we used the \el{Reader!} effect: with an \el{elab} for \el{Exception!} and a \el{handle} for \el{Throw}. In the listing below, we ensure that we do not decrement a value of \el{0} to ensure it will not become negative.
+We can then use the \el{Except!} effect like we used the \el{Reader!} effect: with an \el{elab} for \el{Except!} and a \el{handle} for \el{Throw}. In the listing below, we ensure that we do not decrement a value of \el{0} to ensure it will not become negative.
 
 \begin{lst}{Elaine}
 let main = handle[hThrow] elab[eExcept] {
@@ -499,7 +498,7 @@ let main = handle[hThrow] elab[eExcept] {
 Since the elaborations can be swapped out, we can also design elaborations with different behaviour. Assume, for instance, that there is a \el{Log} effect. Then we can create an alternative elaboration that logs the errors it catches, which might be useful for debugging.
 
 \begin{lst}{Elaine}
-let eExceptLog = elaboration Exception! -> <Throw,Log> {
+let eExceptLog = elaboration Except! -> <Throw,Log> {
     throw!(s) { throw(s) }
     catch!(a, b) {
         match handle[hThrow] a {
@@ -513,13 +512,13 @@ let eExceptLog = elaboration Exception! -> <Throw,Log> {
 };
 \end{lst}
 %
-We could also disable exception catching entirely if we so desire. This might be helpful if we are debugging a piece of a program that is wrapped in a \el{catch!} to ensure it never fully crashes, but we want to see errors while we are debugging. Of course, this changes the functionality of the program significantly. We should therefore be careful not to change computations that rely on a specific implementation of the \el{Exception!}.
+We could also disable exception catching entirely if we so desire. This might be helpful if we are debugging a piece of a program that is wrapped in a \el{catch!} to ensure it never fully crashes, but we want to see errors while we are debugging. Of course, this changes the functionality of the program significantly. We should therefore be careful not to change computations that rely on a specific implementation of the \el{Except!}.
 
 \begin{lst}{Elaine}
-let eExceptIgnoreCatch = elaboration Exception! -> <Throw> {
+let eExceptIgnoreCatch = elaboration Except! -> <Throw> {
     throw!(s) { throw(s) }
     catch!(a, b) { a }
-}
+};
 \end{lst}
 %
-What these examples illustrate is that elaborations provide a great deal of flexibility, with which we can define and alter the functionality of the \el{Exception!} effect. We can change it temporarily for debugging purposes or apply another elaboration to a part of a computation. We can also define more \el{Exception}-like effects and use multiple versions at the same time.
+What these examples illustrate is that elaborations provide a great deal of flexibility, with which we can define and alter the functionality of the \el{Except!} effect. We can change it temporarily for debugging purposes or apply another elaboration to a part of a computation. We can also define more effects like \el{Except!} and use them at the same time.

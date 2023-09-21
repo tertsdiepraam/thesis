@@ -307,12 +307,13 @@ The \textsc{D-Type} ensures two things: it adds the type to the type context $\G
         \Gamma \vdash \kw{match}\;e\;\tok{\{}\;p_1\;\kw{=>}\; e_1\tok{,}\dots\tok{,} p_n\;\kw{=>}\;e_n\;\tok{\}} : \Delta\tau'
     }
     \and
-    \inferrule[E-Handle]{
-        \Gamma \vdash e_h : \Delta\;\kw{Handler}[\phi,\tau,\tau']
+    % Elab
+    \inferrule[E-Elab]{
+        \Gamma \vdash e_E : \Delta\;\kw{Elab}[x!, \Delta]
         \\\\
-        \Gamma \vdash e_c : \tok{<}\phi \tok{|} \Delta \tok{>}\;\tau
+        \Gamma \vdash e_c : \tok{<} x! \tok{|} \Delta \tok{>}\;\tau
     }{
-        \Gamma \vdash \handle\tok{[}e_h\tok{]}\;e_c : \Delta\;\tau'
+        \Gamma \vdash \elab\tok{[}e_E\tok{]}\;e_c: \Delta\tau
     }
     \and
     % Implicit Elab
@@ -328,13 +329,12 @@ The \textsc{D-Type} ensures two things: it adds the type to the type context $\G
         \Gamma \vdash \elab\;e : \Delta\;\tau
     }
     \and
-    % Elab
-    \inferrule[E-Elab]{
-        \Gamma \vdash e_E : \Delta\;\kw{Elab}[x!, \Delta]
+    \inferrule[E-Handle]{
+        \Gamma \vdash e_h : \Delta\;\kw{Handler}[\phi,\tau,\tau']
         \\\\
-        \Gamma \vdash e_c : \tok{<} x! \tok{|} \Delta \tok{>}\;\tau
+        \Gamma \vdash e_c : \tok{<}\phi \tok{|} \Delta \tok{>}\;\tau
     }{
-        \Gamma \vdash \elab\tok{[}e_E\tok{]}\;e_c: \Delta\tau
+        \Gamma \vdash \handle\tok{[}e_h\tok{]}\;e_c : \Delta\;\tau'
     }
     \and
     \inferrule[E-HandlerNoRet]{

@@ -244,6 +244,7 @@ for every \hs{f} and finally a function \hs{Free End a -> a} to reduce the free 
     \item the return case, \hs{a -> Free f' b};
     \item and the case for handling the operations: \hs{f (Free f' b) -> Free f' b}.
 \end{itemize}
+\TODO{Check formatting at the end}
 However, to generalize the handler, we add a parameter \hs{p} as well, which is a parameter that the handlers can access and modify. This parameter is used to thread state through the computation. Therefore, \hs{handle} is defined as follows.
 
 \begin{lst}{Haskell}
@@ -289,7 +290,7 @@ result :: (Int, Maybe Int)
 result = handleEnd $ handleState (0::Int) $ handleAbort decrement  
 \end{lst}
 %
-This finally allows us to use the abort and state effects together, while providing a handler per effect. Note that the order in which the handlers are applied matters for the return type of the result. If abort is handled first and state second, the final type is \hs{(Int, Maybe Int)}. If state is handled first, it is \hs{Maybe (Int, Int)}.
+This finally allows us to use the abort and state effects together, while providing separate handlers per effect. Note that the order in which the handlers are applied matters for the return type of \hs{result}. If abort is handled first and state second, the final type is \hs{(Int, Maybe Int)}. If state is handled first, it is \hs{Maybe (Int, Int)}.
 
 While the plumbing needed for a free monad is extensive, it has many advantages over regular monads. First, we can combine multiple functors in our type signatures. Second, we can define operations that work for any effect composition that contains an effect. Third, we can provide modular handlers that handle a single effect from the composed functors. If all effects are defined in this way, then effect is automatically compatible with all other effects.
 
