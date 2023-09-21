@@ -126,17 +126,16 @@ Additionally, we give transformations from higher-order effects to algebraic eff
 
 We present a specification for Elaine, including the syntax definition, typing judgments, and semantics. Along with this specification, we provide a reference implementation written in Haskell in the artifact accompanying this thesis. This implementation includes a parser, type checker, interpreter, pretty printer, and the transformations mentioned above. Elaine opens up exploration for programming languages with higher-order effects.
 
-\feedback{Casper: clarify why not, omit, or replace by a statement that it is a prototype/intended as a demonstration/vehicle for research/... if that is what you mean.}
-
-\paragraph{Contributions} The main contribution of this thesis is the specification and implementation of Elaine. This consists of several parts.\feedback{Casper: Reference chapters for everything.}
+\paragraph{Contributions} The main contribution of this thesis is the specification and implementation of Elaine. This consists of several parts.
+%
 \begin{itemize}
-    \item We present a language with both handlers and elaborations based on hefty algebras (\cref{chap:basics}). The language definition consists of a syntax definition, typing judgments and reduction semantics. (\cref{chap:spec}). We conjecture that the semantics of the language are equivalent\feedback{"give a semantics", "hefty algebras are the semantics of"} to hefty algebras, but we do not proof soundness.
+    \item We present a language with both handlers and elaborations based on hefty algebras (\cref{chap:basics}). The language definition consists of a syntax definition, typing judgments and reduction semantics. (\cref{chap:spec}). We conjecture that hefty algebras are the semantics of the language, but we do not prove this.
     %
-    \item This language includes a type system for a language with higher-order effects and elaborations. This type system generalizes effect rows from languages with algebraic effects to higher-order effects.\feedback{Last bit most important}
+    \item We generalize effect rows to higher-order effects (\cref{sec:hoeffectrow}). The type system of the language is based on these generalized effect row.
     %
-    \item We provide a prototype with a parser, type checker and interpreter for this language implemented in Haskell. This prototype is available in the artifact.\feedback{Mention Hindley-Milner here}
+    \item We provide a prototype for the language with a parser, a type checker based on Hindley-Milner type inference and an interpreter for this language implemented in Haskell. This prototype is available in the artifact.
     %
-    \item We provide a set of examples for programming with higher-order effect operations in Elaine (\cref{chap:examples}). These examples provide evidence that elaborations are a suitable and convenient construct for writing programs with higher-order effects. These examples can be executed and produce the expected results with the prototype. The examples include the reader effect, the writer effect, structured logging and parser combinators, which are all implemented using higher-order effects.
+    \item We provide a set of examples for programming with higher-order effect operations in Elaine (\cref{chap:examples}). These examples provide evidence that elaborations are a suitable and convenient construct for writing programs with higher-order effects. These examples can be executed and produce the expected results with the prototype. The examples include the reader effect, the writer effect, structured logging and parser combinators, all of which are implemented using higher-order effects.
     %
     \item We provide a type-directed procedure for inferring elaborations, which alleviates the programmer from specifying which elaboration should be applied when it can be inferred from the context (\cref{chap:elabres}).
 \end{itemize}

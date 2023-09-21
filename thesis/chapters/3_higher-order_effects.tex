@@ -207,7 +207,7 @@ main = handleThrow $ handleAsk 0 $
     (elab eCatch a) >>= (elab eCatch' b)
 \end{lst}
 %
-However, this does not work, because the argument for the reader elaboration should be a hefty tree, not a free monad. Therefore, the only way hefty algebras allow us to do so is by elaborating the reader effect in \hs{a} and \hs{b} separately.
+However, this does not work, because the argument for the reader elaboration should be a hefty tree, not a free monad. Therefore, the only way hefty algebras allow us to separate the elaboration for catch is by elaborating the reader effect in \hs{a} and \hs{b} separately, too.
 
 \begin{lst}{Haskell}
 main = handleThrow $ handleAsk 0 $
@@ -217,12 +217,23 @@ main = handleThrow $ handleAsk 0 $
 %
 However, now the elaboration for the reader effect needs to be repeated. With algebraic effects, handlers can be applied for each effect individually, which can be convenient for applying different handlers to different effects.
 
-Because applying single elaborations is so useful, Elaine's type checker and interpreter do allow it. We conjecture that these semantics still correspond to hefty algebras. However, a proof of this conjecture is left to future work. Apart from this deviation, Elaine follows the framework of hefty algebras closely.
+Because applying single elaborations is useful, Elaine's semantics do allow it. We conjecture that these semantics still correspond to hefty algebras. However, a proof of this conjecture is left to future work. In Elaine's semantics, the \el{elab} function does not return a free monad, instead returns a hefty tree with one higher-order effect removed.
 
-\section{Effect Rows from Hefty Trees}
+\begin{lst}{Haskell}
+-- Hypothetical type signature for an elab construct
+-- corresponding to Elaine's semantics.
+elab' :: HOFunctor h
+  => (forall a. h (Hefty h') (hefty h' a) -> Hefty h' a)
+  -> Hefty (h + h') a
+  -> Hefty h' a
+\end{lst}
+
+With this hypothetical \hs{elab'} function, every computation becomes a hefty tree. In Elaine's type system, we therefore do not distinguish between free monads and hefty trees. This leads us to generalize the notion of an effect row to hefty trees.
+
+\section{Effect Rows from Hefty Trees}\label{sec:hoeffectrow}
 \newcommand\BB[1]{\left\llbracket\mcode{#1}\right\rrbracket}
 
-Recall that Koka has a syntax for effect rows which corresponds to the free monad:
+Recall the notation for effect rows introduced in \cref{chap:algebraic_effects}, which corresponds to the free monad:
 \[
   \BB{() -> e a}
   \qquad=\qquad
@@ -231,13 +242,13 @@ Recall that Koka has a syntax for effect rows which corresponds to the free mona
 To represent effect rows in Elaine, this concept has be generalized to hefty trees. Therefore, Elaine's effect rows correspond to higher-order functors:
 \[
   \BB{() -> e a}
-  \qquad\sim\qquad
+  \qquad=\qquad
   \mcode{() -> Hefty}\ \BB{e}\ \BB{a}.
 \]
 However, any algebraic effect needs to be lifted to be represented in a hefty tree. So, to make it easier to mix algebraic and higher-order effects, we therefore lift algebraic effects implicitly. In Elaine, all higher-order effects are suffixed with \hs{!}, so all effects without a \el{!} suffix are lifted. Consequently, for some higher-order effect \el{H!} and algebraic effect \el{A}, we have the following correspondence:
 \[
   \BB{() -> <A,H!> b}
-  \qquad\sim\qquad
+  \qquad=\qquad
   \mcode{() -> Hefty (Lift}
     \ \BB{A}
     \ \mcode{+}
@@ -255,6 +266,4 @@ Like the effect rows for algebraic effects, extensions are supported as well. Co
     \ \BB{e}\mcode{)}
     \ \BB{b}.
 \]
-This is an unambiguous yet concise representation of the effect row containing any combination of algebraic and higher-order effects. This notation for effect rows is used for Elaine's types. 
-
-\TODO{Effect row with only algebraic effects is Free but implicitly lifted to Hefty whenever necessary?}
+We do not use new notation for this generalized effect row, since there is a bijection between \hs{Free e a} and \hs{Hefty (Lift e) a}. Therefore, this definition of effect rows is equivalent to the definition of the effect row for algebraic effects if all effects it contains are algebraic. The notation above is therefore a concise representation of the effect row containing any combination of algebraic and higher-order effects.
