@@ -1,12 +1,12 @@
 \chapter{Algebraic Effects}\label{chap:algebraic_effects}
 
-The theory of algebraic effects is intended to make working with effectful operations easier by making effects composable. It achieves this goal for many important effects, but, crucially, does not cover higher-order effects; effect operations that take other effectful computations as arguments. The theory of hefty algebras extends the theory of algebraic effects with higher-order effects. How this is achieved is discussed in \cref{chap:higher_order}. Since Elaine is based on the theory of hefty algebras, the theory of algebraic effects also applies to Elaine. In this chapter, we give an introduction to algebraic effects. In the next chapter, we discuss its limitations regarding higher-order effects and describe how hefty algebras overcome those limitations.
+The theory of algebraic effects makes working with effectful operations easier in two ways: it makes effects composable and separates the use and interpretation of effects, which provides a high degree of modularity. Crucially, however, it does not cover many higher-order operations; effect operations that take effectful computations as arguments. The theory of hefty algebras extends the theory of algebraic effects with higher-order effects. Since Elaine is based on the theory of hefty algebras, the theory of algebraic effects also applies to Elaine. In this chapter, we give an introduction to algebraic effects. In the next chapter, we discuss its limitations regarding higher-order effects and describe how hefty algebras overcome those limitations.
 
 \section{Monads}
 
-We will build up the notion of algebraic effects from monads. Monads were introduced as an abstraction for effectful computation by \textcite{moggi_abstract_1989,moggi_computational_1989}. Later, this model was popularized as a technique for writing effectful programs in pure languages \autocite{wadler_essence_1992,peyton_jones_imperative_1993}.
+We will build up the notion of algebraic effects from monads. Monads were introduced as an abstraction for effectful computation by \textcite{moggi_abstract_1989,moggi_computational_1989}. Shortly afterwards, monads were popularized as a technique for writing effectful programs in pure languages \autocite{wadler_essence_1992,peyton_jones_imperative_1993}.
 
-While many descriptions of monads using category theory and various analogies can be employed in explaining them, for our purposes, a monad is a type constructor \hs{m} with two associated functions: \hs{return} and \hs{>>=}, with the latter pronounced ``bind''. In Haskell, this concept is easily encoded in a type class, which is listed below.
+Many definitions of monads can be given, and various analogies can be employed in explaining them. However, for our purposes, a monad is a type constructor with two associated functions: \hs{return} and \hs{>>=}, with the latter pronounced ``bind''. In Haskell, this concept is easily encoded in a type class.
 
 \begin{lst}{Haskell}
 class Monad m where
@@ -14,9 +14,9 @@ class Monad m where
   (>>=)  :: m a -> (a -> m b) -> m b
 \end{lst}
 %
-This type class tells us that we can construct a value of \hs{m a} for any type \hs{a} and for any monad \hs{m} using \hs{return}. This represents a computation that has no further effects and just ``returns'' a value. Additionally, we can compose two monadic computations using \hs{>>=}, which takes a monadic computation and a \emph{continuation}, which is the function that should be called after the operation has been performed. The continuation is passed the return value of the operation as an argument. The \hs{>>=} operator therefore sequences two monadic operations.
+This type class dictates that \hs{return} constructs a value of type \hs{m a} for any monad \hs{m} and any type \hs{a}. This represents a computation that has no further effects and just ``returns'' a value. Additionally, we can compose two monadic computations using \hs{>>=}, which takes a monadic computation and a \emph{continuation}. The continuation is the function that should be called after the operation has been performed. The continuation is passed the return value of the operation. Intuitively, the \hs{>>=} operator therefore sequences two computations.
 
-To explain how effectful operations can be encoded with this, we can look at a simple example: the \hs{Maybe} monad. Our goal with this monad is to create an ``abort'' effect, where the computation stops and returns immediately once the \hs{abort} operation is used. To represent the intention of the operation, we define the \hs{abort} operations as \hs{Nothing}.
+To explain how effectful operations can be encoded with this, we can look at a simple example: the \hs{Maybe} monad. Our goal with this monad is to create an ``abort'' effect, where the computation stops and returns immediately once the \hs{abort} operation is used, without evaluating the rest of the computation. While the returned value is wrapped in \hs{Just}, the computation continues, but once a computation returns \hs{Nothing}, the computation should abort. So, we define the \hs{abort} operation as \hs{Nothing}.
 
 \begin{lst}{Haskell}
 data Maybe a
@@ -33,7 +33,7 @@ abort :: Maybe a
 abort = Nothing
 \end{lst}
 %
-With this definition, we can chain functions returning \hs{Maybe}. For example, we can define a \hs{head} function with the type \hs{[a] -> Maybe a} that returns the first element of a list if it is non-empty and \hs{Nothing} otherwise. We can also define a division function which checks that the divisor is non-zero. These functions can then be composed using \hs{>>=}.
+With this definition, we can chain functions returning \hs{Maybe}. For example, we can define a \hs{head} function with the type \hs{[a] -> Maybe a} that returns the first element of a list if it is non-empty and \hs{Nothing} otherwise. We also define a division function which checks that the divisor is non-zero. These functions can then be composed using the \hs{>>=} operator, such that the composed computation returns \hs{Nothing} if one of these functions returns \hs{Nothing}.
 
 \begin{lst}{Haskell}
 head :: [a] -> Maybe a
@@ -50,7 +50,8 @@ main = do
   print $ head [2,3,4] >>= safeDiv 10 -- -> Just 5
 \end{lst}
 %
-A more involved example is the \hs{State} monad. If we were to keep track of state manually a function that modifies state would need to take some state of type \hs{s} as an argument and return a new value for the state. Therefore, if a function \hs{foo} normally is a function with type \hs{a -> b}, it would need to have the type \hs{a -> s -> (s, b)}. Instead of modifying the state directly, it maps an old state to a new state. Then we need to ensure that we update the state with the modified value. For example, if the function is called multiple times, the code would look something like the code before.
+A more involved example is the \hs{State} monad. A function that modifies state needs to take the current state and return the new state. For example, a function that takes \hs{a}, returns \hs{b}, and modifies state \hs{s} needs to have the type \hs{a -> s -> (s, b)}.
+The new state then needs to be passed to the next function that modifies state.
 
 \begin{lst}{Haskell}
 -- Increment the state by `a` and return the old state
@@ -64,7 +65,7 @@ multipleIncs s = let
   in inc 7 s''
 \end{lst}
 %
-The program becomes verbose and repetitive as a result. However, all functions types that use state now end with the same pattern: \hs{s -> (s, b)}. This is an opportunity for abstraction, because we can define a type for that pattern. Since this type represents the state effect, this type is called \hs{State}.
+The types of all functions using state now end with the same pattern: \hs{s -> (s, b)}. This is an opportunity for abstraction, because we can define a type for that pattern. Since this type represents the state effect, this type is called \hs{State}.
 
 \begin{lst}{Haskell}
 newtype State s a = State (s -> (s, a))
@@ -74,7 +75,7 @@ inc :: Int -> State Int Int
 inc a = State (\s -> (s + a, s))
 \end{lst}
 %
-Now we can turn \hs{State s} into a monad! We do this by making it an instance for the \hs{Monad} type class and implementing the \hs{return} and \hs{>>=} functions for it. This allows us to compose functions returning the \hs{State} type. Additionally, we define the \hs{get} and \hs{put} operations, which are the basic building blocks we can use to build more complex computations.
+This \hs{State s} type becomes a monad if we implement \hs{return} and \hs{>>=} for it. This allows us to compose functions returning the \hs{State} type. Additionally, we define the \hs{get} and \hs{put} functions as a basic interface for interacting with state.
 
 \begin{lst}{Haskell}
 instance Monad (State s) where
@@ -114,7 +115,7 @@ multipleIncs = inc 5 >> inc 6 >> inc 7
 main = print (runState 0 bar) -- prints 0 + 5 + 6 + 7 = 18
 \end{lst}
 %
-This is the power of monads: they allow us to abstract the effectful operations away, while also signalling the effects that a function requires in the return type. In the final example, we do not have to think about how the \hs{State} monad works any more, but only use the \hs{get} and \hs{put} operations to build complex computations. The abstraction separates the interface from the implementation. This modularity is one of the core motivations of the study of effects. 
+This is the power of monads: they allow us to abstract over the effectful operations, while also declaring the effects that a function requires in its return type. In the final example, we do not have to think about how the \hs{State} monad works any more, but only use the \hs{get} and \hs{put} operations to build complex computations. The abstraction separates the interface from the implementation. This modularity is one of the core motivations of the study of effects. 
 
 To make working with monads more convenient, Haskell also features do-notation, which is syntactic sugar for the \hs{>>=} and \hs{>>} operators. Using do-notation, the \hs{multipleIncs} computation from the previous example can be written as:
 
@@ -128,21 +129,21 @@ multipleIncs = do
 If the results from the \hs{inc} computations needs to be used, the \hs{<-} operator, which is part of do-notation, can be used to bind the result of a computation to a variable. For example, the sum of all the results from the \hs{inc} calls can be returned.
 
 \begin{lst}{Haskell}
-multipleIncs = do
+multipleIncs' = do
   a <- inc 5
   b <- inc 6
   c <- inc 7
   return (a + b + c)
 
 -- which is equivalent to
-multipleIncs = 
+multipleIncs' = 
   inc 5 >>= \a ->
     inc 6 >>= \b ->
       inc 7 >>= \c ->
         return (a + b + c)
 \end{lst}
 %
-This is a convenient method for programming with effects in Haskell, while also staying true to its functional paradigm. However, monads are also limited, since they cannot be composed. Imagine, for instance, a computation that decrements some state and returns the new value, but also asserts that the value never becomes negative and returns \hs{Nothing} in that case. This computation might look as follows.
+Monads are a convenient model for programming with effects in Haskell, while also staying true to its functional paradigm. However, monads are also limited, since they cannot be composed. Imagine, for instance, a computation that decrements some state and returns the new value, but also asserts that the value never becomes negative and returns \hs{Nothing} in that case. This computation might look as follows.
 
 \begin{lst}{Haskell}
 decrement :: State Int (Maybe Int)
@@ -152,7 +153,7 @@ decrement = get >>= \s ->
               else return abort
 \end{lst}
 %
-What is important here is that \hs{Maybe} cannot benefit from the \hs{>>=} operator. The type of \hs{decrement} is not a combined monad for both effects, but one monad wrapped in another. For complex computations, this quickly gets complicated. Instead, there could be some combined monad \hs{MaybeAndState} that combines the operations of both monads.
+What is important here is that \hs{Maybe} cannot benefit from the \hs{>>=} operator. The type of \hs{decrement} is not a combined monad for both effects, but one monad wrapped in another. Instead, we need some combined monad \hs{MaybeAndState} that combines the operations of both monads.
 
 \begin{lst}{Haskell}
 decrement :: MaybeAndState Int Int
@@ -162,9 +163,9 @@ decrement = get >>= \s ->
               else abort
 \end{lst}
 %
-While it is technically possible to define such a monad, we would need to define one for every combination of monad operations that we would like to use, which quickly becomes very cumbersome. Hence, we need to look elsewhere for a solution. One solution to this is to use monad transformers, as explained in \cref{sec:monad_transformers}. Another solution is to use the \emph{free monad}.
+While it is possible to define such a monad, we would need to define one for every combination of monad operations that we would like to use, which quickly becomes very cumbersome. Hence, we need to look elsewhere for a solution. One solution to this is to use monad transformers, as explained in \cref{sec:monad_transformers}. Another solution is to compose effects in the \emph{free monad}.
 
-\section{Effect Composition with the Free Monad}
+\section{Composing Effects with the Free Monad}
 
 The free monad is a monad that encodes the structure of a program without imposing semantics \autocite{swierstra_data_2008}. The free monad takes a functor \hs{f} as an argument. The free monad then gives a syntactic description of the operations given by that functor. It is therefore the trivial monad parametrized by the operations of \hs{f}. In Haskell, the free monad is implemented as the \hs{Free} data type. The definitions in this section are based on the implementation by \textcite{kammar_handlers_2013} and the encoding of the free monad by \textcite{bach_poulsen_hefty_2023}.
 
