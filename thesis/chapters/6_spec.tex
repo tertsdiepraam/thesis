@@ -16,6 +16,8 @@ The full syntax definition is given in \cref{fig:syntax} as a context-free gramm
     \item $\csep{p}$ indicates that the sort $p$ can be repeated zero or more times, separated by commas.
 \end{itemize}
 
+The sorts $x$, $i$ and $s$ denote identifiers, integers and strings respectively. Identifiers must match the regex expression \code{[a-zA-Z_][a-zA-Z_0-9]*'*} and cannot be a keyword. Integers consist of numeric digits. Strings are delimited by double quotes.
+
 \begin{figure}[p]
 \begin{align*}
     \text{program}\ p
@@ -36,7 +38,7 @@ The full syntax definition is given in \cref{fig:syntax} as a context-free gramm
         \OR & \tok{let}\ \opt{\tok{rec}}\ p\ \tok{=}\ e\tok{;}\ es\\
     \text{expression}\ e
         \IS & x\\
-        \OR & \tok{()} \OR \tok{true} \OR \tok{false} \OR integer \OR string \\
+        \OR & \tok{()} \OR \tok{true} \OR \tok{false} \OR i \OR s \\
         \OR & \tok{(} \csep{e} \tok{)} \\
         \OR & \tok{fn} \tok{(} \csep{p} \kw{)}\ \opt{T}\ b \\
         \OR & \tok{if}\ e\ b\ \tok{else}\ b\\
@@ -84,9 +86,7 @@ The syntax definition in \cref{fig:syntax} describes a layer of syntactic sugar 
 \[
 \Delta \IS \tok{<>} \OR \tok{<}\phi\tok{|}\Delta\tok{>}
 \]
-We transform the syntactic sugar form into the standard form with the $N$ operation defined in \cref{fig:normalization}, which maps $R$ to $\Delta$. This operation is implicitly applied to all occurrences $R$ in the syntax tree.
-
-Additionally, our typing judgments require operations that split an effect row into algebraic and higher-order effects, denoted $A$ and $H$, respectively. The definition of these operations is given in \cref{fig:HandA}.
+We transform the syntactic sugar form into the standard form with the $\Norm$ operation defined in \cref{fig:normalization}, which maps $R$ to $\Delta$. This operation is applied to all occurrences of $R$ in the syntax tree. Additionally, our typing judgments require operations that split an effect row into algebraic and higher-order effects, denoted $\A$ and $\Ho$, respectively. The definition of these operations is given in \cref{fig:HandA}.
 
 Effect rows should be considered equivalent up to reordering. Following \textcite{leijen_koka_2014}, we define the $\equiv$ relation to denote effect row equivalence in \cref{fig:rowequiv}. This equivalence is implicitly used whenever effect rows are asserted to be equivalent in the typing judgments.
 
@@ -167,15 +167,13 @@ In the typing judgments, we often need to extend just one of these sub-contexts.
     \Gamma' = (\Gamma_M\ ;\ \Gamma_V, x: T\ ;\ \Gamma_E\ ;\ \Gamma_\Phi)
 \end{gather*}
 
-In the typing judgments below, we assume that all types are explicitly specified. Hindley-Milner type inference can be used to infer the types if missing. This is also done in the Elaine prototype.
-
-In addition to the typing judgments, we assert that all effects, effect operations and modules have unique names within any scope.
+In the typing judgments below, we assume that all types are explicitly specified for function arguments and return types. Hindley-Milner type inference can be used to infer the types if missing. This is also done in the Elaine prototype. In addition to the typing judgments, we assert that all effects, effect operations and modules have unique names within any scope.
 
 The typing judgments for expressions inductively define a ternary relation
 \[ \Gamma \vdash e : \Delta\tau, \]
-where $\Gamma$ ranges over contexts, $e$ ranges over expressions and $\Delta\;\tau$ ranges over pair of effect rows and value types. This relation should be read as ``in the context $\Gamma$, the expression $e$ has type $\Delta\tau$''. This relation is fairly standard, apart from the inclusion of the effect row. Note that in this specification, the effect row is an overapproximation of the effect which are present. This means, for example, that the boolean value \el{true} has the type $\Delta\Bool$ for every effect row $\Delta$, as rule \textsc{E-True} shows. A common pattern in the judgments is that many expressions that are evaluated in sequence all have the same effect row. This can be seen clearly in the \textsc{E-If} and \textsc{E-Tuple} rules. A function application (\textsc{E-App}) has an effect row that matches the same effect row on the return type of the called function. 
+where $\Gamma$ ranges over contexts, $e$ ranges over expressions and $\Delta\;\tau$ ranges over pair of effect rows and value types. This relation should be read as: ``in the context $\Gamma$, the expression $e$ has type $\Delta\tau$''. This relation is fairly standard, apart from the inclusion of the effect row. Note that in this specification, the effect row is an overapproximation of the effect which are present. This means, for example, that the (pure) boolean value \el{true} has the type $\Delta\Bool$ for every effect row $\Delta$, as rule \textsc{E-True} shows. A common pattern in the judgments is that many expressions that are evaluated in sequence all have the same effect row. This can be seen clearly in the \textsc{E-If} and \textsc{E-Tuple} rules. A function application (\textsc{E-App}) has an effect row that matches the same effect row on the return type of the called function. 
 
-Handlers have the type \lstinline[mathescape]{Handler[$\phi$,$\tau$,$\tau'$]}. In this type, the $\phi$ variable represents the effect that it handles, $\tau$ is the type of the sub-computation and $\tau'$ is the type of the \el{handle} that handles a computation with type $\tau$. The $\tau$ and $\tau'$ types may be related. For example, a handler for the abort effect might be represented by the type scheme
+Handlers have the type \lstinline[mathescape]{Handler[$\phi$,$\tau$,$\tau'$]}. In this type, the $\phi$ variable represents the effect that it handles, $\tau$ is the type of the sub-computation and $\tau'$ is the type of the \el{handle} that handles a computation with type $\tau$. The $\tau$ and $\tau'$ types may be related. For example, a handler for the abort effect can be represented by the following type scheme:
 \[ \forall \alpha.\ \kw{Handler[Abort,}\alpha\kw{,Maybe[}\alpha\kw{]]}. \]
 If no \el{return} branch is specified, it is assumed to be the identity function and hence $\tau$ is equal to $\tau'$ in that case, as written in rule \textsc{E-Handler}.
 
@@ -189,7 +187,7 @@ where $\Gamma$ again ranges over contexts and $d$ ranges over declarations and s
 
 All declarations generate only private bindings with an empty context for public bindings, written $\varepsilon$. The \textsc{D-Pub} rule then ensures that this private context is duplicated to the public context. Therefore, if the declarations in a module generate $(\Gamma_{\text{priv}};\Gamma_{\text{pub}})$, then only $\Gamma_{\text{pub}}$ should be stored in $\Gamma_M$, which is specified by the \textsc{D-Mod} rule.
 
-The \textsc{D-Type} ensures two things: it adds the type to the type context $\Gamma_T$ and adds all constructors as functions to the variable context $\Gamma_V$. Because all constructors are modelled as functions, we do not need special rules for constructors in the expression inference rules. The \textsc{D-AlgebraicEffect} and \textsc{D-HigherOrderEffect} are split to ensure that all higher-order operations have an \el{!} suffix. Apart from that difference, these rules are identical.
+The \textsc{D-Type} rule ensures two things: it adds the type to the type context $\Gamma_T$ and adds all constructors as functions to the variable context $\Gamma_V$. Because all constructors are modelled as functions, we do not need special rules for constructors in the expression inference rules. The \textsc{D-AlgebraicEffect} and \textsc{D-HigherOrderEffect} rules are split to ensure that all higher-order operations have an \el{!} suffix. Apart from that difference, these rules are identical.
 
 \setlength{\fboxsep}{2\fboxsep}
 
@@ -470,11 +468,12 @@ The \textsc{D-Type} ensures two things: it adds the type to the type context $\G
 \end{figure}
 
 \section{Desugaring}
-To simplify the reduction rules, we simplify the AST by desugaring some constructs. This transform is given by a fold over the syntax tree with the following operation:
+To simplify the reduction rules, we simplify the AST by desugaring some constructs. This transform is given by a fold over the syntax tree with the operation $D$ defined below. If a construct does not match one of the cases below, it is not transformed.
 
 \begin{align*}
     D(\fn(x_1: T_1, \dots, x_n: T_n)\;T\;\{e\}) &= \lambda x_1,\dots,x_n . e \\
     D(\kw{let}\;x = e_1;\;e_2) &= (\lambda x . e_2)(e_1)\\
+    D(\kw{let}\;\kw{rec}\;x = e_1;\;e_2) &= (\lambda x . e_2)((\lambda x . x(x))(\lambda x. e_1[x\mapsto x(x)]))\\
     D(e_1; e_2) &= (\lambda \_ . e_2)(e_1)\\
     D(\S{e}) &= e\\
 \end{align*}
@@ -482,11 +481,54 @@ To simplify the reduction rules, we simplify the AST by desugaring some construc
 \section{Semantics}\label{sec:semantics}
 \newcommand{\reduce}{\quad\longrightarrow\quad}
 
+We give two descriptions of the semantics of Elaine. First, we give an informal description of the denotational semantics to highlight the connection between Elaine and hefty algebras. There is no full specification for the denotational semantics of Elaine. Second, we give a formal small-step reduction semantics for the evaluation of expressions.
+
+\subsection{Denotational Semantics}\label{ssec:denosem}
+\newcommand\BB[1]{\left\llbracket\mcode{#1}\right\rrbracket}
+\newcommand\bb[1]{\left\llbracket\mcode{#1}\right\rrbracket}
+
+In this section, we give an intuition for the intended denotational semantics of Elaine. The $\llbracket\cdot\rrbracket$ operator is used to represent the denotational semantics.
+
+In languages based on algebraic effects, such as Koka, the semantics of effect rows are free monad. So, the denotational semantics of Koka's effect row notation would then be given as follows:
+\[
+  \BB{() -> e a}
+  \qquad=\qquad
+  \mcode{() -> Free}\ \BB{e}\ \BB{a}.
+\]
+However, the semantics for Elaine's effect rows are hefty trees instead of free monads. Therefore, effects correspond to higher-order functors of a hefty tree and algebraic effects need to be lifted. In general, this can be expressed as:
+\[
+  \BB{fn() -> e a}
+  \qquad=\qquad
+  \mcode{() -> Hefty (Lift}\ \bb{A(e)}\ \mcode{+}\ \bb{H(e)}\mcode{)}\ \BB{a}.
+\]
+We conjecture that the denotational semantics of Elaine expressions are hefty trees. However, the semantics of Elaine are still unclear, because the \el{elab} construct does not correspond directly to hefty algebras. To see why, recall that elaboration in hefty algebras returns a free monad. To elaborate multiple higher-order effects, the elaborations of the effects need to be composed using \hs{^} operator.
+%
+Elaine's \el{elab} construct, however, returns a type with only the elaborated effect removed and allows other higher-order effects to be left in the effect row.
+%
+Composition of elaborations is then no longer necessary, because individual elaborations can be applied in sequence. For example, to elaborate a computation that uses both the catch and reader effect, Elaine allows the following expression:
+
+\begin{lst}{Elaine}
+let main = elab[eCatch] elab[eReader] { ... };
+\end{lst}
+%
+This provides more flexibility than composition, since elaborations can then be applied to specific sub-computations of elaborations. This means that Elaine is more flexible than hefty algebras. For example, the following example does not have a clear semantics as hefty tree:
+
+\begin{lst}{Elaine}
+# Note: valid in Elaine, but not in hefty algebras!
+let main = elab[eReader] {
+    elab[eCatch1] a();
+    elab[eCatch2] b()
+};
+\end{lst}
+
+Therefore, the semantics for Elaine's \el{elab} construct are left to future work.
+
+\subsection{Small-step Reduction Semantics}
 The reduction semantics for Elaine are given in \cref{fig:reductionsemantics}. It is given in the form of two contexts $E$ and $X_{op}$ and a reduction relation $\longrightarrow$.
 
-The $E$ context is used for all reduction rules except effect operations, such as \code{if}, \code{let}, and function applications. The $X_{op}$ context is the context in which a handler can reduce an operation $op$. The two contexts are mostly equivalent, except for the fact that an $X_{op}$ cannot enter the sub-computation of a \el{handle} or \el{elab} construct. This is important to ensure correct behaviour for when there are multiple nested handlers for a single effect. In that case, only the innermost handler should be able to handle said effect. The same reasoning applies to elaborations. We use the $\not\in$ symbol to mean that an operation is not handled by a handler, or elaborated by an elaboration.
+The $E$ context is used for all reduction rules except effect operations, such as \code{if}, \code{let}, and function applications. The $X_{op}$ context is the context in which a handler can reduce an operation $op$. The two contexts are mostly equivalent, except for the fact that an $X_{op}$ cannot enter the sub-computation of a \el{handle} or \el{elab} construct. This is important to ensure correct behaviour for when there are multiple nested handlers for a single effect. In that case, only the innermost handler should be able to handle said effect. The same reasoning applies to elaborations. We use the $\in$ symbol to mean that an operation is not handled by a handler, or elaborated by an elaboration.
 
-The figure with semantics does not include semantics for declarations and modules. A sequence of declarations is evaluated in order. The bindings from each declaration get substituted in the remainder of the program. If the declarations are inside a module declaration, then the public bindings get collected. These bindings are substituted when a module is imported with the \el{use} declaration.
+\cref{fig:reductionsemantics} with semantics does not include semantics for declarations and modules. A sequence of declarations is evaluated in order. The bindings from each declaration get substituted in the remainder of the program. If the declarations are inside a module declaration, then the public bindings get collected. These bindings are substituted when a module is imported with the \el{use} declaration.
 
 In this semantics, we assume that all elaborations are explicit. If they are implicit, they first need to be transformed according to the procedure from \cref{chap:elabres}.
 
@@ -622,8 +664,8 @@ Conversions
     & \code{State} & \code{effect State \{ get() String, put(String) () \}} \\
     & \code{hState} & \code{Handler[State,a,fn(String) a]}
     \end{tabular}
-    \label{fig:submods}
     \caption{Sub-modules of \el{std}}
+    \label{fig:submods}
 \end{subfigure}
 \caption{Overview of Elaine's standard library.}
 \end{figure}

@@ -2,7 +2,7 @@
 
 In many programming languages, computations are allowed to have \emph{effects}. This means that they can perform operations besides producing output, and interact with their environment. A computation might, for instance, read or modify a global variable, write to a file, throw an exception, or even exit the program.
 
-Historically, programming languages have supported effects in different ways. Some programming languages opt to give the programmer virtually unrestricted access to effectful operations. For instance, any part of a C program can interact with memory, the filesystem or the network. The program can even yield control to any location in program with the \code{goto} keyword, which has famously been criticized by \textcite{dijkstra_letters_1968}, who argued that \code{goto} breaks the structure of the code and therefore makes the program harder to understand. The same reasoning extends to other effects: the more effects a function is allowed to exhibit, the harder it becomes to reason about.
+Historically, programming languages have supported effects in different ways. Some programming languages opt to give the programmer virtually unrestricted access to effectful operations. For instance, any part of a C program can interact with memory, the filesystem, or the network. The program can even yield control to any location in program with the \code{goto} keyword, which has famously been criticized by \textcite{dijkstra_letters_1968}, who argued that \code{goto} breaks the structure of the code and therefore makes the program harder to understand. The same reasoning extends to other effects: the more effects a function is allowed to exhibit, the harder it becomes to reason about.
 
 The ``anything goes'' approach to effects therefore puts a large burden of ensuring correct behaviour of a program on the programmer. If the language cannot provide any guarantees about what (a part of) a program can do, the programmer has to check instead. For instance, if a function somewhere in the code sets global variable to some incorrect value. This can then cause seemingly unrelated parts of the program to behave incorrectly. The programmer tasked with debugging this issue then has to examine the program as a whole to find where this modification takes place. In languages where this is possible, effectful operations therefore limit our ability to split the code into chunks to be examined separately.
 
@@ -118,22 +118,18 @@ However, many \emph{higher-order operations}, which are operations that take eff
 
 Therefore, there currently exist languages with algebraic effects and there is a theory for hefty algebras, but there are no languages based on hefty algebras yet. This is the gap in research that this thesis aims to fill. The question we aim to answer is:
 \begin{center}
-\textbf{How can we design a language with higher-order effects and elaborations using hefty algebras as semantics?}
+\textbf{How can we design a language with native support for higher-order effects and elaborations based on hefty algebras?}
 \end{center}
-In this thesis, we introduce a novel programming language called \emph{Elaine}. This language features elaborations and higher-order effects as first-class constructs. This brings the theory of hefty algebras into practice. We also present a set of example programs written in Elaine to demonstrate the use of elaborations as a language feature.
+In this thesis, we introduce a novel programming language called \emph{Elaine}. This language features elaborations and higher-order effects as native constructs. This brings the theory of hefty algebras into practice. We also present a set of example programs written in Elaine to demonstrate the use of elaborations as a language feature.
 
 Like handlers for algebraic effects, elaborations require the programmer to specify which elaboration should be applied. In practice, we find that the set of elaborations to apply is often unambiguous. Therefore, we introduce \emph{implicit elaboration resolution}, a type-directed procedure that infers the set of elaborations to apply from context.
-
-Additionally, we give transformations from higher-order effects to algebraic effects. There are two reasons for defining such a transformation. The first is to show how elaborations can be compiled in a larger compilation pipeline. The second is that these transformations show how elaborations could be added to existing systems for algebraic effects.
 
 We provide a specification for Elaine, including its syntax definition, typing judgments, and reduction semantics. Along with this specification, we provide a prototype implementing this specification written in Haskell in the artifact accompanying this thesis. This implementation includes a parser, type checker, interpreter, pretty printer, and the transformations mentioned above.
 
 \paragraph{Contributions} The main contribution of this thesis is the specification and implementation of Elaine. This consists of several parts.
 %
 \begin{itemize}
-    \item We present a language with both handlers and elaborations based on hefty algebras (\cref{chap:basics}). The language specification consists of a syntax definition, typing judgments and reduction semantics. (\cref{chap:spec}). We conjecture that hefty algebras are the semantics of the language, but we do not prove this.
-    %
-    \item We generalize effect rows to higher-order effects (\cref{sec:hoeffectrow}). The type system of the language is based on these generalized effect row.
+    \item We present a language with both handlers and elaborations based on hefty algebras (\cref{chap:basics}). The language specification consists of a syntax definition, typing judgments and reduction semantics (\cref{chap:spec}). We conjecture that hefty algebras are the semantics of the language, but we do not prove this. We also generalize effect rows to higher-order effects (\cref{ssec:denosem}). The type system of the language is based on these generalized effect rows.
     %
     \item We provide a prototype for the language with a parser, a type checker based on Hindley-Milner type inference and an interpreter for this language implemented in Haskell. This prototype is available in the artifact.
     %

@@ -1,9 +1,9 @@
 \chapter{Implicit Elaboration Resolution}\label{chap:elabres}
 
-With Elaine, we aim to explore further ergonomic improvements for programming with effects. We note that elaborations are often not parametrized and that there is often only one in scope at a time. Hence, when we encounter an \el{elab}, there is only one possible elaboration that could be applied. Therefore, we propose that the language should be able to infer the elaborations. Take the example in the listing below, where we let Elaine infer the elaboration for us.
+With Elaine, we aim to explore further ergonomic improvements for programming with effects. We note that elaborations are often not parametrized and that there is often only one elaboratrion in scope per effect at a time. Hence, when we encounter an \el{elab}, there is only one possible elaboration that could be applied. Therefore, the language can infer the elaborations. Take the example in the listing below, where we let Elaine infer the elaboration.
 
 \example[firstline=20]{local_reader_implicit}
-
+%
 A use case of this feature is when an effect and elaboration are defined in the same module. When this module is imported, the effect and elaboration are both brought into scope and \el{elab} will apply the standard elaboration automatically.
 
 \begin{lst}{Elaine}
@@ -19,7 +19,6 @@ use local;
 # We do not have to specify the elaboration, since it is
 # imported along with the effect.
 let main = handle[hAsk] elab { local!(double, ask!()) };
-#                          ^^^
 \end{lst}
 %
 However, while useful, this feature only saves a few characters in the examples above. It becomes more important when multiple higher-order effects are involved: an \el{elab} without argument will elaborate all higher-order effects in the sub-computation. For instance, if elaborations for both \el{Except!} and \el{Reader!} are in scope, the following program works.
@@ -36,7 +35,7 @@ let main = handle[hAsk(2)] handle[hThrow] elab {
 }
 \end{lst}
 %
-This relies on the fact that the order in which elaboration are applied does not affect the semantics of the program as explained in \cref{sec:hefty_algebras}. To make the inference predictable, we require that an implicit elaboration must elaborate all higher-order effects in the sub-computation.
+To make the inference predictable, we require that an implicit elaboration must elaborate all higher-order effects in the sub-computation.
 
 A problem with this feature arises when multiple elaborations for a single effect are in scope; which one should then be used? To keep the result of the inference predictable and deterministic, the type checker should yield a type error in this case. Hence, if type checking succeeds, then the inference procedure has found exactly one elaboration to apply for each higher-order effect. If not, the elaboration cannot be inferred and must be written explicitly.
 
@@ -53,5 +52,4 @@ To infer the elaborations, the type checker first analyses the sub-expression. T
 
 The \el{elab} is finally transformed into one explicit \el{elab} per higher-order effect. Recall that the order of elaborations does not matter for the semantics of the program, meaning that we apply them in arbitrary order.
 
-A nice property of this transformation is that it results in very readable code. Because the elaboration is in scope, there is an identifier for it in scope as well. The transformation then simply inserts this identifier. The \elab in the first example of this chapter will, for instance, be transformed to \el{elab[eVal]}. A code editor could then display this transformed \el{elab} as an inlay hint.
-
+A nice property of this transformation is that it results in readable code. Because the elaboration is in scope, there is an identifier for it in scope as well. The transformation simply inserts this identifier. The \elab in the first example of this chapter will, for instance, be transformed to \el{elab[eVal]}. A code editor could then display this transformed \el{elab} as an inlay hint.

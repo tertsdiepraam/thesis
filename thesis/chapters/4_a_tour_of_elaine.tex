@@ -1,12 +1,12 @@
 \chapter{A Tour of Elaine}\label{chap:basics}
 
-The language designed for this thesis is called ``Elaine''. The distinguishing feature of this language is its support for higher-order effects via elaborations. The basic feature of elaborations has been extended implicit elaboration resolution, which is detailed in \cref{chap:elabres}.
+The language designed for this thesis is called ``Elaine''. The distinguishing feature of this language is its support for higher-order effects via elaborations. The basic feature of elaborations has been extended with implicit elaboration resolution, which is detailed in \cref{chap:elabres}.
 
 \section{Overview}
 
 At its core, Elaine is based on the lambda calculus, extended with algebraic and higher-order effects. The feature set has been chosen to be comprehensive enough for fairly extensive programs, which are given in \cref{chap:examples}.
 
-Elaine's syntax is mostly inspired by Koka \autocite{leijen_koka_2014,leijen_type_2017} and Rust \autocite{matsakis_rust_2014}. The keywords of the language will be particularly familiar to Rust programmers. It is designed to be relatively simple to parse, which is most clearly reflected in the fact that whitespace is ignored and that there are no infix operators. As a result, Elaine requires semicolons at the end of each statement and requires computations consisting of multiple statements to be wrapped in braces.
+Elaine's syntax is mostly inspired by Koka \autocite{leijen_koka_2014,leijen_type_2017} and Rust \autocite{matsakis_rust_2014}. The keywords of the language will be particularly familiar to Rust programmers. It is designed to be relatively simple to parse, which is most clearly reflected in the fact that whitespace is ignored and that there are no infix operators. Elaine requires semicolons at the end of each statement and requires computations consisting of multiple statements to be wrapped in braces.
 
 All expressions in Elaine are statically and strongly typed with a type system based on Hindley-Milner style type inference \autocite{hindley_principal_1969,milner_theory_1978}. The type system has a special treatment for effect rows similar to Koka's approach. In most cases, types can be completely inferred and do not need to be specified. Additionally, algebraic data types and tuples are supported for modelling complex data.
 
@@ -136,7 +136,7 @@ let main = match safe_div(5, 0) {
 };
 \end{lst}
 %
-\indent Data types can be recursive. For example, we can define a \el{List} with a \el{Cons} and a \el{Nil} constructor.
+Data types can be recursive. For example, we can define a \el{List} with a \el{Cons} and a \el{Nil} constructor.
 
 \begin{lst}{Elaine}
 type List[a] {
@@ -147,15 +147,11 @@ type List[a] {
 let list: List[Int] = Cons(1, Cons(2, Nil()));
 \end{lst}
 %
-The \el{List} type is also provided in the standard library in the \el{list} module. If that module is in scope there is also some syntactic sugar for lists: we can write a list with brackets and comma-separated expressions like \el{[1, 2, 3]}.
+The \el{List} type is also provided in the standard library in the \el{list} module. There is also syntactic sugar for lists: we can write a list with brackets and comma-separated expressions like \el{[1, 2, 3]}.
 
 \section{Recursion \& Loops}\label{sec:recursion}
 
-The let bindings in the previous sections are not allowed to be recursive. In general, let bindings can only reference values that have been defined before the binding itself. However, recursion or some other looping construct is necessary for many programs. Therefore, Elaine has a special syntax for recursive definitions: \el{let rec}.
-
-Let bindings with \el{rec} definitions are desugared into the Y combinator. However, it is impossible to write the Y combinator manually, because it would have an infinite type. The type checker therefore has special case for recursive definitions.
-
-An example of a recursive function is the \el{factorial} function listed below.
+The let-bindings in the previous sections are not allowed to be recursive. In general, let-bindings can only reference values that have been defined before the binding itself. However, recursion or some other looping construct is necessary for many programs. Therefore, Elaine has special syntax for recursive definitions: \el{let rec}. Let-bindings with \el{rec} are desugared into the Y combinator. However, it is impossible to write the Y combinator manually, because it would have an infinite type. The type checker therefore has special case for recursive definitions. An example of a recursive function is the \el{factorial} function listed below.
 
 \begin{lst}{Elaine}
 use std;
@@ -177,7 +173,7 @@ let rec f = fn(x) { f(x) };
 let rec x = x;
 \end{lst}
 %
-Using recursive definitions, we can build functions like \el{map}, \el{foldl}, and \el{foldr} to operate on our previously defined \el{List} type. The implementation for \el{map} might look like the listing below. Note that, in contrast with Haskell, Elaine evaluates these functions eagerly; there is no lazy evaluation.
+Using recursive definitions, we can define functions like \el{map}, \el{foldl}, and \el{foldr} to operate on our previously defined \el{List} type. The implementation for \el{map} might look like the listing below. Note that, in contrast with Haskell, Elaine evaluates these functions eagerly; there is no lazy evaluation.
 
 \begin{lst}{Elaine}
 let rec map = fn(f: fn(a) b, list: List[a]) List[b] {
@@ -191,6 +187,27 @@ let doubled = map(fn(x) { mul(2, x) }, [1, 2, 3]); # -> [2, 4, 6]
 \end{lst}
 %
 The \el{list} module provides the most common operations on lists. Such \el{head}, \el{concat_list}, \el{range}, \el{map}, \el{foldl}, and \el{foldr}. It also provides a \el{sum} function for lists of integers and a \el{join} function for lists of strings.
+
+\section{Modules}
+
+Modules can be used to group declarations. We have previously introduced the \el{std} module, which is available by default. However, we can also define new modules. The contents of any module can be brought into scope with the \el{use} declaration. However, only the public declarations in a module are imported. A declaration is public if it is prefixed with the \el{pub} keywords. This also applies to \el{mod} and \el{use} declarations. A public module can be imported after importing its parent module and a \el{pub use} brings the public declarations into the current module and makes them public.
+
+\begin{lst}{Elaine}
+use std;
+mod math {
+    pub mod multiplication {
+        pub let square = fn(x: Int) Int { x * x };
+    }
+    pub let add3 = fn(x: Int, y: Int, z: Int) Int {
+        add(add(x, y), z)
+    };
+}
+
+use math;
+use multiplication;
+
+let main = add3(square(4), square(5), square(6));
+\end{lst}
 
 \section{Algebraic Effects}
 
@@ -275,9 +292,9 @@ effect Twice {
 let hTwice = handler {
     twice() {
         resume(());
-        resume(()))
+        resume(())
     }
-}
+};
 
 let main = {
     let a = handle[hState] handle[hTwice] {
@@ -288,7 +305,7 @@ let main = {
     a(3)
 };
 \end{lst}
-%
+
 \subsection{Effect Rows}
 
 All types in Elaine have an effect row. So far, we have omitted the effect rows, because effect rows can be inferred by the type checker. Effect rows represent the set of effects that need to be handled to obtain the value in a computation. For simple values, that effect row is empty, denoted \el{<>}. For example, an integer has type \el{<> Int}. With explicit effect row, the \el{square} function in the previous section could therefore have been written as below.
@@ -301,38 +318,15 @@ let square = fn(x: <> Int) <> Int {
 %
 Simple effect rows consist of a list of effect names separated by commas. The return type of a function that returns an integer and uses the \el{Ask} and \el{State} effects has type \el{<Ask,State> Int} or, equivalently \el{<State,Ask> Int}. The order of effects in effect rows is irrelevant. However, the multiplicity is important, that is, the effect rows \el{<State,State>} and \el{<State>} are not equivalent.
 
-Like in Koka, we can extend effect rows with other effect rows. This is denoted with the \el{|} at the end of the effect row: \el{<A,B|e>} means that the effect row contains \el{A}, \el{B} and some (possibly empty) set of remaining effects. We call a row without extension \emph{closed} and a row with extension \emph{open}.
-
-
-Like value types, effect rows are unified in the type checker. For unification, any closed row is first opened by introducing a new expansion variable. Then unification solves for the equation
-\[ \el{<A1,...,AN|e>} = \el{<B1,...,BM|f>}, \]
-for \el{e} and \el{f}. To do so, a fresh variable \el{g} is introduced which represents the intersection of \el{e} and \el{f}. The unified row then becomes \el{<A1,...,AN,B1,...,BN|g>}. \Cref{table:unification} provides some more examples of effect row unification. The full procedure for unification is detailed in \cref{sec:effectrows}.
-
-\begin{table}[t]
-\centering
-\begin{tabular}{lllll}
-    \el{<A>}     & $\cup$ & \el{<>}     & $\to$ & \el{<A>} \\
-    \el{<A>}     & $\cup$ & \el{<A>}    & $\to$ & \el{<A>} \\
-    \el{<A>}     & $\cup$ & \el{<B>}    & $\to$ & \el{<A,B>} \\
-    \el{<A,B>}   & $\cup$ & \el{<B,A>}  & $\to$ & \el{<A,B>} \\
-    \el{<A,A>}   & $\cup$ & \el{<A>}    & $\to$ & \el{<A,A>} \\
-    \el{<A,B|e>} & $\cup$ & \el{<C>}    & $\to$ & \el{<A,B,C|e'>} \\
-    \el{<A|e>}   & $\cup$ & \el{<B|e>}  & $\to$ & \el{# error!} \\
-    \el{<A|e1>}  & $\cup$ & \el{<B|e2>} & $\to$ & \el{<A,B|e3>} \\
-\end{tabular}
-\caption{Examples of effect row unification.}
-\label{table:unification}
-\end{table}
-%
-\TODO{Give implications of this algo}
+Like in Koka, we can extend effect rows with other effect rows. This is denoted with the \el{|} at the end of the effect row: \el{<A,B|e>} means that the effect row contains \el{A}, \el{B} and some (possibly empty) set of remaining effects. We call a row without extension \emph{closed} and a row with extension \emph{open}. Effect rows are considered equivalent up to reordering by the type checker. When a function is applied, the effect row of its return type is opened. This ensures that a function using only the state effect can be called in a computation wrapped in handlers for both the state and abort effect.
 
 \section{Functions Generic over Effects}
-We can use extensions to ensure equivalence between effect rows without specifying the full rows. For example, the following function uses the \el{Abort} effect if the called function returns false, while retaining the effects of the wrapped function.
+We can use extensions of effect rows to ensure equivalence between effect rows without specifying the full rows. For example, the following function uses the \el{Abort} effect if the called function returns false, while retaining the effects of the wrapped function.
 
 \begin{lst}{Elaine}
 let abort_on_false = fn(f: fn() <|e> Bool) <Abort|e> () {
     if f() { () } else { abort() }
-}
+};
 \end{lst}
 %
 When an effect is handled, it is removed from the effect row. The \el{main} binding is required to have an empty effect row, which means that all effects in the program need to be handled. Therefore, to use the \el{abort_on_false} function defined above, it needs to be called from within a handler.
@@ -342,8 +336,8 @@ let main: <> Maybe[()] = handle[hAbort] {
     abort_on_false(fn() { false })
 };
 \end{lst}
-
-Recall the definition of \el{map} in \cref{sec:recursion}, which was written without any effects in its signature. Adding the effects yields the following definition.
+%
+Recall the definition of \el{map} in \cref{sec:recursion}, which was written without any effects in its signature. Adding the effect rows yields the following definition:
 
 \begin{lst}{Elaine}
 let rec map = fn(f: fn(a) <|e> b, l: List[a]) <|e> List[b] {
@@ -363,7 +357,7 @@ let ask_added = handle[hAsk(5)] map(fn(x) { add(ask() x) }, [1,2,3]);
 %
 If we were two write the same expressions in Haskell instead, we would need two different implementations of \el{map}: one for applying pure functions (\hs{map}) and another for applying monadic functions (\hs{mapM}). Our definition of \el{map} is therefore more general than Haskell's \hs{map} function. The same reasoning can be applied to other functions like \el{foldl} and \el{foldr} or indeed any higher-order function.
 
-Functional languages like Haskell usually do not feature a construct for looping. This is partly because folds, maps, and recursion are preferred to loops, but also because a looping construct relies on effects. In Koka and Elaine, we can define a \el{while} function which is generic over effects. This enables both functional and imperative styles of programming.
+Functional languages like Haskell usually do not feature constructs for looping, such as \hs{while} loops. This is partly because folds, maps, and recursion are preferred to loops, but also because a looping construct relies on effects, since a loop does not return a value. In Elaine, we can define a \el{while} function which is generic over effects. This enables both functional and imperative styles of programming.
 
 \begin{lst}{Elaine}
 let rec while = fn(
@@ -378,18 +372,18 @@ let rec while = fn(
     }
 };
 \end{lst}
-%
+
 \section{Higher-Order Effects}\label{sec:hoeffects}
 
-Higher-order effects in Elaine are supported via elaborations, as proposed by \textcite{bach_poulsen_hefty_2023} and explained in \cref{sec:hefty_algebras}. In this framework, higher-order effects are elaborated into a computation using only algebraic effects. They are not handled directly. This means that we cannot write handlers for them as we did for algebraic effects in the previous section.
+Higher-order effects in Elaine are supported via elaborations, as introduced by \textcite{bach_poulsen_hefty_2023} and explained in \cref{sec:hefty_algebras}. In this framework, higher-order effects are elaborated into a computation using only algebraic effects. They are not handled directly. This means that we cannot write handlers for them as we did for algebraic effects in the previous section.
 
-To distinguish higher-order effects and operations from algebraic effects and operations, we write them with an \el{!} suffix. For example, a higher-order \el{Except!} effect is written \el{Except!}, and its \el{catch} operations is written \el{catch!}.
+To distinguish higher-order effects and operations from algebraic effects and operations, we write them with an \el{!} suffix. For example, a higher-order \el{Except!} effect is written \el{Except!}, and its \el{catch} operation is written \el{catch!}.
 
 Higher-order effects are treated exactly like algebraic effects in the effect rows. The order of effects still does not matter, and we can create effect rows with arbitrary combinations of algebraic and higher-order effects.
 
-The elaborated operations differ from other functions and algebraic operations because they have call-by-name semantics; the arguments are not evaluated before they are passed to the elaboration. Hence, the arguments can be computations, even effectful computations.
+The higher-order effect operations differ from other functions and algebraic operations because they have call-by-name semantics; the arguments are not evaluated before they are passed to the elaboration. Hence, the arguments can be effectful computations.
 
-Just like we have the \el{handler} and \el{handle} keywords to create and apply handlers for algebraic effects, we can create and apply elaborations with the \el{elaboration} and \el{elab} keywords. Unlike handlers, elaborations do not get access to the \el{resume} function, because they always resume exactly once.
+Just like we have the \el{handler} and \el{handle} keywords to create and apply handlers for algebraic effects, we can create and apply elaborations with the \el{elaboration} and \el{elab} keywords. Unlike handlers, elaborations do not get access to the \el{resume} function, and always resume exactly once.
 
 An illustrative example of this feature is the \el{Reader} effect with a \el{local} operation. This effect enhances the previously introduced \el{Ask} effect with a \el{local} operation that modifies the value returned by \el{ask}. To motivate the implementation, let us first imagine how to emulate the behaviour of \el{local}. Our goal is to make the following snippet return the value \el{15}.
 
@@ -406,7 +400,7 @@ This means that the \el{local} operation would need to handle the \el{ask} effec
 \begin{lst}{Elaine}
 let local = fn(f: fn(Int) Int, g: fn() <Ask|e> a) <|e> a {
     handle[hAsk(f(ask()))] { g() }
-}
+};
 \end{lst}
 %
 This works but is not implemented as an effect. For example, we cannot modularly provide another implementation of \el{local}. To turn this implementation into an effect, we start with the effect declaration.
@@ -424,7 +418,7 @@ let eLocal = elaboration Reader! -> <Ask> {
     local!(f, c) {
         handle[hAsk(f(ask()))] c
     }
-}
+};
 \end{lst}
 %
 Note how similar the elaboration for \el{local!} is to the \el{local} function above. In the first line, we specify explicitly what effect the elaboration elaborates (\el{Reader!}) and which effects should be present in the context where this elaboration is used (\el{<Ask>}). This can be an effect row of multiple effects if necessary. In this case we only require the \el{Ask} effect. This means that we can use this elaboration in any expression that is wrapped by at least a handler for \el{Ask}.
@@ -434,7 +428,7 @@ let main = handle[hAsk(5)] elab[eLocal] {
     let x = ask();
     let y = local!(double, ask());
     add(x, y)
-}
+};
 \end{lst}
 %
 That is the full implementation for the higher-order \el{Reader!} effect in Elaine. \Cref{sec:reader} contains a listing of all these pieces put together in a single example.

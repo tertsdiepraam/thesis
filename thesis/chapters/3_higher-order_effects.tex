@@ -10,7 +10,7 @@ Recall that an effect in the free monad encoding is a functor over some \hs{k} w
 data Branch k = Branch Bool k k
 
 branch :: Branch < f => Bool -> Free f a -> Free f a -> Free f a
-branch b ifTrue ifFalse :: Do $ inj $ Branch b ifTrue ifFalse
+branch b ifTrue ifFalse :: Op $ inj $ Branch b ifTrue ifFalse
 \end{lst}
 %
 The important observation with this effect is that both \hs{ifTrue} and \hs{ifFalse} behave like continuations. To examine why, consider the following computation.
@@ -19,7 +19,7 @@ The important observation with this effect is that both \hs{ifTrue} and \hs{ifFa
 branch b (pure 0) (pure 1) >>= \x -> pure (x + 1)
 \end{lst}
 %
-Like previously established, the \hs{>>=} operator distributes over the computation parameters. This yields the following expression.
+Like previously established, the \hs{>>=} operator defined by \hs{Free} distributes over the computation parameters. This yields the following expression.
 
 \begin{lst}{Haskell}
 branch b
@@ -37,16 +37,7 @@ This is what we mean by saying that the parameters are computation-like: the con
 
 For other effects, however, the intended semantics are not such that the computation parameters are continuation-like.
 
-One such effect is the \hs{Reader} effect. Traditionally, the \hs{Reader} monad has two operations: \hs{local} and \hs{ask}. The latter functions much like the \hs{get} operation from the state effect and is algebraic. However, the \hs{local} operation is more complex. It takes two parameters, a function \hs{f} and a computation \hs{c}. The intended semantics are then that whenever \hs{ask} is used within \hs{c}, the function \hs{f} is applied to the returned value.
-
-\begin{lst}{Haskell}
-data Reader a k = Ask (a -> k) | Local (a -> a) k k
-
-ask       = Do $ inj $ Get Pure
-local f c = Do $ inj $ Local f c (Pure ())
-\end{lst}
-%
-To see why the \hs{local} operation breaks algebraicity, consider the following computation.
+One such effect is the \hs{Reader} effect. Traditionally, the \hs{Reader} monad has two operations: \hs{local} and \hs{ask}. The latter functions much like the \hs{get} operation from the state effect and is algebraic. However, the \hs{local} operation is more complex. It takes two parameters, a function \hs{f} and a computation \hs{c}. The intended semantics are then that whenever \hs{ask} is used within \hs{c}, the function \hs{f} is applied to the returned value. To see why the \hs{local} operation breaks algebraicity, consider the following computation.
 
 \begin{lst}{Haskell}
 local (* 2) ask >>= \x -> ask >>= \y -> pure x + y
@@ -60,16 +51,7 @@ local (* 2) (ask >>= \x -> ask >>= \y -> pure x + y)
 %
 Now, both \hs{ask} operations are inside the \hs{local} operation, so both values will be doubled. For example, if we had installed a handler that makes \hs{ask} return 1, the first computation would return $2 + 1 = 3$ and the second $2 + 2 = 4$. Therefore, we have shown with a counterexample that the \hs{Reader} effect cannot be algebraic.
 
-A similar argument holds for the \hs{Except} effect, which also has two operations: \hs{catch} and \hs{throw}. In the simplest form, \hs{throw} resembles the \hs{abort} effect, but it takes a parameter that represents an error message. The \hs{catch} operation evaluates its first parameter and jump to the second if it fails, much like the try-catch constructs of languages with effects.
-
-\begin{lst}{Haskell}
-data Except a k = Throw a | Catch k k
-
-throw     = Do $ inj $ Throw
-catch a b = Do $ inj $ Catch a b
-\end{lst}
-%
-Again, we take a simple example program to show that \hs{Except} violates algebraicity.
+A similar argument holds for the \hs{Except} effect, which also has two operations: \hs{catch} and \hs{throw}. In the simplest form, \hs{throw} resembles the \hs{abort} effect, but it takes a parameter that represents an error message. The \hs{catch} operation evaluates its first parameter and jump to the second if it fails, much like the try-catch constructs of languages with effects. Again, we examine a simple example program to show that \hs{Except} violates algebraicity.
 
 \begin{lst}{Haskell}
 catch (pure False)  (pure True) >>= throw -- -> throws False
@@ -91,7 +73,7 @@ Taking a step back from effects, defining a function for exception catching is p
 catch c1 c2 =
   case handleThrow c1 of
     Left e -> c2
-    Right a -> pure a
+    Right a -> return a
 \end{lst}
 %
 The distinction between effects which are and which are not algebraic has been described as the difference between \emph{effect constructors} and \emph{effect deconstructors} \autocite{plotkin_algebraic_2003}. The \el{local} and \el{catch} operations have to act on effectful computations and change the meaning of the effects in that computation. So, they have to deconstruct the effects in their computations using handlers. An imperfect heuristic for whether a function can be an algebraic effect is to check whether the implementation requires a handler. If it uses a handler, it probably cannot be an algebraic effect.
@@ -104,7 +86,7 @@ Several solutions to the modularity problem have been proposed \autocite{wu_effe
 
 For a full treatment of hefty algebras, we refer to \textcite{bach_poulsen_hefty_2023}. In addition, the encoding of hefty algebras is explained in more detail by \textcite{bach_poulsen_algebras_2023}.
 
-At the core of hefty algebras are hefty trees. A hefty tree is a generalization of the free monad to higher-order functors, which will write \hs{HOFunctor}. In the listing below, we also repeat the definition of a functor from the previous chapter for comparison.
+At the core of hefty algebras are hefty trees. A hefty tree is a generalization of the free monad to higher-order functors, which will write \hs{HFunctor}. In the listing below, we also repeat the definition of a functor from the previous chapter for comparison.
 
 \begin{lst}{Haskell}
 -- a regular functor
@@ -112,7 +94,7 @@ class Functor f where
   fmap :: (a -> b) -> f a -> f b
 
 -- a higher-order functor
-class (forall f. Functor (h f)) => HOFunctor h where
+class (forall f. Functor (h f)) => HFunctor h where
   hmap :: (f a -> g a) -> (h f a -> h g a)
 \end{lst}
 %
@@ -122,7 +104,7 @@ The definition of a hefty tree, with the free monad for reference, then becomes:
 -- free monad
 data Free f a
   = Pure a
-  | Do (f (Free f a))
+  | Op (f (Free f a))
 
 -- hefty tree
 data Hefty h a
@@ -130,13 +112,13 @@ data Hefty h a
   | Do (h (Hefty h) (Hefty h a))
 \end{lst}
 %
-A hefty tree and a free monad are very similar: we can define the \hs{>>=}, \hs{<} and \hs{+} operators from the previous chapter for hefty trees, so that the hefty tree can be used in the same way.\footnote{We are abusing Haskell's syntax here. In the real Haskell encoding, these operators need to have different names from their free monad counterparts, for example \hs{:+} and \hs{:<}.} We refer to \textcite{bach_poulsen_hefty_2023} for the definition of these operators. Furthermore, any functor can be lifted to a higher-order functor with a \hs{Lift} data type.
+A hefty tree and a free monad are very similar. Like for the free monad, we can define \hs{return} and \hs{>>=} for \hs{Hefty h}, so that it can be used as a monad. Additionally, we define \hs{injH}, \hs{:<:}, and \hs{:+:} as analogues for \hs{inj}, \hs{<}, and \hs{+} from the previous chapter, respectively. We refer to \textcite{bach_poulsen_algebras_2023} for the definition of these operators. Furthermore, any functor can be lifted to a higher-order functor with a \hs{Lift} data type.
 
 \begin{lst}{Haskell}
 data Lift f (m :: * -> *) k = Lift (f k)
   deriving Functor
 
-instance Functor f => HOFunctor (Lift f) where
+instance Functor f => HFunctor (Lift f) where
   hmap _ (Lift x) = Lift x
 \end{lst}
 %
@@ -151,109 +133,138 @@ Using hefty algebras, the evaluation instead starts with a \emph{hefty tree}, wh
 This elaboration is a transformation from a hefty tree into the free monad, defined as an algebra over hefty trees. The algebras are then used in \hs{hfold}; a fold over hefty trees.
 
 \begin{lst}{Haskell}
-hfold :: HOFunctor h
+hfold :: HFunctor h
       => (forall a. a -> g a)
       -> (forall a. h g (g a) -> g a)
       -> Hefty h a 
       -> g a
 hfold gen _   (Return x) = gen x
 hfold gen alg (Do x)     =
-  ha alg (fmap (hfold gen alg) (hmap (hfold gen alg) x))
+  alg (fmap (hfold gen alg) (hmap (hfold gen alg) x))
 
-elab :: HOFunctor h
+elab :: HFunctor h
      => (forall a. h (Free f) (Free f a) -> Free f a)
      -> Hefty h a
      -> Free f a
 elab elabs = hfold Pure elabs
 \end{lst}
 %
-For any algebraic -- and thus lifted -- effect, this elaboration is trivially defined by unwrapping the \hs{Lift} constructor.
+For any algebraic -- and thus lifted -- effect, this elaboration \hs{eLift} is trivially defined by unwrapping the \hs{Lift} constructor. Applying \hs{eLift} to \hs{elab} then gives a function which elaborates \hs{Hefty (Lift f) a} to \hs{Free f a} for any functor \hs{f}. 
 
 \begin{lst}{Haskell}
 eLift :: g < f => Lift g (Free f) (Free f a) -> Free f a
 eLift (Lift x) = Op (inj x)
 \end{lst}
 %
-Applying \hs{eLift} to \hs{elab} then gives a function which elaborates \hs{Hefty (Lift f) a} to \hs{Free f a} for any functor \hs{f}. The more interesting case is that of higher-order effects. For example, the \hs{local} operation of the \hs{Reader} effect can be mapped to a computation using the free monad as well, resembling the definition of \hs{local} as a function.
-
-\begin{lst}{Haskell}
-data Reader r k = Local r k k
-
-eReader :: Ask r < f
-           => Reader r (Free f) (Free f a)
-           -> Free f a
-eReader (Local f m k) = ask >>= \r -> handle (hAsk (f r)) m >>= k
-\end{lst}
-%
-The \hs{eReader} elaboration can then be used to elaborate higher-order effects in a computation. This makes the \hs{local} operation modular, because we can define different elaborations to apply to different sub-computations. \fixme{This applies to any higher-order effect we define and that is how hefty algebras solve the modularity problem.}
-
-\TODO{Write elaboration for the catch effect}
-
 To elaborate multiple effects, elaborations can be composed using the \hs{^} operator as defined by \textcite{bach_poulsen_hefty_2023}. The composed elaborations are then applied all at once, because an elaboration of a \hs{Hefty h a} returns a \hs{Free f a}, which cannot contain any higher-order effects.
 
-We found this constraint to be limiting in practice. Imagine a program with elaborations \hs{eCatch} and \hs{eReader}, for the catch and reader effect, respectively. If \hs{a} and \hs{b} are both computations that use these two effects, these elaborations can be applied as follows.
+Using elaborations, we can modularly define higher-order operations, such as \hs{catch} and \hs{local} operations. For example, the \hs{Except} effect can be elaborated to a computation using only the algebraic \hs{ThrowA} effect. This elaboration is given in \cref{fig:except}.\footnote{This code is simplified and does not compile in this form. In reality the result of the handler needs to be wrapped in a function \hs{hup}, which reorders the effects in the effect row to match the context. The same goes for the example for the reader effect below. This \hs{hup} requires some additional machinery as explained by \textcite{bach_poulsen_encoding_2023}.}
+
+For the \hs{Reader} effect, the \el{local} operation needs to be elaborated, but the \el{ask} operation can be handled. So, we define an algebraic effect \el{AskA} with only the \el{ask} operation. This effect is handled by \hs{handleAskA}. The implementation of both the handler and elaboration are listed in \cref{fig:reader}.
+
+The \hs{catch} and \hs{local} operations in these examples are modular, because the elaborations can be swapped out for different elaborations. Additionally, we can write computations using both effects. For example, the elaboration of a computation with both a catch and reader effect looks as follows:
 
 \begin{lst}{Haskell}
 main = handleThrow $ handleAsk 0 $
-  elab (eCatch ^ eReader) (a >>= b)
+  elab (eCatch ^ eReader ^ eLift) c
 \end{lst}
 %
-Now, we want to apply a different elaboration \hs{eCatch'} to \hs{b}, but not to \hs{a}. Since \el{elab} returns a free monad, we cannot write the following:
+Similar to how Koka is based on the theory of algebraic effects, Elaine is based on hefty algebras. Therefore, Elaine supports elaborations for higher-order effects. While the intended semantics for expressions in Elaine are hefty trees, the semantics of Elaine's \el{elab} construct are currently unclear, as discussed in \cref{ssec:denosem}.
 
+\begin{figure}[p]
 \begin{lst}{Haskell}
--- Not valid in hefty algebras!
-main = handleThrow $ handleAsk 0 $
-  elab eReader $
-    (elab eCatch a) >>= (elab eCatch' b)
-\end{lst}
-%
-Therefore, the only way hefty algebras allow us to separate the elaboration for the catch effect is by elaborating the reader effect for \hs{a} and \hs{b} separately. The elaboration for the reader effect needs to be repeated.
+data ThrowA e k = ThrowA e
+  deriving Functor
 
+handleThrowA :: Functor f
+             => Free (Abort + f) a -> Free f (Maybe a)
+handleThrowA c = handle
+    (\a _ -> Pure $ Right a)
+    (\(Throw e) () -> Pure $ Left e) 
+    c ()
+
+data Except e f k
+  = Throw e
+  | Catch (f a) (f a) (a -> k)
+
+deriving instance Functor (Except e f)
+
+instance HFunctor (Except e) where
+  hmap _ (Throw x) = Throw x
+  hmap f (Catch m1 m2 k) = Catch (f m1) (f m2) k
+
+throw :: Except e :<: h => e -> Hefty h a
+throw x = Op (injH (Throw x))
+
+catch :: Except :<: h
+      => Hefty h a -> Hefty h a -> Hefty h a
+catch m1 m2 = Do $ inj $ Catch m1 m2 Return
+
+eExcept :: ThrowA e < f
+        => Except e (Free f) (Free f a)
+        -> Free f a
+eExcept (Throw e) = Do (inj (ThrowA e))
+eExcept (Catch m1 m2 k) =
+  handleThrowA c1 >>= \v ->
+    case v of
+      Left e -> c2 >>= k
+      Right x  -> k x
+
+comp :: Hefty (Except e :+: Lift (ThrowA e)) Int
+comp = catch (throw) (return 4)
+
+result = handleAbort $ elab (eExcept ^ eLift) comp
+\end{lst}
+\caption{Definition, elaboration and use of the \hs{Except} effect.}
+\label{fig:except}
+\end{figure}
+
+\begin{figure}[p]
 \begin{lst}{Haskell}
-main = handleThrow $ handleAsk 0 $
-  (elab (eCatch ^ eReader) a)
-    >>= (elab (eCatch' ^ eReader) b)
+data AskA r k = AskA (r -> k)
+  deriving Functor
+
+handleAskA :: Functor f
+           => r -> Free (AskA + f) a -> Free f a 
+handleAskA v m =
+  handle
+    (\a () -> Pure a)
+    (\(Ask k) -> k v)
+    m ()
+
+data Reader r m k =
+  = Ask (r -> k)
+  | forall a. Local (r -> r) (m a) (a -> k)
+
+deriving instance Functor (Reader r m)
+
+instance HFunctor (Reader r) where
+  hmap _ (Ask k) = (Ask k)
+  hmap f (Local f m k) = Local g (f m) k
+
+ask :: Reader r :<: h
+    => Hefty h r
+ask = Do $ injH $ Ask Pure
+
+local :: Reader r :<: h
+      => (r -> r) -> Hefty h a -> Hefty h a
+local f m = Do $ injH $ Local f
+
+eReader :: AskA r < f
+        => Reader r (Free f) (Free f a)
+        -> Free f a
+eReader (Ask k) = Op $ inj $ AskA k
+eReader (Local f m k) = 
+  askA >>= \r ->
+    handleAskA (f r) m >>=
+      k
+
+comp :: Hefty (Reader Int :+: Lift Abort) Int
+comp = ask >>= \x ->
+        local (* 2) (ask >>= \y -> return (x + y))
+                          
+result = handleAbort $ elab (eReader ^ eLift) comp
 \end{lst}
-%
-We found applying single elaborations to be useful, and Elaine's semantics allow it. We conjecture that these semantics still correspond to hefty algebras. However, a proof of this conjecture is left to future work. In Elaine's semantics, the \el{elab} function does not return a free monad, but instead returns a hefty tree with the elaborated effect removed.
-
-\begin{lst}{Haskell}
--- Hypothetical type signature for an elab construct
--- corresponding to Elaine's semantics.
-elab' :: HOFunctor h
-  => (forall a. h (Hefty h') (Hefty h' a) -> Hefty h' a)
-  -> Hefty (h + h') a
-  -> Hefty h' a
-\end{lst}
-
-Because every computation is a hefty tree when this hypothetical \hs{elab'} function is used, we do not need to distinguish between free monads and hefty trees in Elaine's type system. This leads us to generalize the notion of effect rows to hefty trees.
-
-\section{Effect Rows from Hefty Trees}\label{sec:hoeffectrow}
-\newcommand\BB[1]{\left\llbracket\mcode{#1}\right\rrbracket}
-
-Recall the notation for effect rows introduced in \cref{chap:algebraic_effects}, which correspond to the free monad. Using the $\llbracket\cdot\rrbracket$ operator to represent the denotational semantics for types, the effect row notation would be defined as follows:
-\[
-  \BB{() -> e a}
-  \qquad=\qquad
-  \mcode{() -> Free}\ \BB{e}\ \BB{a}.
-\]
-To represent effect rows in Elaine, this concept has to be generalized to hefty trees. Therefore, Elaine's effect rows correspond to higher-order functors:
-\[
-  \BB{() -> e a}
-  \qquad=\qquad
-  \mcode{() -> Hefty}\ \BB{e}\ \BB{a}.
-\]
-%Algebraic effects need to be lifted to be represented in a hefty tree. So, 
-To include algebraic effects in this effect row, they have to be lifted. In Elaine, all higher-order effects are suffixed with \hs{!}, so all effects without an \el{!} suffix are lifted. Consequently, for some algebraic effect \el{A} and higher-order effect \el{H!}, the semantics for the effect row are given by:
-\[
-  \BB{() -> <A,H!> b}
-  \qquad=\qquad
-  \mcode{() -> Hefty (Lift}
-    \ \BB{A}
-    \ \mcode{+}
-    \ \BB{H}
-    \mcode{)}
-    \ \BB{b}.
-\]
-
-This concise notation is what Elaine uses for effect rows with both algebraic and higher-order effects.
+\caption{Definition, elaboration and use of the \hs{Reader} effect.}
+\label{fig:reader}
+\end{figure}

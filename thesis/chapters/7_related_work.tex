@@ -1,6 +1,6 @@
 \chapter{Related Work}\label{chap:related_work}
 
-This chapter discusses extensions to algebraic effects and alternatives to algebraic effects and hefty algebras. Additionally, we discuss some other languages with effects and the various alternative syntax and semantics.
+This chapter discusses extensions to algebraic effects and alternatives to algebraic effects and hefty algebras. Additionally, we discuss some other languages with algebraic effects.
 
 \section{Monad Transformers}\label{sec:monad_transformers}
 
@@ -59,8 +59,7 @@ let eScoped = elaboration ScopedEffect! -> AlgebraicEffect {
 %
 Scoped effects have been generalized by \textcite{oh_latent_2021} to \emph{latent effects}, which supports the same set of effects as hefty algebras. \textcite{bach_poulsen_hefty_2023} note that while latent effects are powerful, they require \emph{weaving glue} to ensure unhandled operations are treated correctly through sub-computations. In contrast, hefty algebras do not require any weaving.
 
-\section{Languages with First-Class Effects}
-\TODO{Define first-class effects much earlier in the thesis}
+\section{Languages with Native Support for Algebraic Effects}
 
 The motivation of adding support for effects to a programming language is twofold. First, it enables effects to be implemented into languages with type systems in which effects cannot be encoded as a free monad or a similar model. Second, built-in effects allow for more ergonomic and performant implementations. Naturally, the ergonomics of any given implementation are subjective, but we undeniably have more control over the syntax by adding effects to the language.
 
@@ -87,4 +86,4 @@ There are many libraries that implement the free monad in various forms in Haske
 
 Effect rows are often constructed using the \emph{Data Types à la Carte} technique \autocite{swierstra_data_2008}, which requires a fairly robust type system. Hence, many languages cannot encode effects within the language itself. In some languages, it is possible to work around the limitations with metaprogramming, such as the Rust library \lib{effin-mad}{https://github.com/rosefromthedead/effing-mad}, though the result does not integrate well with the rest of language and its use in production is strongly discouraged by the author.
 
-The programming language Idris \autocite{brady_programming_2013} also has an implementation of algebraic effects in its standard library. It is an interesting case study since Idris is a dependently typed language. Due to its dependent typing, it can distinguish multiple occurrences of a single effect in the same effect row by assigning them different \emph{labels}. This is similar to what \emph{named handlers} \autocite{xie_first-class_2022} aims to accomplish.
+The programming language Idris \autocite{brady_programming_2013} also has an implementation of algebraic effects in its standard library. It is an interesting case study since Idris is a dependently typed language. Due to its dependent typing, it can distinguish multiple occurrences of a single effect in the same effect row by assigning them different \emph{labels}. This is similar to what \emph{named handlers} \autocite{xie_first-class_2022} aim to accomplish.

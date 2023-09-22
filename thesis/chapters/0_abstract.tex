@@ -1,34 +1,35 @@
 \noindent
 %In recent years, algebraic effects and handlers have been integrated into programming languages.
 % Algebraic effects and handlers, an abstraction for effectful computation, have become more and more popular, with implementations in mainstream languages.
-Algebraic effects and handlers have become a popular abstraction for effectful computation, with implementations even in mainstream programming languages.
+\emph{Algebraic effects} and \emph{handlers} have become a popular abstraction for effectful computation, with implementations even in mainstream programming languages, such as OCaml.
 %
 %Using algebraic effects, the effect operations and handlers can be declared separately, which provides modularity. 
 %
 %With algebraic effects, effect operations can be declared separately from their corresponding effect handlers. This provides modularity, because these effect handlers can be changed without changing the program.
 %With algebraic effects, effect operations define an interface, which is implemented by effect handlers.
-The operations of an algebraic effect define an interface, which is implemented by an effect handler.
+%The operations of an algebraic effect define an interface, which is implemented by an effect handler.
+The operations of an algebraic effect define the syntax of the effect, while handlers define the semantics.
 %
 This provides modularity, because we can choose which handler to apply to a computation.
 %
-However, we cannot write handlers for many higher-order operations, which can therefore not enjoy this modularity.
+However, we cannot write handlers for many \emph{higher-order operations}; operations that take effectful computations as parameters. Such higher-order operations can therefore not enjoy this modularity.
 %
-Hefty algebras provide an additional layer of abstraction in the form of elaborations to make implementations of higher-order operations modular as well.
+\emph{Hefty algebras} provide an additional layer of abstraction in the form of \emph{elaborations} to make implementations of higher-order operations modular as well.
 %
 %At present, there are no programming languages with based on this theory yet.
 Several languages, such as Koka, natively support algebraic effects and handlers.
 %
 % However, there are no languages with support for elaborations of higher-order effects.
-However, until now, no languages have been created with native support for elaborations.
+However, until now, no languages have been created with native support for higher-order effects.
 %
 In this thesis, we introduce Elaine, a language featuring both handlers for algebraic effects and elaborations for higher-order effects.
 %
 %Additionally, we introduce the concept of implicit elaboration resolution, where the programmer does not have to specify which elaborations are applied, but the elaborations are instead inferred from the context.
-Additionally, we introduce implicit elaboration resolution; a type-directed procedure which infers the appropriate elaborations from context.
+Additionally, we introduce \emph{implicit elaboration resolution}; a type-directed procedure which infers the appropriate elaborations from context.
 %
 We conjecture that hefty algebras are the semantics for Elaine.
 %
 We provide a specification for Elaine, including its syntax definition, typing judgments and reduction semantics.
 %
-This specification is implemented in a prototype which can type check and evaluate the set of example programs included with this thesis.
+This specification is implemented in a publicly available prototype which can type check and evaluate the set of example programs included with this thesis.
 %
