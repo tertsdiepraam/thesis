@@ -18,3 +18,5 @@ desugaring
 mtl
 artifact
 Corbenic
+Effekt
+Eff
